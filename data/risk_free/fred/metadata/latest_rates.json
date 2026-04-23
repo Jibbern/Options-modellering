@@ -1,0 +1,38 @@
+{
+  "generated_at": "2026-04-22T15:39:20Z",
+  "source": "FRED",
+  "series": {
+    "DGS1MO": {
+      "series_id": "DGS1MO",
+      "matched_date": "2026-04-20",
+      "rate_percent": 3.69,
+      "rate_decimal": 0.0369,
+      "downloaded_at": "2026-04-22T15:39:18Z",
+      "source": "FRED"
+    },
+    "DGS3MO": {
+      "series_id": "DGS3MO",
+      "matched_date": "2026-04-20",
+      "rate_percent": 3.71,
+      "rate_decimal": 0.0371,
+      "downloaded_at": "2026-04-22T15:39:18Z",
+      "source": "FRED"
+    },
+    "DGS6MO": {
+      "series_id": "DGS6MO",
+      "matched_date": "2026-04-20",
+      "rate_percent": 3.72,
+      "rate_decimal": 0.037200000000000004,
+      "downloaded_at": "2026-04-22T15:39:18Z",
+      "source": "FRED"
+    },
+    "DGS1": {
+      "series_id": "DGS1",
+      "matched_date": "2026-04-20",
+      "rate_percent": 3.65,
+      "rate_decimal": 0.0365,
+      "downloaded_at": "2026-04-22T15:39:18Z",
+      "source": "FRED"
+    }
+  }
+}

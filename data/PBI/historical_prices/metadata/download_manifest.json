@@ -1,0 +1,33 @@
+{
+  "generated_at": "2026-04-22T15:39:21Z",
+  "ticker": "PBI",
+  "data_root": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\historical_prices",
+  "download_mode": "full_refresh",
+  "request_window": {
+    "start": "1990-01-01",
+    "end": "2026-04-22",
+    "full_refresh": false,
+    "resolved_mode": "full_refresh"
+  },
+  "raw_files": [
+    "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\historical_prices\\raw\\nasdaq_pbi_historical_20260422T153918Z.json"
+  ],
+  "normalized_files": {
+    "csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\historical_prices\\normalized\\pbi_daily_prices.csv",
+    "parquet": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\historical_prices\\normalized\\pbi_daily_prices.parquet",
+    "parquet_written": true,
+    "parquet_note": null
+  },
+  "merged_files": {
+    "csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\historical_prices\\merged\\pbi_daily_prices_merged.csv",
+    "parquet": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\historical_prices\\merged\\pbi_daily_prices_merged.parquet",
+    "parquet_written": true,
+    "parquet_note": null
+  },
+  "source_notes": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\historical_prices\\metadata\\source_notes.json",
+  "row_count": 2514,
+  "non_null_close_row_count": 2514,
+  "min_date": "2016-04-21",
+  "max_date": "2026-04-21",
+  "latest_close_date": "2026-04-21"
+}

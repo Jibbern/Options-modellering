@@ -1,0 +1,2 @@
+ticker,snapshot_date,dividend_yield,expected_dividend_date,source,source_url,acquisition_method,notes,registered_at
+GPRE,2026-04-12,0.0,,synthetic_demo,local_demo_fixture,manual_demo,Synthetic demo dividend assumption used only to validate metadata resolution.,2026-04-12T16:27:57Z

@@ -1,0 +1,23 @@
+{
+  "ticker": "SPY",
+  "primary_source": "ibkr",
+  "policy": {
+    "delayed_only": true,
+    "allowed_market_data_modes": [
+      "delayed",
+      "delayed_frozen"
+    ],
+    "forbidden_market_data_modes": [
+      "live",
+      "frozen",
+      "regulatory_snapshot"
+    ]
+  },
+  "last_run": {
+    "type": "chain",
+    "status": "failed",
+    "market_data_mode": "delayed",
+    "error": "At least one chain row is required.",
+    "warnings": []
+  }
+}

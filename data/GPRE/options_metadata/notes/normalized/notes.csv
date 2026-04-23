@@ -1,0 +1,3 @@
+ticker,note_date,category,title,body,source,source_url,acquisition_method,notes,registered_at
+GPRE,2026-04-10,risk,Synthetic risk note,Synthetic demo risk note for local catalog validation.,synthetic_demo,local_demo_fixture,manual_demo,Not real market research.,2026-04-12T16:28:01Z
+GPRE,2026-04-11,thesis,Synthetic thesis note,Synthetic demo note used to verify report and CLI integration.,synthetic_demo,local_demo_fixture,manual_demo,Not real market research.,2026-04-12T16:28:01Z

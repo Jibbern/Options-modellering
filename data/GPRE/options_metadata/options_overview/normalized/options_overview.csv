@@ -1,0 +1,2 @@
+ticker,snapshot_date,implied_volatility,historic_volatility,iv_rank,iv_percentile,iv_hv_ratio,put_call_volume_ratio,put_call_open_interest_ratio,total_call_volume,total_put_volume,total_call_open_interest,total_put_open_interest,earnings_date,source,source_url,acquisition_method,notes,registered_at
+GPRE,2026-04-12,0.61,0.44,0.72,0.76,1.39,0.84,0.91,1420.0,1195.0,18240.0,16620.0,2026-04-16,synthetic_demo,local_demo_fixture,manual_demo,Synthetic demo options-overview context for validation only.,2026-04-12T16:27:50Z

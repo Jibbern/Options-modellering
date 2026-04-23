@@ -1,0 +1,102 @@
+{
+  "generated_at": "2026-04-14T11:14:01Z",
+  "ticker": "GPRE",
+  "chain_snapshots": [
+    {
+      "file_path": "data\\GPRE\\option_chains\\gpre-options-exp-2026-04-17-monthly-near-the-money-stacked-04-12-2026.csv",
+      "storage_location": "preferred_option_chains",
+      "snapshot_date": "2026-04-12",
+      "expiry_date": "2026-04-17",
+      "has_sidecar_metadata": true
+    },
+    {
+      "file_path": "data\\GPRE\\option_chains\\gpre-options-exp-2026-05-15-monthly-show-all-stacked-04-13-2026.csv",
+      "storage_location": "preferred_option_chains",
+      "snapshot_date": "2026-04-13",
+      "expiry_date": "2026-05-15",
+      "has_sidecar_metadata": false
+    },
+    {
+      "file_path": "data\\GPRE\\option_chains\\gpre-options-exp-2026-06-18-monthly-show-all-stacked-04-14-2026.csv",
+      "storage_location": "preferred_option_chains",
+      "snapshot_date": "2026-04-14",
+      "expiry_date": "2026-06-18",
+      "has_sidecar_metadata": false
+    }
+  ],
+  "chain_snapshot_count": 3,
+  "datasets": {
+    "expected_move": {
+      "dataset": "expected_move",
+      "row_count": 1,
+      "coverage_dates": [
+        "2026-04-12"
+      ],
+      "min_date": "2026-04-12",
+      "max_date": "2026-04-12",
+      "sources": [
+        "synthetic_demo"
+      ],
+      "manifest_path": "data\\GPRE\\options_metadata\\expected_move\\metadata\\expected_move_manifest.json",
+      "expiry_dates": [
+        "2026-04-17"
+      ]
+    },
+    "options_overview": {
+      "dataset": "options_overview",
+      "row_count": 1,
+      "coverage_dates": [
+        "2026-04-12"
+      ],
+      "min_date": "2026-04-12",
+      "max_date": "2026-04-12",
+      "sources": [
+        "synthetic_demo"
+      ],
+      "manifest_path": "data\\GPRE\\options_metadata\\options_overview\\metadata\\options_overview_manifest.json"
+    },
+    "events": {
+      "dataset": "events",
+      "row_count": 1,
+      "coverage_dates": [
+        "2026-04-16"
+      ],
+      "min_date": "2026-04-16",
+      "max_date": "2026-04-16",
+      "sources": [
+        "synthetic_demo"
+      ],
+      "manifest_path": "data\\GPRE\\options_metadata\\events\\metadata\\events_manifest.json",
+      "event_types": [
+        "earnings"
+      ]
+    },
+    "dividends": {
+      "dataset": "dividends",
+      "row_count": 1,
+      "coverage_dates": [
+        "2026-04-12"
+      ],
+      "min_date": "2026-04-12",
+      "max_date": "2026-04-12",
+      "sources": [
+        "synthetic_demo"
+      ],
+      "manifest_path": "data\\GPRE\\options_metadata\\dividends\\metadata\\dividends_manifest.json"
+    },
+    "notes": {
+      "dataset": "notes",
+      "row_count": 2,
+      "coverage_dates": [
+        "2026-04-10",
+        "2026-04-11"
+      ],
+      "min_date": "2026-04-10",
+      "max_date": "2026-04-11",
+      "sources": [
+        "synthetic_demo"
+      ],
+      "manifest_path": "data\\GPRE\\options_metadata\\notes\\metadata\\notes_manifest.json"
+    }
+  }
+}

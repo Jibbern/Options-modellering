@@ -1,0 +1,14 @@
+{
+  "ticker": "GPRE",
+  "snapshot_date": "2026-04-19",
+  "snapshot_time": "21:08:17",
+  "expiry_date": "2028-01-21",
+  "spot_price": null,
+  "spot_price_source": "ibkr_delayed",
+  "source": "ibkr",
+  "market_data_mode": "delayed",
+  "snapshot_scope": "filtered_slice",
+  "storage_location": "ibkr_chain_snapshot",
+  "quote_count": 16,
+  "strike_count": 8
+}

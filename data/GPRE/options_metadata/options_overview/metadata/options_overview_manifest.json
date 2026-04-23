@@ -1,0 +1,22 @@
+{
+  "generated_at": "2026-04-12T16:27:50Z",
+  "ticker": "GPRE",
+  "dataset": "options_overview",
+  "data_root": "data\\GPRE\\options_metadata\\options_overview",
+  "raw_file": "data\\GPRE\\options_metadata\\options_overview\\raw\\gpre_options_overview_demo.json",
+  "normalized_files": {
+    "csv": "data\\GPRE\\options_metadata\\options_overview\\normalized\\options_overview.csv",
+    "parquet": "data\\GPRE\\options_metadata\\options_overview\\normalized\\options_overview.parquet",
+    "parquet_written": true,
+    "parquet_note": null
+  },
+  "row_count": 1,
+  "sources": [
+    "synthetic_demo"
+  ],
+  "coverage_dates": [
+    "2026-04-12"
+  ],
+  "min_date": "2026-04-12",
+  "max_date": "2026-04-12"
+}

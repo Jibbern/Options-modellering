@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.playwright-cli/
+.tmp_http_*.txt
+.tmp_test_runs/
+analysis_outputs/
+model_outputs/
+Dashboards/
+dashboards/
+analysis_outputs/_staging/
+analysis_outputs/tests/
+analysis_outputs/tests_data/

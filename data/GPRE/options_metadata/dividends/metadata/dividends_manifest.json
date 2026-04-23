@@ -1,0 +1,22 @@
+{
+  "generated_at": "2026-04-12T16:27:57Z",
+  "ticker": "GPRE",
+  "dataset": "dividends",
+  "data_root": "data\\GPRE\\options_metadata\\dividends",
+  "raw_file": "data\\GPRE\\options_metadata\\dividends\\raw\\gpre_dividends_demo.json",
+  "normalized_files": {
+    "csv": "data\\GPRE\\options_metadata\\dividends\\normalized\\dividends.csv",
+    "parquet": "data\\GPRE\\options_metadata\\dividends\\normalized\\dividends.parquet",
+    "parquet_written": true,
+    "parquet_note": null
+  },
+  "row_count": 1,
+  "sources": [
+    "synthetic_demo"
+  ],
+  "coverage_dates": [
+    "2026-04-12"
+  ],
+  "min_date": "2026-04-12",
+  "max_date": "2026-04-12"
+}

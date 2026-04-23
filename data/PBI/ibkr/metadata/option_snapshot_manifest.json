@@ -1,0 +1,1477 @@
+{
+  "generated_at": "2026-04-22T23:29:17Z",
+  "ticker": "PBI",
+  "market_data_mode": "delayed",
+  "request": {
+    "timestamp": "2026-04-22T23:16:43Z",
+    "connection": {
+      "host": "127.0.0.1",
+      "port": 7496,
+      "client_id": 72
+    }
+  },
+  "raw_json": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\ibkr\\snapshots\\option_quotes\\raw\\ibkr_pbi_options_exp_multi_20260422T231643Z_delayed.json",
+  "normalized_files": {
+    "csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_pbi_options_exp_multi_20260422T231643Z_delayed.csv",
+    "parquet": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_pbi_options_exp_multi_20260422T231643Z_delayed.parquet",
+    "parquet_written": true,
+    "parquet_note": null
+  },
+  "chain_slice_files": [
+    "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_pbi_options_exp_2026-05-15_20260422T231643Z_delayed.csv",
+    "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_pbi_options_exp_2026-06-18_20260422T231643Z_delayed.csv",
+    "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_pbi_options_exp_2026-07-17_20260422T231643Z_delayed.csv",
+    "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_pbi_options_exp_2026-10-16_20260422T231643Z_delayed.csv",
+    "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_pbi_options_exp_2027-01-15_20260422T231643Z_delayed.csv",
+    "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_pbi_options_exp_2028-01-21_20260422T231643Z_delayed.csv"
+  ],
+  "request_filters": {
+    "requested_expiries": [
+      "2026-05-15",
+      "2026-06-18",
+      "2026-07-17",
+      "2026-10-16",
+      "2027-01-15",
+      "2028-01-21"
+    ],
+    "requested_right": "both",
+    "requested_min_strike": null,
+    "requested_max_strike": null,
+    "requested_strikes": [],
+    "around_spot": null,
+    "max_contracts": null,
+    "requested_expiry_exists": null,
+    "available_expiries": [],
+    "nearest_expiries": [],
+    "available_strike_count": 0,
+    "available_strike_sample": [],
+    "spot_price_used": null,
+    "around_spot_skipped_reason": null,
+    "row_counts": {
+      "final_selected_contracts": 348
+    },
+    "selected_contracts": [],
+    "failure_stage": null
+  },
+  "snapshot_scope": "full_chain",
+  "storage_location": "ibkr_full_quoted_snapshot",
+  "discovered_expiries": [
+    "2026-05-15",
+    "2026-06-18",
+    "2026-07-17",
+    "2026-10-16",
+    "2027-01-15",
+    "2028-01-21"
+  ],
+  "strike_count_by_expiry": {
+    "2026-05-15": 29,
+    "2026-06-18": 29,
+    "2026-07-17": 29,
+    "2026-10-16": 29,
+    "2027-01-15": 29,
+    "2028-01-21": 29
+  },
+  "attempted_contract_count": 348,
+  "persisted_quote_count": 348,
+  "coverage_summary": {
+    "contract_count": 348,
+    "overall": {
+      "bid": {
+        "available_count": 0,
+        "missing_count": 348,
+        "coverage_pct": 0.0
+      },
+      "ask": {
+        "available_count": 0,
+        "missing_count": 348,
+        "coverage_pct": 0.0
+      },
+      "implied_volatility": {
+        "available_count": 22,
+        "missing_count": 326,
+        "coverage_pct": 6.3
+      },
+      "volume": {
+        "available_count": 0,
+        "missing_count": 348,
+        "coverage_pct": 0.0
+      },
+      "open_interest": {
+        "available_count": 0,
+        "missing_count": 348,
+        "coverage_pct": 0.0
+      }
+    },
+    "by_expiry": {
+      "2026-05-15": {
+        "contract_count": 58,
+        "bid": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "ask": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "implied_volatility": {
+          "available_count": 13,
+          "missing_count": 45,
+          "coverage_pct": 22.4
+        },
+        "volume": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "open_interest": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        }
+      },
+      "2026-06-18": {
+        "contract_count": 58,
+        "bid": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "ask": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "implied_volatility": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "volume": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "open_interest": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        }
+      },
+      "2026-07-17": {
+        "contract_count": 58,
+        "bid": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "ask": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "implied_volatility": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "volume": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "open_interest": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        }
+      },
+      "2026-10-16": {
+        "contract_count": 58,
+        "bid": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "ask": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "implied_volatility": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "volume": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "open_interest": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        }
+      },
+      "2027-01-15": {
+        "contract_count": 58,
+        "bid": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "ask": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "implied_volatility": {
+          "available_count": 5,
+          "missing_count": 53,
+          "coverage_pct": 8.6
+        },
+        "volume": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "open_interest": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        }
+      },
+      "2028-01-21": {
+        "contract_count": 58,
+        "bid": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "ask": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "implied_volatility": {
+          "available_count": 4,
+          "missing_count": 54,
+          "coverage_pct": 6.9
+        },
+        "volume": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "open_interest": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        }
+      }
+    }
+  },
+  "field_availability": {
+    "missing_fields": [
+      "ask",
+      "bid",
+      "implied_volatility",
+      "last",
+      "open_interest"
+    ],
+    "missing_field_counts": {
+      "ask": 348,
+      "bid": 348,
+      "implied_volatility": 326,
+      "last": 348,
+      "open_interest": 348
+    },
+    "warnings": [
+      "Delayed field availability was partial for this request: missing ask, bid, implied_volatility, last, open_interest.",
+      "Delayed field availability was partial for this request: missing ask, bid, last, open_interest.",
+      "IBKR did not confirm delayed or delayed-frozen market data for this request.",
+      "No security definition has been found for the request",
+      "Part of requested market data requires additional subscription for API. See link in 'Market Data Connections' dialog for more details.PBI NYSE/TOP/ALL",
+      "Requested market data is not subscribed. Displaying delayed market data."
+    ]
+  },
+  "row_count": 348,
+  "expiries": [
+    "2026-05-15",
+    "2026-06-18",
+    "2026-07-17",
+    "2026-10-16",
+    "2027-01-15",
+    "2028-01-21"
+  ],
+  "diagnostics": {
+    "underlying_snapshot": {
+      "ticker": "PBI",
+      "snapshot_timestamp": "2026-04-22T23:16:33Z",
+      "market_data_mode": "delayed",
+      "market_data_type_code": null,
+      "bid": null,
+      "ask": null,
+      "last": null,
+      "close": null,
+      "mid": null,
+      "mark": null,
+      "exchange": "SMART",
+      "primary_exchange": null,
+      "currency": "USD",
+      "source": "ibkr",
+      "warnings": [
+        "Delayed field availability was partial for this request: missing ask, bid, close, last.",
+        "IBKR did not confirm delayed or delayed-frozen market data for this request.",
+        "Requested market data requires additional subscription for API. See link in 'Market Data Connections' dialog for more details.PBI NYSE/TOP/ALL"
+      ],
+      "missing_fields": [
+        "bid",
+        "ask",
+        "last",
+        "close"
+      ]
+    },
+    "resolved_underlying": {
+      "conid": 10920,
+      "symbol": "PBI",
+      "sec_type": "STK",
+      "currency": "USD",
+      "exchange": "SMART",
+      "primary_exchange": "NYSE",
+      "local_symbol": "PBI",
+      "trading_class": "PBI",
+      "multiplier": null
+    },
+    "chain_diagnostics": {
+      "requested": {
+        "ticker": "PBI",
+        "exchange": "SMART",
+        "currency": "USD",
+        "market_data_mode": "delayed",
+        "include_all_exchanges": false
+      },
+      "resolved_underlying": {
+        "conid": 10920,
+        "symbol": "PBI",
+        "sec_type": "STK",
+        "currency": "USD",
+        "exchange": "SMART",
+        "primary_exchange": "NYSE",
+        "local_symbol": "PBI",
+        "trading_class": "PBI",
+        "multiplier": null
+      },
+      "raw_option_parameter_rows": [
+        {
+          "exchange": "MERCURY",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "EDGX",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "CBOE",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "MIAX",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "ISE",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "NASDAQBX",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "SMART",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "AMEX",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "BATS",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "NASDAQOM",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "IBUSOPT",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "PSE",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "EMERALD",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "PHLX",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "MEMX",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "SAPPHIRE",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "BOX",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "CBOE2",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "GEMINI",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        },
+        {
+          "exchange": "PEARL",
+          "underlying_conid": 10920,
+          "trading_class": "PBI",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260717",
+            "20261016",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            29.0
+          ]
+        }
+      ],
+      "raw_exchanges_seen": [
+        "AMEX",
+        "BATS",
+        "BOX",
+        "CBOE",
+        "CBOE2",
+        "EDGX",
+        "EMERALD",
+        "GEMINI",
+        "IBUSOPT",
+        "ISE",
+        "MEMX",
+        "MERCURY",
+        "MIAX",
+        "NASDAQBX",
+        "NASDAQOM",
+        "PEARL",
+        "PHLX",
+        "PSE",
+        "SAPPHIRE",
+        "SMART"
+      ],
+      "raw_trading_classes_seen": [
+        "PBI"
+      ],
+      "available_expiries": [
+        "2026-05-15",
+        "2026-06-18",
+        "2026-07-17",
+        "2026-10-16",
+        "2027-01-15",
+        "2028-01-21"
+      ],
+      "available_strike_count": 29,
+      "available_strike_sample": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0
+      ],
+      "row_counts": {
+        "raw_opt_param_rows": 20,
+        "after_underlying_selection": 20,
+        "after_exchange_filter": 1,
+        "after_trading_class_filter": 1,
+        "after_expiry_strike_normalization": 348,
+        "final_chain_rows": 348
+      },
+      "selected_exchange": "SMART",
+      "failure_stage": null
+    },
+    "contract_match": {
+      "requested_expiries": [
+        "2026-05-15",
+        "2026-06-18",
+        "2026-07-17",
+        "2026-10-16",
+        "2027-01-15",
+        "2028-01-21"
+      ],
+      "requested_right": "both",
+      "requested_min_strike": null,
+      "requested_max_strike": null,
+      "requested_strikes": [],
+      "around_spot": null,
+      "max_contracts": null,
+      "requested_expiry_exists": null,
+      "available_expiries": [],
+      "nearest_expiries": [],
+      "available_strike_count": 0,
+      "available_strike_sample": [],
+      "spot_price_used": null,
+      "around_spot_skipped_reason": null,
+      "row_counts": {
+        "final_selected_contracts": 348
+      },
+      "selected_contracts": [],
+      "failure_stage": null
+    },
+    "snapshot_scope": "full_chain",
+    "discovered_expiries": [
+      "2026-05-15",
+      "2026-06-18",
+      "2026-07-17",
+      "2026-10-16",
+      "2027-01-15",
+      "2028-01-21"
+    ],
+    "strike_count_by_expiry": {
+      "2026-05-15": 29,
+      "2026-06-18": 29,
+      "2026-07-17": 29,
+      "2026-10-16": 29,
+      "2027-01-15": 29,
+      "2028-01-21": 29
+    },
+    "attempted_contract_count": 348,
+    "selected_contract_count": 348,
+    "final_selected_expiries": [
+      "2026-05-15",
+      "2026-06-18",
+      "2026-07-17",
+      "2026-10-16",
+      "2027-01-15",
+      "2028-01-21"
+    ],
+    "final_selected_strikes": [
+      1.0,
+      2.0,
+      3.0,
+      4.0,
+      5.0,
+      6.0,
+      7.0,
+      8.0,
+      9.0,
+      10.0,
+      11.0,
+      12.0,
+      13.0,
+      14.0,
+      15.0,
+      16.0,
+      17.0,
+      18.0,
+      19.0,
+      20.0,
+      21.0,
+      22.0,
+      23.0,
+      24.0,
+      25.0,
+      26.0,
+      27.0,
+      28.0,
+      29.0
+    ],
+    "final_selected_exchanges": [
+      "SMART"
+    ],
+    "final_selected_trading_classes": [
+      "PBI"
+    ],
+    "delayed_field_summary": {
+      "missing_fields": [
+        "ask",
+        "bid",
+        "implied_volatility",
+        "last",
+        "open_interest"
+      ],
+      "missing_field_counts": {
+        "ask": 348,
+        "bid": 348,
+        "implied_volatility": 326,
+        "last": 348,
+        "open_interest": 348
+      },
+      "warnings": [
+        "Delayed field availability was partial for this request: missing ask, bid, implied_volatility, last, open_interest.",
+        "Delayed field availability was partial for this request: missing ask, bid, last, open_interest.",
+        "IBKR did not confirm delayed or delayed-frozen market data for this request.",
+        "No security definition has been found for the request",
+        "Part of requested market data requires additional subscription for API. See link in 'Market Data Connections' dialog for more details.PBI NYSE/TOP/ALL",
+        "Requested market data is not subscribed. Displaying delayed market data."
+      ],
+      "effective_market_data_types": [
+        3
+      ],
+      "coverage_summary": {
+        "contract_count": 348,
+        "overall": {
+          "bid": {
+            "available_count": 0,
+            "missing_count": 348,
+            "coverage_pct": 0.0
+          },
+          "ask": {
+            "available_count": 0,
+            "missing_count": 348,
+            "coverage_pct": 0.0
+          },
+          "implied_volatility": {
+            "available_count": 22,
+            "missing_count": 326,
+            "coverage_pct": 6.3
+          },
+          "volume": {
+            "available_count": 0,
+            "missing_count": 348,
+            "coverage_pct": 0.0
+          },
+          "open_interest": {
+            "available_count": 0,
+            "missing_count": 348,
+            "coverage_pct": 0.0
+          }
+        }
+      }
+    },
+    "failure_stage": null
+  }
+}

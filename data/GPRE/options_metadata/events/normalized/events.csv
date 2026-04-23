@@ -1,0 +1,2 @@
+ticker,event_date,event_time,event_type,source,source_url,acquisition_method,notes,registered_at
+GPRE,2026-04-16,after_close,earnings,synthetic_demo,local_demo_fixture,manual_demo,Synthetic earnings event for validating nearest-event report integration.,2026-04-12T16:27:54Z

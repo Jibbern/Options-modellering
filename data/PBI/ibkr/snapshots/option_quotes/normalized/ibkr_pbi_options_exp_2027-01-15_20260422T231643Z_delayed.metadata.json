@@ -1,0 +1,14 @@
+{
+  "ticker": "PBI",
+  "snapshot_date": "2026-04-22",
+  "snapshot_time": "23:16:43",
+  "expiry_date": "2027-01-15",
+  "spot_price": 15.225000000000001,
+  "spot_price_source": "ibkr_delayed",
+  "source": "ibkr",
+  "market_data_mode": "delayed",
+  "snapshot_scope": "full_chain",
+  "storage_location": "ibkr_full_quoted_snapshot",
+  "quote_count": 58,
+  "strike_count": 29
+}

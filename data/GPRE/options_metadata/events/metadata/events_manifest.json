@@ -1,0 +1,25 @@
+{
+  "generated_at": "2026-04-12T16:27:54Z",
+  "ticker": "GPRE",
+  "dataset": "events",
+  "data_root": "data\\GPRE\\options_metadata\\events",
+  "raw_file": "data\\GPRE\\options_metadata\\events\\raw\\gpre_events_demo.json",
+  "normalized_files": {
+    "csv": "data\\GPRE\\options_metadata\\events\\normalized\\events.csv",
+    "parquet": "data\\GPRE\\options_metadata\\events\\normalized\\events.parquet",
+    "parquet_written": true,
+    "parquet_note": null
+  },
+  "row_count": 1,
+  "sources": [
+    "synthetic_demo"
+  ],
+  "coverage_dates": [
+    "2026-04-16"
+  ],
+  "min_date": "2026-04-16",
+  "max_date": "2026-04-16",
+  "event_types": [
+    "earnings"
+  ]
+}

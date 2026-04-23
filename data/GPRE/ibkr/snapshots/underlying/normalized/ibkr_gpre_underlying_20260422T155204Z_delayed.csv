@@ -1,0 +1,2 @@
+ticker,snapshot_timestamp,market_data_mode,market_data_type_code,bid,ask,last,close,mid,mark,exchange,primary_exchange,currency,source,warnings,missing_fields
+GPRE,2026-04-22T15:52:04Z,delayed,,,,,,,,SMART,,USD,ibkr,"['Delayed field availability was partial for this request: missing ask, bid, close, last.', 'IBKR did not confirm delayed or delayed-frozen market data for this request.', ""Requested market data requires additional subscription for API. See link in 'Market Data Connections' dialog for more details.GPRE NASDAQ.NMS/TOP/ALL""]","['bid', 'ask', 'last', 'close']"

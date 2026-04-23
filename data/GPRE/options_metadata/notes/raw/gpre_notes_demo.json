@@ -1,0 +1,24 @@
+[
+  {
+    "ticker": "GPRE",
+    "note_date": "2026-04-11",
+    "category": "thesis",
+    "title": "Synthetic thesis note",
+    "body": "Synthetic demo note used to verify report and CLI integration.",
+    "source": "synthetic_demo",
+    "source_url": "local_demo_fixture",
+    "acquisition_method": "manual_demo",
+    "notes": "Not real market research."
+  },
+  {
+    "ticker": "GPRE",
+    "note_date": "2026-04-10",
+    "category": "risk",
+    "title": "Synthetic risk note",
+    "body": "Synthetic demo risk note for local catalog validation.",
+    "source": "synthetic_demo",
+    "source_url": "local_demo_fixture",
+    "acquisition_method": "manual_demo",
+    "notes": "Not real market research."
+  }
+]

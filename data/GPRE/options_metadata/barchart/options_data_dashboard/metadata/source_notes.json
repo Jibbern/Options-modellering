@@ -1,0 +1,11 @@
+{
+  "ticker": "GPRE",
+  "source": "barchart",
+  "artifact_type": "options_data_dashboard_image",
+  "notes": [
+    "Options Data Dashboard images are optional reference assets only.",
+    "They are not parsed as machine-readable pricing inputs.",
+    "Manual registration is the stable primary path.",
+    "The automated downloader is best-effort and may stop working if Barchart changes page behavior or blocks requests."
+  ]
+}

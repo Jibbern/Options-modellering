@@ -1,0 +1,22 @@
+{
+  "ticker": "AAPL",
+  "primary_source": "ibkr",
+  "policy": {
+    "delayed_only": true,
+    "allowed_market_data_modes": [
+      "delayed",
+      "delayed_frozen"
+    ],
+    "forbidden_market_data_modes": [
+      "live",
+      "frozen",
+      "regulatory_snapshot"
+    ]
+  },
+  "last_run": {
+    "type": "option_snapshot",
+    "timestamp": "2026-04-19T21:09:08Z",
+    "market_data_mode": "delayed",
+    "row_count": 10
+  }
+}

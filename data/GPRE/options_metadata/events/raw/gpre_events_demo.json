@@ -1,0 +1,12 @@
+[
+  {
+    "ticker": "GPRE",
+    "event_date": "2026-04-16",
+    "event_time": "after_close",
+    "event_type": "earnings",
+    "source": "synthetic_demo",
+    "source_url": "local_demo_fixture",
+    "acquisition_method": "manual_demo",
+    "notes": "Synthetic earnings event for validating nearest-event report integration."
+  }
+]

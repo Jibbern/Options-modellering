@@ -1,0 +1,2 @@
+ticker,snapshot_date,expiry_date,expected_move_abs,expected_move_pct,lower_bound,upper_bound,implied_volatility,source,source_url,acquisition_method,notes,registered_at
+GPRE,2026-04-12,2026-04-17,1.8,0.118,13.45,17.05,0.61,synthetic_demo,local_demo_fixture,manual_demo,Synthetic demo data for validating the local research-metadata store.,2026-04-12T16:27:46Z

@@ -1,0 +1,132 @@
+{
+  "generated_at": "2026-04-22T22:24:45Z",
+  "ticker": "PBI",
+  "chain_snapshots": [
+    {
+      "file_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_pbi_options_exp_2026-05-15_20260422T155411Z_delayed.csv",
+      "storage_location": "ibkr_full_quoted_snapshot",
+      "snapshot_scope": "full_chain",
+      "snapshot_date": "2026-04-22",
+      "expiry_date": "2026-05-15",
+      "has_sidecar_metadata": true,
+      "contract_count": 58,
+      "usable_quote_count": 0,
+      "usable_quote_coverage_pct": 0.0,
+      "quote_usable": false,
+      "quote_usability_gate_pct": 20.0
+    },
+    {
+      "file_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_pbi_options_exp_2026-06-18_20260422T155411Z_delayed.csv",
+      "storage_location": "ibkr_full_quoted_snapshot",
+      "snapshot_scope": "full_chain",
+      "snapshot_date": "2026-04-22",
+      "expiry_date": "2026-06-18",
+      "has_sidecar_metadata": true,
+      "contract_count": 58,
+      "usable_quote_count": 0,
+      "usable_quote_coverage_pct": 0.0,
+      "quote_usable": false,
+      "quote_usability_gate_pct": 20.0
+    },
+    {
+      "file_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_pbi_options_exp_2026-07-17_20260422T155411Z_delayed.csv",
+      "storage_location": "ibkr_full_quoted_snapshot",
+      "snapshot_scope": "full_chain",
+      "snapshot_date": "2026-04-22",
+      "expiry_date": "2026-07-17",
+      "has_sidecar_metadata": true,
+      "contract_count": 58,
+      "usable_quote_count": 0,
+      "usable_quote_coverage_pct": 0.0,
+      "quote_usable": false,
+      "quote_usability_gate_pct": 20.0
+    },
+    {
+      "file_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_pbi_options_exp_2026-10-16_20260422T155411Z_delayed.csv",
+      "storage_location": "ibkr_full_quoted_snapshot",
+      "snapshot_scope": "full_chain",
+      "snapshot_date": "2026-04-22",
+      "expiry_date": "2026-10-16",
+      "has_sidecar_metadata": true,
+      "contract_count": 58,
+      "usable_quote_count": 0,
+      "usable_quote_coverage_pct": 0.0,
+      "quote_usable": false,
+      "quote_usability_gate_pct": 20.0
+    },
+    {
+      "file_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_pbi_options_exp_2027-01-15_20260422T155411Z_delayed.csv",
+      "storage_location": "ibkr_full_quoted_snapshot",
+      "snapshot_scope": "full_chain",
+      "snapshot_date": "2026-04-22",
+      "expiry_date": "2027-01-15",
+      "has_sidecar_metadata": true,
+      "contract_count": 58,
+      "usable_quote_count": 0,
+      "usable_quote_coverage_pct": 0.0,
+      "quote_usable": false,
+      "quote_usability_gate_pct": 20.0
+    },
+    {
+      "file_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_pbi_options_exp_2028-01-21_20260422T155411Z_delayed.csv",
+      "storage_location": "ibkr_full_quoted_snapshot",
+      "snapshot_scope": "full_chain",
+      "snapshot_date": "2026-04-22",
+      "expiry_date": "2028-01-21",
+      "has_sidecar_metadata": true,
+      "contract_count": 58,
+      "usable_quote_count": 0,
+      "usable_quote_coverage_pct": 0.0,
+      "quote_usable": false,
+      "quote_usability_gate_pct": 20.0
+    }
+  ],
+  "chain_snapshot_count": 6,
+  "datasets": {
+    "expected_move": {
+      "dataset": "expected_move",
+      "row_count": 0,
+      "coverage_dates": [],
+      "min_date": null,
+      "max_date": null,
+      "sources": [],
+      "manifest_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\options_metadata\\expected_move\\metadata\\expected_move_manifest.json"
+    },
+    "options_overview": {
+      "dataset": "options_overview",
+      "row_count": 0,
+      "coverage_dates": [],
+      "min_date": null,
+      "max_date": null,
+      "sources": [],
+      "manifest_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\options_metadata\\options_overview\\metadata\\options_overview_manifest.json"
+    },
+    "events": {
+      "dataset": "events",
+      "row_count": 0,
+      "coverage_dates": [],
+      "min_date": null,
+      "max_date": null,
+      "sources": [],
+      "manifest_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\options_metadata\\events\\metadata\\events_manifest.json"
+    },
+    "dividends": {
+      "dataset": "dividends",
+      "row_count": 0,
+      "coverage_dates": [],
+      "min_date": null,
+      "max_date": null,
+      "sources": [],
+      "manifest_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\options_metadata\\dividends\\metadata\\dividends_manifest.json"
+    },
+    "notes": {
+      "dataset": "notes",
+      "row_count": 0,
+      "coverage_dates": [],
+      "min_date": null,
+      "max_date": null,
+      "sources": [],
+      "manifest_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\options_metadata\\notes\\metadata\\notes_manifest.json"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "ticker": "GPRE",
+    "snapshot_date": "2026-04-12",
+    "implied_volatility": 0.61,
+    "historic_volatility": 0.44,
+    "iv_rank": 0.72,
+    "iv_percentile": 0.76,
+    "iv_hv_ratio": 1.39,
+    "put_call_volume_ratio": 0.84,
+    "put_call_open_interest_ratio": 0.91,
+    "total_call_volume": 1420,
+    "total_put_volume": 1195,
+    "total_call_open_interest": 18240,
+    "total_put_open_interest": 16620,
+    "earnings_date": "2026-04-16",
+    "source": "synthetic_demo",
+    "source_url": "local_demo_fixture",
+    "acquisition_method": "manual_demo",
+    "notes": "Synthetic demo options-overview context for validation only."
+  }
+]

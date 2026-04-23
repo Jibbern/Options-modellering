@@ -1,0 +1,2 @@
+ticker,snapshot_timestamp,market_data_mode,market_data_type_code,bid,ask,last,close,mid,mark,exchange,primary_exchange,currency,source,warnings,missing_fields
+GPRE,2026-04-17T18:23:07Z,delayed,3,,,,,,,SMART,,USD,ibkr,"['Delayed field availability was partial for this request: missing ask, bid, close, last.', 'Requested market data is not subscribed. Displaying delayed market data.']","['bid', 'ask', 'last', 'close']"

@@ -1,0 +1,1473 @@
+{
+  "generated_at": "2026-04-22T15:53:47Z",
+  "ticker": "GPRE",
+  "status": "succeeded",
+  "request_type": "full_chain_snapshot",
+  "market_data_mode": "delayed",
+  "request": {
+    "connection": {
+      "host": "127.0.0.1",
+      "port": 7496,
+      "client_id": 71
+    }
+  },
+  "snapshot_scope": "full_chain",
+  "discovered_expiries": [
+    "2026-05-15",
+    "2026-06-18",
+    "2026-09-18",
+    "2026-12-18",
+    "2027-01-15",
+    "2028-01-21"
+  ],
+  "strike_count_by_expiry": {
+    "2026-05-15": 29,
+    "2026-06-18": 29,
+    "2026-09-18": 29,
+    "2026-12-18": 29,
+    "2027-01-15": 29,
+    "2028-01-21": 29
+  },
+  "attempted_contract_count": 348,
+  "persisted_quote_count": 348,
+  "coverage_summary": {
+    "contract_count": 348,
+    "overall": {
+      "bid": {
+        "available_count": 0,
+        "missing_count": 348,
+        "coverage_pct": 0.0
+      },
+      "ask": {
+        "available_count": 0,
+        "missing_count": 348,
+        "coverage_pct": 0.0
+      },
+      "implied_volatility": {
+        "available_count": 238,
+        "missing_count": 110,
+        "coverage_pct": 68.4
+      },
+      "volume": {
+        "available_count": 0,
+        "missing_count": 348,
+        "coverage_pct": 0.0
+      },
+      "open_interest": {
+        "available_count": 0,
+        "missing_count": 348,
+        "coverage_pct": 0.0
+      }
+    },
+    "by_expiry": {
+      "2026-05-15": {
+        "contract_count": 58,
+        "bid": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "ask": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "implied_volatility": {
+          "available_count": 34,
+          "missing_count": 24,
+          "coverage_pct": 58.6
+        },
+        "volume": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "open_interest": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        }
+      },
+      "2026-06-18": {
+        "contract_count": 58,
+        "bid": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "ask": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "implied_volatility": {
+          "available_count": 58,
+          "missing_count": 0,
+          "coverage_pct": 100.0
+        },
+        "volume": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "open_interest": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        }
+      },
+      "2026-09-18": {
+        "contract_count": 58,
+        "bid": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "ask": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "implied_volatility": {
+          "available_count": 54,
+          "missing_count": 4,
+          "coverage_pct": 93.1
+        },
+        "volume": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "open_interest": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        }
+      },
+      "2026-12-18": {
+        "contract_count": 58,
+        "bid": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "ask": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "implied_volatility": {
+          "available_count": 44,
+          "missing_count": 14,
+          "coverage_pct": 75.9
+        },
+        "volume": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "open_interest": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        }
+      },
+      "2027-01-15": {
+        "contract_count": 58,
+        "bid": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "ask": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "implied_volatility": {
+          "available_count": 24,
+          "missing_count": 34,
+          "coverage_pct": 41.4
+        },
+        "volume": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "open_interest": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        }
+      },
+      "2028-01-21": {
+        "contract_count": 58,
+        "bid": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "ask": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "implied_volatility": {
+          "available_count": 24,
+          "missing_count": 34,
+          "coverage_pct": 41.4
+        },
+        "volume": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        },
+        "open_interest": {
+          "available_count": 0,
+          "missing_count": 58,
+          "coverage_pct": 0.0
+        }
+      }
+    }
+  },
+  "field_availability": {
+    "missing_fields": [
+      "ask",
+      "bid",
+      "implied_volatility",
+      "last",
+      "open_interest"
+    ],
+    "missing_field_counts": {
+      "ask": 348,
+      "bid": 348,
+      "implied_volatility": 110,
+      "last": 348,
+      "open_interest": 348
+    },
+    "warnings": [
+      "Can't find EId with tickerId:1",
+      "Can't find EId with tickerId:2",
+      "Can't find EId with tickerId:3",
+      "Delayed field availability was partial for this request: missing ask, bid, implied_volatility, last, open_interest.",
+      "Delayed field availability was partial for this request: missing ask, bid, last, open_interest.",
+      "IBKR did not confirm delayed or delayed-frozen market data for this request.",
+      "No security definition has been found for the request",
+      "Part of requested market data requires additional subscription for API. See link in 'Market Data Connections' dialog for more details.GPRE NASDAQ.NMS/TOP/ALL",
+      "Requested market data is not subscribed. Displaying delayed market data."
+    ]
+  },
+  "files": {
+    "underlying": {
+      "raw_json": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\snapshots\\underlying\\raw\\ibkr_gpre_underlying_20260422T155227Z_delayed.json",
+      "normalized_csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\snapshots\\underlying\\normalized\\ibkr_gpre_underlying_20260422T155227Z_delayed.csv",
+      "normalized_parquet": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\snapshots\\underlying\\normalized\\ibkr_gpre_underlying_20260422T155227Z_delayed.parquet",
+      "manifest_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\metadata\\underlying_manifest.json",
+      "source_notes_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\metadata\\source_notes.json"
+    },
+    "chain": {
+      "raw_json": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\chains\\raw\\ibkr_gpre_chain_20260422T155227Z_delayed.json",
+      "normalized_csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\chains\\normalized\\ibkr_gpre_chain_20260422T155227Z_delayed.csv",
+      "normalized_parquet": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\chains\\normalized\\ibkr_gpre_chain_20260422T155227Z_delayed.parquet",
+      "manifest_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\metadata\\chain_manifest.json",
+      "source_notes_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\metadata\\source_notes.json"
+    },
+    "option_snapshot": {
+      "raw_json": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\snapshots\\option_quotes\\raw\\ibkr_gpre_options_exp_multi_20260422T155233Z_delayed.json",
+      "normalized_csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_gpre_options_exp_multi_20260422T155233Z_delayed.csv",
+      "normalized_parquet": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_gpre_options_exp_multi_20260422T155233Z_delayed.parquet",
+      "manifest_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\metadata\\option_snapshot_manifest.json",
+      "source_notes_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\metadata\\source_notes.json",
+      "chain_slice_files": [
+        "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_gpre_options_exp_2026-05-15_20260422T155233Z_delayed.csv",
+        "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_gpre_options_exp_2026-06-18_20260422T155233Z_delayed.csv",
+        "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_gpre_options_exp_2026-09-18_20260422T155233Z_delayed.csv",
+        "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_gpre_options_exp_2026-12-18_20260422T155233Z_delayed.csv",
+        "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_gpre_options_exp_2027-01-15_20260422T155233Z_delayed.csv",
+        "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\ibkr\\snapshots\\option_quotes\\normalized\\ibkr_gpre_options_exp_2028-01-21_20260422T155233Z_delayed.csv"
+      ]
+    }
+  },
+  "diagnostics": {
+    "underlying_snapshot": {
+      "ticker": "GPRE",
+      "snapshot_timestamp": "2026-04-22T15:52:27Z",
+      "market_data_mode": "delayed",
+      "market_data_type_code": null,
+      "bid": null,
+      "ask": null,
+      "last": null,
+      "close": null,
+      "mid": null,
+      "mark": null,
+      "exchange": "SMART",
+      "primary_exchange": null,
+      "currency": "USD",
+      "source": "ibkr",
+      "warnings": [
+        "Delayed field availability was partial for this request: missing ask, bid, close, last.",
+        "IBKR did not confirm delayed or delayed-frozen market data for this request.",
+        "Requested market data requires additional subscription for API. See link in 'Market Data Connections' dialog for more details.GPRE NASDAQ.NMS/TOP/ALL"
+      ],
+      "missing_fields": [
+        "bid",
+        "ask",
+        "last",
+        "close"
+      ]
+    },
+    "resolved_underlying": {
+      "conid": 38333348,
+      "symbol": "GPRE",
+      "sec_type": "STK",
+      "currency": "USD",
+      "exchange": "SMART",
+      "primary_exchange": "NASDAQ",
+      "local_symbol": "GPRE",
+      "trading_class": "NMS",
+      "multiplier": null
+    },
+    "chain_diagnostics": {
+      "requested": {
+        "ticker": "GPRE",
+        "exchange": "SMART",
+        "currency": "USD",
+        "market_data_mode": "delayed",
+        "include_all_exchanges": false
+      },
+      "resolved_underlying": {
+        "conid": 38333348,
+        "symbol": "GPRE",
+        "sec_type": "STK",
+        "currency": "USD",
+        "exchange": "SMART",
+        "primary_exchange": "NASDAQ",
+        "local_symbol": "GPRE",
+        "trading_class": "NMS",
+        "multiplier": null
+      },
+      "raw_option_parameter_rows": [
+        {
+          "exchange": "ISE",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "NASDAQBX",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "BATS",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "EMERALD",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "GEMINI",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "PEARL",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "PHLX",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "MERCURY",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "EDGX",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "IBUSOPT",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "MIAX",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "CBOE",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "BOX",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "CBOE2",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "NASDAQOM",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "AMEX",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "SMART",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "MEMX",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "SAPPHIRE",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        },
+        {
+          "exchange": "PSE",
+          "underlying_conid": 38333348,
+          "trading_class": "GPRE",
+          "multiplier": "100",
+          "expirations": [
+            "20260515",
+            "20260618",
+            "20260918",
+            "20261218",
+            "20270115",
+            "20280121"
+          ],
+          "strikes": [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+            16.0,
+            17.0,
+            18.0,
+            19.0,
+            20.0,
+            21.0,
+            22.0,
+            23.0,
+            24.0,
+            25.0,
+            26.0,
+            27.0,
+            28.0,
+            30.0
+          ]
+        }
+      ],
+      "raw_exchanges_seen": [
+        "AMEX",
+        "BATS",
+        "BOX",
+        "CBOE",
+        "CBOE2",
+        "EDGX",
+        "EMERALD",
+        "GEMINI",
+        "IBUSOPT",
+        "ISE",
+        "MEMX",
+        "MERCURY",
+        "MIAX",
+        "NASDAQBX",
+        "NASDAQOM",
+        "PEARL",
+        "PHLX",
+        "PSE",
+        "SAPPHIRE",
+        "SMART"
+      ],
+      "raw_trading_classes_seen": [
+        "GPRE"
+      ],
+      "available_expiries": [
+        "2026-05-15",
+        "2026-06-18",
+        "2026-09-18",
+        "2026-12-18",
+        "2027-01-15",
+        "2028-01-21"
+      ],
+      "available_strike_count": 29,
+      "available_strike_sample": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0
+      ],
+      "row_counts": {
+        "raw_opt_param_rows": 20,
+        "after_underlying_selection": 20,
+        "after_exchange_filter": 1,
+        "after_trading_class_filter": 1,
+        "after_expiry_strike_normalization": 348,
+        "final_chain_rows": 348
+      },
+      "selected_exchange": "SMART",
+      "failure_stage": null
+    },
+    "contract_match": {
+      "requested_expiries": [
+        "2026-05-15",
+        "2026-06-18",
+        "2026-09-18",
+        "2026-12-18",
+        "2027-01-15",
+        "2028-01-21"
+      ],
+      "requested_right": "both",
+      "requested_min_strike": null,
+      "requested_max_strike": null,
+      "requested_strikes": [],
+      "around_spot": null,
+      "max_contracts": null,
+      "requested_expiry_exists": null,
+      "available_expiries": [],
+      "nearest_expiries": [],
+      "available_strike_count": 0,
+      "available_strike_sample": [],
+      "spot_price_used": null,
+      "around_spot_skipped_reason": null,
+      "row_counts": {
+        "final_selected_contracts": 348
+      },
+      "selected_contracts": [],
+      "failure_stage": null
+    },
+    "snapshot_scope": "full_chain",
+    "discovered_expiries": [
+      "2026-05-15",
+      "2026-06-18",
+      "2026-09-18",
+      "2026-12-18",
+      "2027-01-15",
+      "2028-01-21"
+    ],
+    "strike_count_by_expiry": {
+      "2026-05-15": 29,
+      "2026-06-18": 29,
+      "2026-09-18": 29,
+      "2026-12-18": 29,
+      "2027-01-15": 29,
+      "2028-01-21": 29
+    },
+    "attempted_contract_count": 348,
+    "selected_contract_count": 348,
+    "final_selected_expiries": [
+      "2026-05-15",
+      "2026-06-18",
+      "2026-09-18",
+      "2026-12-18",
+      "2027-01-15",
+      "2028-01-21"
+    ],
+    "final_selected_strikes": [
+      1.0,
+      2.0,
+      3.0,
+      4.0,
+      5.0,
+      6.0,
+      7.0,
+      8.0,
+      9.0,
+      10.0,
+      11.0,
+      12.0,
+      13.0,
+      14.0,
+      15.0,
+      16.0,
+      17.0,
+      18.0,
+      19.0,
+      20.0,
+      21.0,
+      22.0,
+      23.0,
+      24.0,
+      25.0,
+      26.0,
+      27.0,
+      28.0,
+      30.0
+    ],
+    "final_selected_exchanges": [
+      "SMART"
+    ],
+    "final_selected_trading_classes": [
+      "GPRE"
+    ],
+    "delayed_field_summary": {
+      "missing_fields": [
+        "ask",
+        "bid",
+        "implied_volatility",
+        "last",
+        "open_interest"
+      ],
+      "missing_field_counts": {
+        "ask": 348,
+        "bid": 348,
+        "implied_volatility": 110,
+        "last": 348,
+        "open_interest": 348
+      },
+      "warnings": [
+        "Can't find EId with tickerId:1",
+        "Can't find EId with tickerId:2",
+        "Can't find EId with tickerId:3",
+        "Delayed field availability was partial for this request: missing ask, bid, implied_volatility, last, open_interest.",
+        "Delayed field availability was partial for this request: missing ask, bid, last, open_interest.",
+        "IBKR did not confirm delayed or delayed-frozen market data for this request.",
+        "No security definition has been found for the request",
+        "Part of requested market data requires additional subscription for API. See link in 'Market Data Connections' dialog for more details.GPRE NASDAQ.NMS/TOP/ALL",
+        "Requested market data is not subscribed. Displaying delayed market data."
+      ],
+      "effective_market_data_types": [
+        3
+      ],
+      "coverage_summary": {
+        "contract_count": 348,
+        "overall": {
+          "bid": {
+            "available_count": 0,
+            "missing_count": 348,
+            "coverage_pct": 0.0
+          },
+          "ask": {
+            "available_count": 0,
+            "missing_count": 348,
+            "coverage_pct": 0.0
+          },
+          "implied_volatility": {
+            "available_count": 238,
+            "missing_count": 110,
+            "coverage_pct": 68.4
+          },
+          "volume": {
+            "available_count": 0,
+            "missing_count": 348,
+            "coverage_pct": 0.0
+          },
+          "open_interest": {
+            "available_count": 0,
+            "missing_count": 348,
+            "coverage_pct": 0.0
+          }
+        }
+      }
+    },
+    "failure_stage": null
+  },
+  "warnings": [
+    "Can't find EId with tickerId:1",
+    "Can't find EId with tickerId:2",
+    "Can't find EId with tickerId:3",
+    "Delayed field availability was partial for this request: missing ask, bid, implied_volatility, last, open_interest.",
+    "Delayed field availability was partial for this request: missing ask, bid, last, open_interest.",
+    "IBKR did not confirm delayed or delayed-frozen market data for this request.",
+    "No security definition has been found for the request",
+    "Part of requested market data requires additional subscription for API. See link in 'Market Data Connections' dialog for more details.GPRE NASDAQ.NMS/TOP/ALL",
+    "Requested market data is not subscribed. Displaying delayed market data."
+  ]
+}

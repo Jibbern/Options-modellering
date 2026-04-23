@@ -1,0 +1,34 @@
+{
+  "snapshot": {
+    "ticker": "GPRE",
+    "snapshot_timestamp": "2026-04-19T17:13:36Z",
+    "market_data_mode": "delayed",
+    "market_data_type_code": null,
+    "bid": null,
+    "ask": null,
+    "last": null,
+    "close": null,
+    "mid": null,
+    "mark": null,
+    "exchange": "SMART",
+    "primary_exchange": null,
+    "currency": "USD",
+    "source": "ibkr",
+    "warnings": [
+      "Delayed field availability was partial for this request: missing ask, bid, close, last.",
+      "IBKR did not confirm delayed or delayed-frozen market data for this request.",
+      "Requested market data requires additional subscription for API. See link in 'Market Data Connections' dialog for more details.GPRE NASDAQ.NMS/TOP/ALL"
+    ],
+    "missing_fields": [
+      "bid",
+      "ask",
+      "last",
+      "close"
+    ]
+  },
+  "connection": {
+    "host": "127.0.0.1",
+    "port": 7496,
+    "client_id": 71
+  }
+}

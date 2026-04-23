@@ -1,0 +1,132 @@
+{
+  "downloaded_at": "2026-04-22T15:39:19Z",
+  "ticker": "GPRE",
+  "request_params": {
+    "assetclass": "stocks",
+    "fromdate": "2026-04-03",
+    "todate": "2026-04-22",
+    "limit": 5000,
+    "offset": 0
+  },
+  "api_response": {
+    "data": {
+      "symbol": "GPRE",
+      "totalRecords": 12,
+      "tradesTable": {
+        "asOf": null,
+        "headers": {
+          "date": "Date",
+          "close": "Close/Last",
+          "volume": "Volume",
+          "open": "Open",
+          "high": "High",
+          "low": "Low"
+        },
+        "rows": [
+          {
+            "date": "04/21/2026",
+            "close": "$16.21",
+            "volume": "1,346,166",
+            "open": "$15.69",
+            "high": "$16.345",
+            "low": "$15.50"
+          },
+          {
+            "date": "04/20/2026",
+            "close": "$15.625",
+            "volume": "1,193,489",
+            "open": "$15.04",
+            "high": "$15.765",
+            "low": "$14.85"
+          },
+          {
+            "date": "04/17/2026",
+            "close": "$14.82",
+            "volume": "3,596,029",
+            "open": "$15.51",
+            "high": "$15.63",
+            "low": "$14.08"
+          },
+          {
+            "date": "04/16/2026",
+            "close": "$15.96",
+            "volume": "1,624,131",
+            "open": "$15.35",
+            "high": "$15.975",
+            "low": "$15.28"
+          },
+          {
+            "date": "04/15/2026",
+            "close": "$15.41",
+            "volume": "1,366,214",
+            "open": "$15.36",
+            "high": "$15.51",
+            "low": "$15.05"
+          },
+          {
+            "date": "04/14/2026",
+            "close": "$15.39",
+            "volume": "1,360,273",
+            "open": "$15.61",
+            "high": "$15.83",
+            "low": "$15.21"
+          },
+          {
+            "date": "04/13/2026",
+            "close": "$15.67",
+            "volume": "1,150,214",
+            "open": "$15.50",
+            "high": "$16.09",
+            "low": "$15.225"
+          },
+          {
+            "date": "04/10/2026",
+            "close": "$15.23",
+            "volume": "760,170",
+            "open": "$15.03",
+            "high": "$15.27",
+            "low": "$14.92"
+          },
+          {
+            "date": "04/09/2026",
+            "close": "$15.21",
+            "volume": "1,142,208",
+            "open": "$15.72",
+            "high": "$16.04",
+            "low": "$14.98"
+          },
+          {
+            "date": "04/08/2026",
+            "close": "$15.59",
+            "volume": "1,818,735",
+            "open": "$14.684",
+            "high": "$15.71",
+            "low": "$14.57"
+          },
+          {
+            "date": "04/07/2026",
+            "close": "$15.70",
+            "volume": "968,100",
+            "open": "$16.09",
+            "high": "$16.39",
+            "low": "$15.64"
+          },
+          {
+            "date": "04/06/2026",
+            "close": "$16.09",
+            "volume": "843,022",
+            "open": "$16.73",
+            "high": "$16.835",
+            "low": "$15.82"
+          }
+        ]
+      }
+    },
+    "message": null,
+    "status": {
+      "rCode": 200,
+      "bCodeMessage": null,
+      "developerMessage": null
+    }
+  }
+}

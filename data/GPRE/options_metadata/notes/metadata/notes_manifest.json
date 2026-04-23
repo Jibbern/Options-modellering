@@ -1,0 +1,27 @@
+{
+  "generated_at": "2026-04-12T16:28:01Z",
+  "ticker": "GPRE",
+  "dataset": "notes",
+  "data_root": "data\\GPRE\\options_metadata\\notes",
+  "raw_file": "data\\GPRE\\options_metadata\\notes\\raw\\gpre_notes_demo.json",
+  "normalized_files": {
+    "csv": "data\\GPRE\\options_metadata\\notes\\normalized\\notes.csv",
+    "parquet": "data\\GPRE\\options_metadata\\notes\\normalized\\notes.parquet",
+    "parquet_written": true,
+    "parquet_note": null
+  },
+  "row_count": 2,
+  "sources": [
+    "synthetic_demo"
+  ],
+  "coverage_dates": [
+    "2026-04-10",
+    "2026-04-11"
+  ],
+  "min_date": "2026-04-10",
+  "max_date": "2026-04-11",
+  "categories": [
+    "risk",
+    "thesis"
+  ]
+}

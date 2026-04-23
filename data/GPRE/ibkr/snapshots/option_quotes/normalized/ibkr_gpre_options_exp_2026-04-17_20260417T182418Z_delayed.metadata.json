@@ -1,0 +1,10 @@
+{
+  "ticker": "GPRE",
+  "snapshot_date": "2026-04-17",
+  "snapshot_time": "18:24:18",
+  "expiry_date": "2026-04-17",
+  "spot_price": null,
+  "spot_price_source": "ibkr_delayed",
+  "source": "ibkr",
+  "market_data_mode": "delayed"
+}

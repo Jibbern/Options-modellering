@@ -1,0 +1,6 @@
+{
+  "ticker": "GPRE",
+  "dividend_yield": 0.0,
+  "source": "Barchart",
+  "notes": "The source CSV does not include a clean explicit underlying spot price. The lab will infer spot from near-money moneyness unless an override is supplied. Risk-free rate should preferably come from the local FRED store when available."
+}

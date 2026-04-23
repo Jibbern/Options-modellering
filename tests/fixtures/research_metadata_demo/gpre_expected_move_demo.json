@@ -1,0 +1,16 @@
+[
+  {
+    "ticker": "GPRE",
+    "snapshot_date": "2026-04-12",
+    "expiry_date": "2026-04-17",
+    "expected_move_abs": 1.8,
+    "expected_move_pct": 0.118,
+    "lower_bound": 13.45,
+    "upper_bound": 17.05,
+    "implied_volatility": 0.61,
+    "source": "synthetic_demo",
+    "source_url": "local_demo_fixture",
+    "acquisition_method": "manual_demo",
+    "notes": "Synthetic demo data for validating the local research-metadata store."
+  }
+]

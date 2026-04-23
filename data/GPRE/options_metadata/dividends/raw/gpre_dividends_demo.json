@@ -1,0 +1,12 @@
+[
+  {
+    "ticker": "GPRE",
+    "snapshot_date": "2026-04-12",
+    "dividend_yield": 0.0,
+    "expected_dividend_date": null,
+    "source": "synthetic_demo",
+    "source_url": "local_demo_fixture",
+    "acquisition_method": "manual_demo",
+    "notes": "Synthetic demo dividend assumption used only to validate metadata resolution."
+  }
+]

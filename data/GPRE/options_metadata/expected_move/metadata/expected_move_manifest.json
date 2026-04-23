@@ -1,0 +1,25 @@
+{
+  "generated_at": "2026-04-12T16:27:46Z",
+  "ticker": "GPRE",
+  "dataset": "expected_move",
+  "data_root": "data\\GPRE\\options_metadata\\expected_move",
+  "raw_file": "data\\GPRE\\options_metadata\\expected_move\\raw\\gpre_expected_move_demo.json",
+  "normalized_files": {
+    "csv": "data\\GPRE\\options_metadata\\expected_move\\normalized\\expected_move.csv",
+    "parquet": "data\\GPRE\\options_metadata\\expected_move\\normalized\\expected_move.parquet",
+    "parquet_written": true,
+    "parquet_note": null
+  },
+  "row_count": 1,
+  "sources": [
+    "synthetic_demo"
+  ],
+  "coverage_dates": [
+    "2026-04-12"
+  ],
+  "min_date": "2026-04-12",
+  "max_date": "2026-04-12",
+  "expiry_dates": [
+    "2026-04-17"
+  ]
+}

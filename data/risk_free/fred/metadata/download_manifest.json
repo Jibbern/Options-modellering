@@ -1,0 +1,89 @@
+{
+  "generated_at": "2026-04-22T15:39:20Z",
+  "source": "FRED",
+  "data_root": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred",
+  "requested_series": [
+    "DGS1MO",
+    "DGS3MO",
+    "DGS6MO",
+    "DGS1"
+  ],
+  "request_window": {
+    "start": "2026-04-09",
+    "end": null,
+    "full_refresh": false
+  },
+  "raw_files": {
+    "DGS1MO": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\raw\\DGS1MO_20260422T153918Z.json",
+    "DGS3MO": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\raw\\DGS3MO_20260422T153918Z.json",
+    "DGS6MO": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\raw\\DGS6MO_20260422T153918Z.json",
+    "DGS1": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\raw\\DGS1_20260422T153918Z.json"
+  },
+  "series": {
+    "DGS1MO": {
+      "normalized_csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\normalized\\DGS1MO.csv",
+      "normalized_parquet": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\normalized\\DGS1MO.parquet",
+      "normalized_parquet_written": true,
+      "normalized_parquet_note": null,
+      "row_count": 6450,
+      "non_null_row_count": 6181,
+      "min_date": "2001-07-31",
+      "max_date": "2026-04-20",
+      "latest_non_null_date": "2026-04-20",
+      "latest_raw_file": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\raw\\DGS1MO_20260422T153918Z.json"
+    },
+    "DGS3MO": {
+      "normalized_csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\normalized\\DGS3MO.csv",
+      "normalized_parquet": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\normalized\\DGS3MO.parquet",
+      "normalized_parquet_written": true,
+      "normalized_parquet_note": null,
+      "row_count": 11645,
+      "non_null_row_count": 11157,
+      "min_date": "1981-09-01",
+      "max_date": "2026-04-20",
+      "latest_non_null_date": "2026-04-20",
+      "latest_raw_file": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\raw\\DGS3MO_20260422T153918Z.json"
+    },
+    "DGS6MO": {
+      "normalized_csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\normalized\\DGS6MO.csv",
+      "normalized_parquet": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\normalized\\DGS6MO.parquet",
+      "normalized_parquet_written": true,
+      "normalized_parquet_note": null,
+      "row_count": 11645,
+      "non_null_row_count": 11157,
+      "min_date": "1981-09-01",
+      "max_date": "2026-04-20",
+      "latest_non_null_date": "2026-04-20",
+      "latest_raw_file": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\raw\\DGS6MO_20260422T153918Z.json"
+    },
+    "DGS1": {
+      "normalized_csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\normalized\\DGS1.csv",
+      "normalized_parquet": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\normalized\\DGS1.parquet",
+      "normalized_parquet_written": true,
+      "normalized_parquet_note": null,
+      "row_count": 16775,
+      "non_null_row_count": 16059,
+      "min_date": "1962-01-02",
+      "max_date": "2026-04-20",
+      "latest_non_null_date": "2026-04-20",
+      "latest_raw_file": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\raw\\DGS1_20260422T153918Z.json"
+    }
+  },
+  "merged_files": {
+    "csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\merged\\fred_treasury_constant_maturity_daily.csv",
+    "parquet": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\merged\\fred_treasury_constant_maturity_daily.parquet",
+    "parquet_written": "True",
+    "parquet_note": ""
+  },
+  "latest_files": {
+    "latest_json": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\metadata\\latest_rates.json",
+    "current_snapshot_csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\risk_free\\fred\\merged\\current_risk_free_snapshot.csv"
+  },
+  "merged": {
+    "row_count": 16775,
+    "min_date": "1962-01-02",
+    "max_date": "2026-04-20",
+    "parquet_written": true,
+    "parquet_note": null
+  }
+}

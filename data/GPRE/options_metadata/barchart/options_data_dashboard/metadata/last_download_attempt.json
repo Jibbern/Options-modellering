@@ -1,0 +1,10 @@
+{
+  "ticker": "GPRE",
+  "page_url": "https://www.barchart.com/stocks/quotes/GPRE/options-data",
+  "attempted_at": "2026-04-12T15:58:16Z",
+  "method": "best_effort_page_inspection",
+  "success": false,
+  "debug_html_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\options_metadata\\barchart\\options_data_dashboard\\metadata\\gpre_options_data_dashboard_page_20260412T155817Z.html",
+  "candidate_image_urls": [],
+  "error": "No direct dashboard image URL could be discovered from the page HTML. Manual registration remains the stable workflow."
+}

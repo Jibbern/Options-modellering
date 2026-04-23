@@ -1,0 +1,34 @@
+{
+  "ticker": "GPRE",
+  "primary_source": "ibkr",
+  "policy": {
+    "delayed_only": true,
+    "allowed_market_data_modes": [
+      "delayed",
+      "delayed_frozen"
+    ],
+    "forbidden_market_data_modes": [
+      "live",
+      "frozen",
+      "regulatory_snapshot"
+    ]
+  },
+  "last_run": {
+    "type": "full_chain_snapshot",
+    "status": "succeeded",
+    "market_data_mode": "delayed",
+    "attempted_contract_count": 348,
+    "persisted_quote_count": 348,
+    "warnings": [
+      "Can't find EId with tickerId:1",
+      "Can't find EId with tickerId:2",
+      "Can't find EId with tickerId:3",
+      "Delayed field availability was partial for this request: missing ask, bid, implied_volatility, last, open_interest.",
+      "Delayed field availability was partial for this request: missing ask, bid, last, open_interest.",
+      "IBKR did not confirm delayed or delayed-frozen market data for this request.",
+      "No security definition has been found for the request",
+      "Part of requested market data requires additional subscription for API. See link in 'Market Data Connections' dialog for more details.GPRE NASDAQ.NMS/TOP/ALL",
+      "Requested market data is not subscribed. Displaying delayed market data."
+    ]
+  }
+}

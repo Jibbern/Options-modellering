@@ -1,0 +1,33 @@
+{
+  "generated_at": "2026-04-22T15:39:22Z",
+  "ticker": "GPRE",
+  "data_root": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\historical_prices",
+  "download_mode": "incremental",
+  "request_window": {
+    "start": "2026-04-03",
+    "end": "2026-04-22",
+    "full_refresh": false,
+    "resolved_mode": "incremental"
+  },
+  "raw_files": [
+    "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\historical_prices\\raw\\nasdaq_gpre_historical_20260422T153919Z.json"
+  ],
+  "normalized_files": {
+    "csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\historical_prices\\normalized\\gpre_daily_prices.csv",
+    "parquet": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\historical_prices\\normalized\\gpre_daily_prices.parquet",
+    "parquet_written": true,
+    "parquet_note": null
+  },
+  "merged_files": {
+    "csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\historical_prices\\merged\\gpre_daily_prices_merged.csv",
+    "parquet": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\historical_prices\\merged\\gpre_daily_prices_merged.parquet",
+    "parquet_written": true,
+    "parquet_note": null
+  },
+  "source_notes": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\historical_prices\\metadata\\source_notes.json",
+  "row_count": 2522,
+  "non_null_close_row_count": 2522,
+  "min_date": "2016-04-11",
+  "max_date": "2026-04-21",
+  "latest_close_date": "2026-04-21"
+}

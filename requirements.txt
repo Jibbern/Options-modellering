@@ -1,0 +1,8 @@
+numpy>=2.0
+pandas>=2.2
+matplotlib>=3.9
+pytest>=8.0
+requests>=2.30
+ibapi
+# Optional: install pyarrow for Parquet outputs in local data stores and reports.
+# pyarrow>=15.0

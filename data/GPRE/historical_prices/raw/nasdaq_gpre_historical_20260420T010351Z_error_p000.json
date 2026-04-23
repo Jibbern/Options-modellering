@@ -1,0 +1,14 @@
+{
+  "downloaded_at": "2026-04-20T01:03:51Z",
+  "ticker": "GPRE",
+  "request_params": {
+    "assetclass": "stocks",
+    "fromdate": "2026-03-30",
+    "todate": "2026-04-20",
+    "limit": 5000,
+    "offset": 0
+  },
+  "api_response": {
+    "error": "HTTPSConnectionPool(host='api.nasdaq.com', port=443): Max retries exceeded with url: /api/quote/gpre/historical?assetclass=stocks&fromdate=2026-03-30&todate=2026-04-20&limit=5000&offset=0 (Caused by NewConnectionError(\"HTTPSConnection(host='api.nasdaq.com', port=443): Failed to establish a new connection: [WinError 10013] Ett f\u00f6rs\u00f6k gjordes att f\u00e5 \u00e5tkomst till en socket p\u00e5 ett s\u00e4tt som \u00e4r f\u00f6rbjudet av \u00e5tkomstbeh\u00f6righeterna\"))"
+  }
+}

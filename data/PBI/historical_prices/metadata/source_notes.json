@@ -1,0 +1,18 @@
+{
+  "ticker": "PBI",
+  "primary_source": "nasdaq_historical_quotes",
+  "transport": "direct_json_xhr",
+  "endpoint": "https://api.nasdaq.com/api/quote/pbi/historical",
+  "request_headers": {
+    "accept": "application/json, text/plain, */*",
+    "accept-language": "en-US,en;q=0.9",
+    "origin": "https://www.nasdaq.com",
+    "referer": "https://www.nasdaq.com/market-activity/stocks/pbi/historical"
+  },
+  "manual_import_directory": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\historical_prices\\raw\\manual",
+  "notes": [
+    "The downloader targets Nasdaq historical quotes JSON/XHR rather than scraping HTML.",
+    "If Nasdaq returns unavailable data or blocks the request, drop a manual CSV into raw/manual and normalize it with normalize_manual_price_file(...)."
+  ],
+  "latest_downloaded_at": "2026-04-22T15:39:18Z"
+}

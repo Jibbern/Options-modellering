@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-04-17T18:14:45Z",
+  "ticker": "SPY",
+  "status": "failed",
+  "request_type": "chain",
+  "market_data_mode": "delayed",
+  "request": {
+    "connection": {
+      "host": "127.0.0.1",
+      "port": 7496,
+      "client_id": 82
+    }
+  },
+  "error": "At least one chain row is required.",
+  "warnings": []
+}

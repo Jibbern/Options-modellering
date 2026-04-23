@@ -1,0 +1,14 @@
+{
+  "ticker": "AAPL",
+  "snapshot_date": "2026-04-19",
+  "snapshot_time": "21:09:08",
+  "expiry_date": "2026-05-15",
+  "spot_price": null,
+  "spot_price_source": "ibkr_delayed",
+  "source": "ibkr",
+  "market_data_mode": "delayed",
+  "snapshot_scope": "filtered_slice",
+  "storage_location": "ibkr_chain_snapshot",
+  "quote_count": 10,
+  "strike_count": 5
+}

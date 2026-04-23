@@ -1,0 +1,23 @@
+{
+  "generated_at": "2026-04-12T15:57:30Z",
+  "ticker": "GPRE",
+  "source": "barchart",
+  "artifact_type": "options_data_dashboard_image",
+  "root": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\options_metadata\\barchart\\options_data_dashboard",
+  "artifacts": [
+    {
+      "ticker": "GPRE",
+      "snapshot_date": null,
+      "source": "barchart",
+      "source_url": "https://www.barchart.com/stocks/quotes/GPRE/options-data",
+      "artifact_type": "options_data_dashboard_image",
+      "local_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\options_metadata\\barchart\\options_data_dashboard\\raw\\manual\\GPRE-options-summary.png",
+      "downloaded_at": "2026-04-12T15:35:38.616866Z",
+      "acquisition_method": "manual",
+      "notes": "Snapshot date could not be inferred reliably from the filename, so the original filename was preserved.",
+      "original_filename": "GPRE-options-summary.png"
+    }
+  ],
+  "source_notes": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\options_metadata\\barchart\\options_data_dashboard\\metadata\\source_notes.json",
+  "artifact_count": 1
+}
