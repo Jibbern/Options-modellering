@@ -2404,12 +2404,13 @@ def plot_single_option_decision_view(
     outcomes = path_outcomes.copy()
     paths["requested_days"] = pd.to_numeric(paths.get("requested_days"), errors="coerce").fillna(0)
     paths["spot_price"] = pd.to_numeric(paths.get("spot_price"), errors="coerce")
-    outcomes = outcomes.drop_duplicates(subset=["path_role"]).copy()
+    identity_col = "decision_path_id" if "decision_path_id" in outcomes.columns and "decision_path_id" in paths.columns else "path_role"
+    outcomes = outcomes.drop_duplicates(subset=[identity_col]).copy()
     outcome_lookup = {
-        clean_string(row.get("path_role")): row
+        clean_string(row.get(identity_col)): row
         for row in outcomes.to_dict("records")
     }
-    paths = paths.loc[paths.get("path_role", pd.Series(dtype=str)).astype(str).isin(outcome_lookup.keys())].copy()
+    paths = paths.loc[paths.get(identity_col, pd.Series(dtype=str)).astype(str).isin(outcome_lookup.keys())].copy()
     if paths.empty:
         raise ValueError("Single-option decision representative paths have no matching outcomes.")
 
@@ -2458,8 +2459,8 @@ def plot_single_option_decision_view(
 
     _style_axes(ax_hero)
     terminal_labels: list[dict[str, object]] = []
-    for display_idx, (path_role, group) in enumerate(paths.sort_values(["display_order", "requested_days"]).groupby("path_role", sort=False), start=1):
-        outcome = outcome_lookup.get(clean_string(path_role), {})
+    for display_idx, (path_id, group) in enumerate(paths.sort_values(["display_order", "requested_days"]).groupby(identity_col, sort=False), start=1):
+        outcome = outcome_lookup.get(clean_string(path_id), {})
         outcome_label = clean_string(outcome.get("outcome_label")) or "fail_too_narrow_or_expiry_issue"
         spec = SINGLE_OPTION_OUTCOME_SPECS.get(outcome_label, SINGLE_OPTION_OUTCOME_SPECS["fail_too_narrow_or_expiry_issue"])
         label = clean_string(outcome.get("path_label")) or clean_string(group.iloc[0].get("path_label"))
@@ -2517,7 +2518,7 @@ def plot_single_option_decision_view(
             linespacing=1.05,
             clip_on=False,
         )
-    ax_hero.set_title("What stock paths make this option worth buying?", loc="left", fontsize=15.6, fontweight="bold", pad=12)
+    ax_hero.set_title("Curated decision paths for this option", loc="left", fontsize=15.6, fontweight="bold", pad=12)
     ax_hero.set_xlabel("Time From Snapshot")
     ax_hero.set_ylabel("Stock Price ($)")
     _format_money_axis(ax_hero)
@@ -2598,7 +2599,7 @@ def plot_single_option_decision_view(
 
     caption = (
         "Fixed: selected option, stock benchmark, exit rule, and thresholds are frozen in analysis. "
-        "The hero chart shows stock paths only; IV and premium are isolated below so the path question stays readable."
+        "The hero chart shows only the curated decision paths; IV and premium are isolated below so the path question stays readable."
     )
     _action_chart_caption(fig, caption)
     return _finalize_caption_chart(fig, output_path, bottom=0.11, top=0.98)
@@ -3665,9 +3666,11 @@ def plot_stock_path_gallery(
     fig, ax = plt.subplots(figsize=(16.8, 8.1))
     _style_axes(ax)
     tick_map = data[["requested_days", "date"]].drop_duplicates().sort_values("requested_days")
-    groups = list(data.groupby(["display_order", "path_name", "path_label", "path_role", "is_active_assumed"], dropna=False))
-    groups.sort(key=lambda item: (item[0][0], clean_string(item[0][1])))
-    for (_, path_name, path_label, path_role, is_active_assumed), group in groups:
+    if "path_family_label" not in data.columns:
+        data["path_family_label"] = ""
+    groups = list(data.groupby(["path_family_label", "display_order", "path_name", "path_label", "path_role", "is_active_assumed"], dropna=False))
+    groups.sort(key=lambda item: (clean_string(item[0][0]), item[0][1], clean_string(item[0][2])))
+    for (path_family_label, _, path_name, path_label, path_role, is_active_assumed), group in groups:
         ordered = group.sort_values("requested_days")
         style_key = clean_string(path_name).lower()
         if clean_string(path_role) == "active_assumed_path":
@@ -3675,6 +3678,9 @@ def plot_stock_path_gallery(
         style = dict(STOCK_PATH_GALLERY_SPECS.get(style_key, {"color": "#4C566A", "marker": "o", "linestyle": "-", "linewidth": 2.4}))
         linewidth = float(style["linewidth"]) + (0.8 if bool(is_active_assumed) else 0.0)
         label = clean_string(path_label)
+        family_label = clean_string(path_family_label)
+        if family_label:
+            label = f"{family_label}: {label}"
         if bool(is_active_assumed) and clean_string(path_role) == "gallery_named_path":
             label = f"{label} (Active)"
         ax.plot(

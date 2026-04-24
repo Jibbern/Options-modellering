@@ -454,6 +454,7 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
     )
 
     for filename in [
+        "stock_path_library.csv",
         "stock_path_gallery.csv",
         "iv_path_gallery.csv",
         "family_comparison.csv",
@@ -1441,12 +1442,34 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
                 "required_winning_path_families": "2",
             }
         ],
+        "single_option_decision_path_selections.csv": [
+            {
+                "candidate_slug": "long-call-2026-12-18-15-00",
+                "candidate_short_label": "15C Dec-26",
+                "decision_path_id": "late_rally_path__late_breakout_to_target",
+                "path_role": "late_rally_path",
+                "path_name": "late_breakout_to_target",
+                "path_label": "Late Breakout To Target",
+                "path_family": "late_rally",
+                "path_family_label": "Late Rally",
+                "timing_shape": "back_loaded_upside",
+                "outcome_label": "stock_better",
+                "selection_score": "80.0",
+                "selection_reason": "Representative stock-better path.",
+                "difference_vs_stock": "-35.0",
+            }
+        ],
         "single_option_representative_paths.csv": [
             {
                 "candidate_slug": "long-call-2026-12-18-15-00",
                 "candidate_short_label": "15C Dec-26",
+                "decision_path_id": "late_rally_path__late_breakout_to_target",
                 "path_role": "late_rally_path",
+                "path_name": "late_breakout_to_target",
                 "path_label": "Late Breakout",
+                "path_family": "late_rally",
+                "path_family_label": "Late Rally",
+                "timing_shape": "back_loaded_upside",
                 "display_order": "1",
                 "date": "2026-12-18",
                 "requested_days": "250",
@@ -1457,8 +1480,13 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
             {
                 "candidate_slug": "long-call-2026-12-18-15-00",
                 "candidate_short_label": "15C Dec-26",
+                "decision_path_id": "late_rally_path__late_breakout_to_target",
                 "path_role": "late_rally_path",
+                "path_name": "late_breakout_to_target",
                 "path_label": "Late Breakout",
+                "path_family": "late_rally",
+                "path_family_label": "Late Rally",
+                "timing_shape": "back_loaded_upside",
                 "outcome_label": "stock_better",
                 "difference_vs_stock": "-35.0",
                 "stock_profit_loss": "1200.0",
@@ -1918,6 +1946,7 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
                 "chain_overview_summary.csv": "tables/chain_overview_summary.csv",
                 "chain_overview_candidates.csv": "tables/chain_overview_candidates.csv",
                 "single_option_decision_summary.csv": "tables/single_option_decision_summary.csv",
+                "single_option_decision_path_selections.csv": "tables/single_option_decision_path_selections.csv",
                 "single_option_representative_paths.csv": "tables/single_option_representative_paths.csv",
                 "single_option_path_outcomes.csv": "tables/single_option_path_outcomes.csv",
                 "single_option_path_family_counts.csv": "tables/single_option_path_family_counts.csv",
@@ -1927,6 +1956,7 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
                 "single_option_summary_bullets.csv": "tables/single_option_summary_bullets.csv",
                 "chain_source_summary.csv": "tables/chain_source_summary.csv",
                 "market_context_summary.csv": "tables/market_context_summary.csv",
+                "stock_path_library.csv": "tables/stock_path_library.csv",
                 "stock_path_gallery.csv": "tables/stock_path_gallery.csv",
                 "iv_path_gallery.csv": "tables/iv_path_gallery.csv",
                 "family_comparison.csv": "tables/family_comparison.csv",
@@ -2112,6 +2142,7 @@ def test_build_model_outputs_projects_primary_contract_selection_artifacts(temp_
     assert (promoted_dir / "00_core_view" / "target_stress_summary.csv").exists()
     assert (promoted_dir / "00_core_view" / "stress_transition_summary.csv").exists()
     assert (promoted_dir / "00_core_view" / "single_option_decision_summary.csv").exists()
+    assert (promoted_dir / "00_core_view" / "single_option_decision_path_selections.csv").exists()
     assert (promoted_dir / "00_core_view" / "single_option_path_outcomes.csv").exists()
     assert (promoted_dir / "00_core_view" / "single_option_iv_sensitivity.csv").exists()
     assert (promoted_dir / "00_core_view" / "single_option_entry_sensitivity.csv").exists()
@@ -2126,6 +2157,7 @@ def test_build_model_outputs_projects_primary_contract_selection_artifacts(temp_
     assert (promoted_dir / "03_tables" / "family_comparison.csv").exists()
     assert (promoted_dir / "03_tables" / "candidate_comparison.csv").exists()
     assert (promoted_dir / "03_tables" / "bullish_long_call_action_board.csv").exists()
+    assert (promoted_dir / "03_tables" / "stock_path_library.csv").exists()
     assert (promoted_dir / "03_tables" / "required_move_summary.csv").exists()
     assert (promoted_dir / "04_secondary" / "action_board.md").exists()
     assert (promoted_dir / "04_secondary" / "highlights.md").exists()
@@ -2216,6 +2248,8 @@ def test_build_model_outputs_projects_primary_contract_selection_artifacts(temp_
     assert "04_secondary/candidate_robustness_vs_upside.png" in start_here
     assert "04_secondary/stock_vs_option_decision_chart.png" in start_here
     assert "summary.md" in start_here
+    assert "single_option_decision_path_selections.csv" in start_here
+    assert "stock_path_library.csv" in start_here
     assert "stock_path_gallery.png" in start_here
     assert "iv_path_gallery.png" in start_here
     assert "required_path_vs_assumed_path.png" in start_here
@@ -2294,6 +2328,7 @@ def test_build_model_outputs_projects_primary_contract_selection_artifacts(temp_
     assert "00_core_view/target_stress_chart.png" in projection_manifest["promoted_files"]
     assert "00_core_view/top_candidate_stress_cards.png" in projection_manifest["promoted_files"]
     assert "00_core_view/single_option_decision_view.png" in projection_manifest["promoted_files"]
+    assert "00_core_view/single_option_decision_path_selections.csv" in projection_manifest["promoted_files"]
     assert "00_core_view/bullish_long_call_watchlist.csv" in projection_manifest["promoted_files"]
     assert "00_core_view/bullish_long_call_triggers.csv" in projection_manifest["promoted_files"]
     assert "00_core_view/chain_overview_summary.csv" in projection_manifest["promoted_files"]
@@ -2313,6 +2348,7 @@ def test_build_model_outputs_projects_primary_contract_selection_artifacts(temp_
     assert "01_thesis_view/thesis_stock_vs_option.png" in projection_manifest["promoted_files"]
     assert "01_thesis_view/current_vs_justified_premium.png" in projection_manifest["promoted_files"]
     assert "03_tables/bullish_long_call_action_board.csv" in projection_manifest["promoted_files"]
+    assert "03_tables/stock_path_library.csv" in projection_manifest["promoted_files"]
     assert "01_thesis_view/current_vs_justified_premium.csv" in projection_manifest["promoted_files"]
     assert "04_secondary/bullish_action_board_overview.png" in projection_manifest["promoted_files"]
     assert "04_secondary/bullish_trigger_map.png" in projection_manifest["promoted_files"]

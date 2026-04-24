@@ -137,7 +137,9 @@ This is the primary Python-first path-thesis workflow. The bundle should be usef
 
 The old contract-selection strike/expiry heatmap and slice bundle artifacts are retired. Use the same-path strike/expiry comparison tables and charts instead; they compare candidates under a concrete stock-path plus IV-path pair rather than a generic grid.
 
-The latest contract-selection bundle also writes a path-centric scenario library for the main named stock paths. Each selected path gets its own same-future chart family:
+The latest contract-selection bundle also writes a path-centric scenario library for the main named stock paths. `stock_path_library.csv` is the library index: it stores stable family labels, timing-shape labels, outcome-bias labels, and the library role for each named path. `stock_path_gallery.csv` and `stock_path_gallery.png` remain the broad browsing surface.
+
+Each selected library path gets its own same-future chart family:
 
 - `<path-alias>__compare_vs_stock_path_delta.png`
 - `<path-alias>__long_call_strike_value.png`
@@ -162,6 +164,8 @@ The latest contract-selection bundle also writes a path-centric scenario library
 - `<path-alias>__iv_robustness_summary.csv`
 
 Read those files path by path when the real question is: "if the stock takes this route, which long calls win?"
+
+The single-option decision view is deliberately narrower than the gallery. It evaluates the selected call across the decision path pool, then persists only 5-8 curated paths in `single_option_decision_path_selections.csv`. Those rows carry the selected path family, timing shape, outcome label, score, and reason, and only those paths are plotted in `single_option_decision_view.png`.
 
 Each path also gets IV-path packs. The single-anchor IV pack fixes the stock path and anchor long call, then varies IV only. The IV-expanded packs apply the same IV regimes to the strike ladder, expiry ladder, and best-of long-call set. Use the value charts to see whether IV saves or crushes option value, the delta charts to see whether the option still beats stock, checkpoint CSVs for key dates, and `iv_robustness_summary.csv` for the compact decision read: survives lower IV, needs IV support, or stock still dominates.
 
@@ -246,6 +250,8 @@ Use `current_vs_justified_premium.png` to see whether the current option premium
 Two layers stay explicit in the bundle:
 
 - required-path layer: what stock path is required for a candidate or family to work
+- path-library layer: broad named scenario gallery plus family/timing/outcome metadata for browsing possible futures
+- decision-path layer: a contract-specific 5-8 path subset for the single-option decision chart
 - simulated-path layer: example stock paths plus separate IV paths showing how a plausible future could miss, almost work, or work under the same valuation engine
 
 ### Curated model outputs
@@ -261,7 +267,7 @@ This command reads a frozen canonical bundle and writes a curated analyst-facing
 
 For contract-selection bundles, the promoted view is grouped by reading job:
 
-- `00_overview/`: Action Board first, then entry justification, then bullish long-call board, then decision highlights, decision charts, stock path gallery, IV path gallery, required-vs-assumed path, and active compare-vs-stock overview
+- `00_overview/`: Action Board first, then entry justification, thesis mode, single-option decision view, bullish long-call board, decision highlights, stock path gallery, IV path gallery, required-vs-assumed path, and active compare-vs-stock overview
 - `01_path_packs/<path_alias>/`: one folder per named scenario path with value views, delta-vs-stock views, single-anchor IV-path views, IV-expanded strike/expiry/best-of views, `iv_robustness_summary.csv`, `checkpoints.csv`, and IV checkpoint tables
 - `02_tables/`: trust/source, family, candidate, strike, and expiry decision tables
 - `03_secondary/`: representative-path and broader support artifacts
@@ -291,17 +297,18 @@ Its reading order is:
 15. `00_overview/charts/stock_vs_option_preference_chart.png`
 16. `00_overview/tables/bullish_long_call_watchlist.csv` and `00_overview/tables/bullish_long_call_avoid.csv`
 17. `02_tables/market_context_summary.csv`
-18. `00_overview/highlights.md` for the broader robustness read
-19. `00_overview/stock_path_gallery.png` and `00_overview/iv_path_gallery.png`
-20. choose a path under `01_path_packs/`
-21. read value charts first: strike, expiry, and best-of
-22. read single-anchor IV-path value and delta charts for the same stock path
-23. read IV-expanded strike, expiry, and best-of value charts
-24. use `iv_robustness_summary.csv` to see what survives lower IV, what needs IV support, and where stock still dominates
-25. read delta-vs-stock charts second: compare-vs-stock plus strike, expiry, best-of, and IV-expanded delta views
-26. use `checkpoints.csv` and IV checkpoint CSVs for key dates
-27. `00_overview/other_structures.md` only after the bullish-first read
-28. `03_secondary/` only for supporting representative-path context
+18. `00_overview/charts/single_option_decision_view.png` and `single_option_decision_path_selections.csv`
+19. `00_overview/highlights.md` for the broader robustness read
+20. `00_overview/stock_path_gallery.png` and `00_overview/iv_path_gallery.png`
+21. choose a path under `01_path_packs/`
+22. read value charts first: strike, expiry, and best-of
+23. read single-anchor IV-path value and delta charts for the same stock path
+24. read IV-expanded strike, expiry, and best-of value charts
+25. use `iv_robustness_summary.csv` to see what survives lower IV, what needs IV support, and where stock still dominates
+26. read delta-vs-stock charts second: compare-vs-stock plus strike, expiry, best-of, and IV-expanded delta views
+27. use `checkpoints.csv` and IV checkpoint CSVs for key dates
+28. `00_overview/other_structures.md` only after the bullish-first read
+29. `03_secondary/` only for supporting representative-path context
 
 No analysis is recomputed during this step. `build-model-outputs` only consumes frozen bundle artifacts.
 
@@ -434,6 +441,8 @@ Then inspect these charts and notes:
 For contract-selection bundles, the published page is now a self-sufficient path-first read of the saved bundle rather than a thin scenario wrapper. The primary published sections are:
 
 - Decision Snapshot
+- Chain Overview / Compare Options
+- Single-Option Decision View
 - Market Context / Trust Summary
 - Stock Path Gallery
 - IV Path Gallery

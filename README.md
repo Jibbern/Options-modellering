@@ -387,6 +387,8 @@ Those same preset names can drive both the active assumed path and deterministic
 The product now separates two different path surfaces deliberately:
 
 - stock path gallery / IV path gallery: named scenario templates used for first-pass thesis thinking
+- path library metadata: stable family labels, timing shapes, and outcome-bias labels for the named scenario library
+- single-option decision paths: a deterministic 5-8 path subset selected for one specific contract, with outcome labels and selection reasons
 - representative paths: heuristic examples selected from simulation or conditioning, used as secondary support after the named galleries
 
 The primary same-future stock benchmark is also explicit now:
@@ -396,7 +398,7 @@ The primary same-future stock benchmark is also explicit now:
 
 Use those assumed-path artifacts before the representative `compare_vs_stock_over_path.*` family when the question is "under this exact thesis path, is stock still cleaner?"
 
-The Action Board is the first product read. It does not claim a universal best option; it translates the frozen path/IV evidence into assumption-relative buckets: Buy Now, Watchlist, Avoid For Now, and Prefer Stock Instead. The Chain Overview / Compare Options layer comes immediately after it and compares bullish long calls side by side against long stock across one shared representative path set, so you can quickly see which calls look robust, asymmetric, early-move friendly, late-move forgiving, too IV-sensitive, too narrow, or simply worse than stock. The entry-justification layer then answers the next practical question: what the stock actually has to do, how quickly, and with how much IV help before a bullish call looks worth buying. The single-option decision view narrows the question to one selected call and asks: which representative stock paths make this option worth buying instead of buying stock? The hero chart is stock-path-only; IV and entry-premium sensitivity are kept in compact lower panels so the path question stays readable. The decision-highlights layer remains the broader robustness read behind those layers, with categories such as most robust call, best aggressive upside, best balanced call, stock still wins, needs IV support, and delayed-move risk. If the evidence is weak, outputs explicitly say `weak_differentiation` or `no_clear_edge_under_current_assumptions`.
+The Action Board is the first product read. It does not claim a universal best option; it translates the frozen path/IV evidence into assumption-relative buckets: Buy Now, Watchlist, Avoid For Now, and Prefer Stock Instead. The Chain Overview / Compare Options layer comes immediately after it and compares bullish long calls side by side against long stock across one shared representative path set, so you can quickly see which calls look robust, asymmetric, early-move friendly, late-move forgiving, too IV-sensitive, too narrow, or simply worse than stock. The entry-justification layer then answers the next practical question: what the stock actually has to do, how quickly, and with how much IV help before a bullish call looks worth buying. The single-option decision view narrows the question to one selected call and asks: which curated decision paths make this option worth buying instead of buying stock? The hero chart shows only the selected 5-8 stock paths; IV and entry-premium sensitivity are kept in compact lower panels so the path question stays readable. The decision-highlights layer remains the broader robustness read behind those layers, with categories such as most robust call, best aggressive upside, best balanced call, stock still wins, needs IV support, and delayed-move risk. If the evidence is weak, outputs explicitly say `weak_differentiation` or `no_clear_edge_under_current_assumptions`.
 
 `build-model-outputs` promotes only the current primary product artifacts from a frozen bundle. It copies the decision-first files into `model_outputs/` and leaves older or noisier secondary files in `analysis_outputs/`.
 
@@ -418,6 +420,8 @@ Definitions:
 
 - required path: the minimum stock price path needed for a candidate or family to clear a goal such as break-even, +25%, +50%, outperforming stock, or a target option value
 - assumed path: the user-selected stock path and IV path that drive the main modeled trace over time
+- path library: the broad named stock-path gallery plus family/timing/outcome-bias metadata in `stock_path_library.csv`
+- decision path: a curated, contract-specific stock path selected for the single-option chart and persisted in `single_option_decision_path_selections.csv`
 - IV path: the volatility-shift path applied across the same canonical horizons as the stock path
 - simulated / representative path: a generated stock path plus a separate IV path used as an explicit example future under the active assumptions; these are not forecasts
 - path pair: one stock path plus one IV path plus valuation-over-time for the same candidate set
@@ -450,6 +454,8 @@ These live alongside the broader family/candidate tables, but they are intended 
 
 The product now also writes a path-centric scenario library for the core named stock paths. Those artifacts are path-prefixed and let you read one future at a time:
 
+- `stock_path_library.csv`
+- `stock_path_gallery.csv`
 - `<path-alias>__compare_vs_stock_path_delta.png`
 - `<path-alias>__long_call_strike_value.png`
 - `<path-alias>__long_call_strike_delta.png`
@@ -473,6 +479,8 @@ The product now also writes a path-centric scenario library for the core named s
 - `<path-alias>__iv_robustness_summary.csv`
 
 That path-centric library is the primary answer to: "if the stock moves like this, what do the relevant long calls do versus stock?"
+
+The single-option decision view intentionally does not plot the whole library. It first evaluates the selected contract across the decision path pool, then persists a deterministic curated subset in `single_option_decision_path_selections.csv`. That table records the family label, timing shape, outcome label, score, and reason for each path shown in `single_option_decision_view.png`.
 
 Each path pack also includes two IV-centric reads. The first holds the named stock path and one anchor long call fixed while varying the IV regime across flat, mean-reversion lower/higher, up-then-down, down-then-low, and earnings build/crush paths. Use `*_iv_path_value` first to isolate pure IV effect, then `*_iv_path_delta` to see whether that same option still beats stock.
 
@@ -501,13 +509,14 @@ The analyst-facing reading order is now:
 15. `00_overview/charts/stock_vs_option_preference_chart.png`
 16. `00_overview/tables/bullish_long_call_watchlist.csv` and `00_overview/tables/bullish_long_call_avoid.csv`
 17. market context / trust
-18. `00_overview/highlights.md` for broader robustness context
-19. stock path gallery and IV path gallery
-20. choose a named stock path and open its compare-vs-stock path pack chart
-21. inspect that path's long-call strike ladder, expiry ladder, and best-of value charts
-22. inspect that path's single-anchor IV-path value and delta-vs-stock charts
-23. inspect the IV-expanded strike, expiry, and best-of value charts
-24. review `iv_robustness_summary.csv`, checkpoint tables, and IV-checkpoint tables
+18. `00_overview/charts/single_option_decision_view.png` and `00_overview/tables/single_option_decision_path_selections.csv`
+19. `00_overview/highlights.md` for broader robustness context
+20. stock path gallery and IV path gallery
+21. choose a named stock path and open its compare-vs-stock path pack chart
+22. inspect that path's long-call strike ladder, expiry ladder, and best-of value charts
+23. inspect that path's single-anchor IV-path value and delta-vs-stock charts
+24. inspect the IV-expanded strike, expiry, and best-of value charts
+25. review `iv_robustness_summary.csv`, checkpoint tables, and IV-checkpoint tables
 25. `00_overview/other_structures.md` for secondary structures only after the bullish-first read
 26. representative paths as secondary context
 

@@ -81,6 +81,7 @@ def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_h
     assert (bundle.bundle_dir / "tables" / "path_risk_summary.csv").exists()
     assert (bundle.bundle_dir / "tables" / "stock_path_examples.csv").exists()
     assert (bundle.bundle_dir / "tables" / "iv_path_examples.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "stock_path_library.csv").exists()
     assert (bundle.bundle_dir / "tables" / "stock_path_gallery.csv").exists()
     assert (bundle.bundle_dir / "tables" / "iv_path_gallery.csv").exists()
     assert (bundle.bundle_dir / "tables" / "path_pair_summary.csv").exists()
@@ -134,6 +135,7 @@ def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_h
     assert (bundle.bundle_dir / "tables" / "target_stress_summary.csv").exists()
     assert (bundle.bundle_dir / "tables" / "stress_transition_summary.csv").exists()
     assert (bundle.bundle_dir / "tables" / "single_option_decision_summary.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "single_option_decision_path_selections.csv").exists()
     assert (bundle.bundle_dir / "tables" / "single_option_representative_paths.csv").exists()
     assert (bundle.bundle_dir / "tables" / "single_option_path_outcomes.csv").exists()
     assert (bundle.bundle_dir / "tables" / "single_option_path_family_counts.csv").exists()
@@ -353,6 +355,7 @@ def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_h
     assert "charts/chain_overview.png" in summary_text
     assert "## Single-Option Decision View" in summary_text
     assert "summary/single_option_decision.md" in summary_text
+    assert "tables/single_option_decision_path_selections.csv" in summary_text
     assert "tables/single_option_path_outcomes.csv" in summary_text
     assert "charts/single_option_decision_view.png" in summary_text
     assert "tables/action_board_candidates.csv" in summary_text
@@ -368,6 +371,7 @@ def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_h
     assert "summary/highlights.md" in summary_text
     assert "## Market Context / Trust Summary" in summary_text
     assert "## Stock Path Gallery" in summary_text
+    assert "tables/stock_path_library.csv" in summary_text
     assert "## IV Path Gallery" in summary_text
     assert "## Path-Centric Long-Call Scenario Library" in summary_text
     assert "## Required vs Assumed Path Summary" in summary_text
@@ -393,6 +397,8 @@ def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_h
     assert _path_view_filename("late_breakout", "long_call_strike_delta.png") in summary_text
     assert _path_view_filename("range_bound_near_flat", "compare_vs_stock_path_delta.png") in summary_text
     assert "stock_path_gallery.png" in summary_text
+    assert "stock_path_library.csv" in summary_text
+    assert "single_option_decision_path_selections.csv" in summary_text
     assert "iv_path_gallery.png" in summary_text
     assert "compare_vs_stock_path_delta.png" in summary_text
     assert "options_show_edge" not in summary_text
@@ -449,6 +455,7 @@ def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_h
     chain_overview_text = (bundle.bundle_dir / "summary" / "chain_overview.md").read_text(encoding="utf-8")
     assert "Single-Option Decision View" in single_option_text
     assert "what stock paths make one selected call worth buying instead of buying stock" in single_option_text
+    assert "single_option_decision_path_selections.csv" in single_option_text
     assert "Chain Overview / Compare Options" in chain_overview_text
     assert "bullish long calls against long stock" in chain_overview_text
     assert "C:/Users" not in chain_overview_text

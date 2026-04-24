@@ -18,10 +18,16 @@ from options_lab.analysis.contract_selection import (
     _path_case_iv_variants,
     _path_case_stock_variants,
     _path_view_filename,
+    _select_curated_single_option_decision_paths,
     _select_long_call_expiry_view_rows,
     _selector_cards,
 )
-from options_lab.analysis.simulation import build_path_grid, build_stock_path_example
+from options_lab.analysis.simulation import (
+    build_path_grid,
+    build_stock_path_example,
+    build_stock_path_library_rows,
+    stock_path_family_metadata,
+)
 from options_lab.io import load_chain
 
 
@@ -111,6 +117,100 @@ def test_full_quoted_snapshot_candidate_discovery_respects_top_n_strikes():
 
     assert [row["strategy_family"] for row in rows].count("long_call") == 1
     assert [spec["strategy_family"] for spec in specs].count("long_call") == 1
+
+
+def test_stock_path_family_metadata_is_stable():
+    early = stock_path_family_metadata("early_breakout_to_target")
+    gap = stock_path_family_metadata("earnings_gap_up_then_fade")
+    library = build_stock_path_library_rows(active_path_name="late_breakout")
+
+    assert early["path_family"] == "early_rally"
+    assert early["timing_shape"] == "front_loaded_upside"
+    assert gap["path_family"] == "earnings_gap"
+    assert gap["outcome_bias"] == "event_sensitive"
+    assert not library.empty
+    assert {
+        "minimum_required_path",
+        "early_rally",
+        "late_rally",
+        "steady_grind_up",
+        "false_breakout",
+        "recovery",
+        "earnings_gap",
+        "quarter_pullback",
+    } <= set(library["path_family"])
+    assert library.loc[library["path_name"].eq("late_breakout"), "is_active_assumed"].any()
+
+
+def test_curated_single_option_decision_path_selection_prefers_outcome_and_family_diversity():
+    path_pool = []
+    outcome_rows = []
+    cases = [
+        ("minimum_required_path", "minimum_required_path", "minimum_required_path", "Minimum Required Path", "contract_specific_threshold", "clear_option_win", 125.0, 2.5),
+        ("early_rally_path__early_breakout_to_target", "early_rally_path", "early_breakout_to_target", "Early Rally", "front_loaded_upside", "clear_option_win", 180.0, 3.1),
+        ("steady_grind_up_path__slow_grind_to_target", "steady_grind_up_path", "slow_grind_to_target", "Steady Grind-Up", "smooth_uptrend", "wins_but_not_enough", 45.0, 1.2),
+        ("late_rally_path__late_breakout_to_target", "late_rally_path", "late_breakout_to_target", "Late Rally", "back_loaded_upside", "stock_better", -35.0, 0.4),
+        ("false_breakout_failed_path__false_breakout_then_recover", "false_breakout_failed_path", "false_breakout_then_recover", "False Breakout", "spike_then_giveback", "fail_too_narrow_or_expiry_issue", -120.0, None),
+        ("recovery_path__down_then_recover_to_target", "recovery_path", "down_then_recover_to_target", "Recovery", "down_then_recover", "wins_but_not_enough", 20.0, 1.1),
+        ("earnings_gap_path__earnings_gap_up_then_fade", "earnings_gap_path", "earnings_gap_up_then_fade", "Earnings Gap", "event_gap_then_follow_through", "stock_better", -10.0, 0.8),
+        ("range_bound_near_flat__range_bound_near_flat", "range_bound_near_flat", "range_bound_near_flat", "Range-Bound", "sideways_chop", "fail_too_narrow_or_expiry_issue", -80.0, None),
+    ]
+    family_by_label = {
+        "Minimum Required Path": "minimum_required_path",
+        "Early Rally": "early_rally",
+        "Steady Grind-Up": "steady_grind_up",
+        "Late Rally": "late_rally",
+        "False Breakout": "false_breakout",
+        "Recovery": "recovery",
+        "Earnings Gap": "earnings_gap",
+        "Range-Bound": "range_bound",
+    }
+    for idx, (decision_path_id, role, name, family_label, timing, outcome, difference, multiple) in enumerate(cases, start=1):
+        path_pool.append(
+            {
+                "decision_path_id": decision_path_id,
+                "path_role": role,
+                "path_name": name,
+                "path_label": name.replace("_", " ").title(),
+                "path_family": family_by_label[family_label],
+                "path_family_label": family_label,
+                "timing_shape": timing,
+                "outcome_bias": "test",
+                "path_description": "Synthetic path.",
+                "selection_reason": "Synthetic library candidate.",
+                "path_points": [],
+            }
+        )
+        outcome_rows.append(
+            {
+                "decision_path_id": decision_path_id,
+                "path_role": role,
+                "path_name": name,
+                "path_family": family_by_label[family_label],
+                "path_family_label": family_label,
+                "timing_shape": timing,
+                "outcome_label": outcome,
+                "difference_vs_stock": difference,
+                "outperformance_multiple": multiple,
+                "display_order": idx,
+            }
+        )
+
+    selected = _select_curated_single_option_decision_paths(path_pool, pd.DataFrame(outcome_rows))
+    selected_again = _select_curated_single_option_decision_paths(path_pool, pd.DataFrame(outcome_rows))
+
+    assert 5 <= len(selected) <= 8
+    assert [path["decision_path_id"] for path in selected] == [path["decision_path_id"] for path in selected_again]
+    assert selected[0]["path_role"] == "minimum_required_path"
+    assert set(SINGLE["outcome_label"] for SINGLE in selected) >= {
+        "clear_option_win",
+        "wins_but_not_enough",
+        "stock_better",
+        "fail_too_narrow_or_expiry_issue",
+    }
+    assert [path["display_order"] for path in selected] == list(range(1, len(selected) + 1))
+    assert all(path["selection_reason"] for path in selected)
+    assert len({path["path_family"] for path in selected}) >= 5
 
 
 def test_thesis_mode_keeps_target_galleries_when_no_long_calls_exist():
@@ -217,6 +317,7 @@ def test_contract_selection_analysis_builds_candidates_path_cases_and_selector_o
     assert not result.stress_transition_summary.empty
     assert "Stress Snapshot" in result.stress_tests_markdown
     assert not result.single_option_decision_summary.empty
+    assert not result.single_option_decision_path_selections.empty
     assert not result.single_option_representative_paths.empty
     assert not result.single_option_path_outcomes.empty
     assert not result.single_option_path_family_counts.empty
@@ -270,7 +371,12 @@ def test_contract_selection_analysis_builds_candidates_path_cases_and_selector_o
     assert result.chain_overview_candidates["strong_outperformance_multiple"].eq(2.0).all()
     assert result.chain_overview_candidates["required_winning_path_families"].eq(2).all()
     assert result.chain_overview_candidates["shared_path_family_count"].between(5, 8).all()
-    assert 5 <= result.single_option_path_outcomes["path_role"].nunique() <= 8
+    assert 5 <= result.single_option_decision_path_selections["decision_path_id"].nunique() <= 8
+    assert set(result.single_option_decision_path_selections["decision_path_id"]) == set(result.single_option_path_outcomes["decision_path_id"])
+    assert set(result.single_option_decision_path_selections["decision_path_id"]) == set(result.single_option_representative_paths["decision_path_id"])
+    assert result.single_option_path_outcomes["is_curated_decision_path"].fillna(False).all()
+    assert result.single_option_representative_paths["is_curated_decision_path"].fillna(False).all()
+    assert result.single_option_decision_path_selections["selection_reason"].astype(str).str.len().gt(0).all()
     assert set(result.single_option_path_outcomes["outcome_label"]).issubset(
         {
             "clear_option_win",
@@ -290,7 +396,21 @@ def test_contract_selection_analysis_builds_candidates_path_cases_and_selector_o
         "stock_profit_loss",
         "outperformance_multiple",
         "qualifies_as_winning_path_family",
+        "decision_path_id",
+        "path_family",
+        "path_family_label",
+        "timing_shape",
+        "selection_reason",
     } <= set(result.single_option_path_outcomes.columns)
+    assert {
+        "decision_path_id",
+        "path_family",
+        "path_family_label",
+        "timing_shape",
+        "outcome_label",
+        "selection_score",
+        "selection_reason",
+    } <= set(result.single_option_decision_path_selections.columns)
     assert {
         "Base",
         "Premium -10%",
@@ -941,11 +1061,29 @@ def test_contract_selection_analysis_builds_expanded_path_gallery_and_path_centr
 def test_contract_selection_analysis_builds_stock_and_iv_path_galleries(late_breakout_contract_selection_result):
     result = late_breakout_contract_selection_result
 
+    assert not result.stock_path_library.empty
     assert not result.stock_path_gallery.empty
     assert not result.iv_path_gallery.empty
     assert {
         "path_name",
         "path_label",
+        "path_family",
+        "path_family_label",
+        "timing_shape",
+        "outcome_bias",
+        "library_role",
+        "display_order",
+        "is_active_assumed",
+        "path_description",
+    } <= set(result.stock_path_library.columns)
+    assert {
+        "path_name",
+        "path_label",
+        "path_family",
+        "path_family_label",
+        "timing_shape",
+        "outcome_bias",
+        "path_description",
         "path_role",
         "display_order",
         "date",
@@ -984,6 +1122,16 @@ def test_contract_selection_analysis_builds_stock_and_iv_path_galleries(late_bre
         "plus_20_pct_in_1q",
         "plus_30_pct_in_1q",
     }
+    assert {
+        "minimum_required_path",
+        "early_rally",
+        "late_rally",
+        "steady_grind_up",
+        "false_breakout",
+        "recovery",
+        "earnings_gap",
+        "quarter_pullback",
+    } <= set(result.stock_path_library["path_family"])
     assert set(result.iv_path_gallery["iv_path_name"]) >= {
         "flat",
         "mean_reversion_lower",

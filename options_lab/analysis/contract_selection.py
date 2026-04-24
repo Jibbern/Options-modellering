@@ -42,6 +42,7 @@ from .paths import (
 from .simulation import (
     IV_PATH_GALLERY_PRESETS as _IV_PATH_GALLERY_PRESETS,
     PATH_CENTRIC_FOCUS_PRESETS as _PATH_CENTRIC_FOCUS_PRESETS,
+    build_stock_path_library_rows as _build_stock_path_library_rows,
     build_iv_path_gallery_rows as _build_iv_path_gallery_rows,
     build_iv_path_example as _build_iv_path_example,
     build_iv_path_from_named_points as _build_iv_path_from_named_points,
@@ -53,6 +54,7 @@ from .simulation import (
     humanize_named_path as _humanize_named_path,
     pair_stock_and_iv_paths as _pair_stock_and_iv_paths,
     select_representative_path_pairs as _select_representative_path_pairs,
+    stock_path_family_metadata as _stock_path_family_metadata,
     stock_path_gallery_named_points as _stock_path_gallery_named_points,
 )
 from ..io import OptionChain, OptionContract, load_chain
@@ -286,6 +288,7 @@ class ContractSelectionComputation:
     candidate_comparison: pd.DataFrame
     strike_comparison: pd.DataFrame
     expiry_comparison: pd.DataFrame
+    stock_path_library: pd.DataFrame
     stock_path_gallery: pd.DataFrame
     iv_path_gallery: pd.DataFrame
     stock_path_examples: pd.DataFrame
@@ -356,6 +359,7 @@ class ContractSelectionComputation:
     chain_overview_candidates: pd.DataFrame
     chain_overview_markdown: str
     single_option_decision_summary: pd.DataFrame
+    single_option_decision_path_selections: pd.DataFrame
     single_option_representative_paths: pd.DataFrame
     single_option_path_outcomes: pd.DataFrame
     single_option_path_family_counts: pd.DataFrame
@@ -3075,6 +3079,7 @@ def _build_assumed_path_galleries(
 ) -> dict[str, pd.DataFrame]:
     path_grid = _build_path_grid(snapshot_date, target_date)
     return {
+        "stock_path_library": _build_stock_path_library_rows(active_path_name=stock_path_name),
         "stock_path_gallery": _build_stock_path_gallery_rows(
             path_grid,
             entry_spot=float(entry_spot),
@@ -4241,6 +4246,7 @@ def _build_stress_test_outputs(
 def _single_option_empty_outputs() -> dict[str, Any]:
     return {
         "single_option_decision_summary": pd.DataFrame(),
+        "single_option_decision_path_selections": pd.DataFrame(),
         "single_option_representative_paths": pd.DataFrame(),
         "single_option_path_outcomes": pd.DataFrame(),
         "single_option_path_family_counts": pd.DataFrame(),
@@ -4452,7 +4458,33 @@ def _single_option_required_path_points(
     return rows
 
 
-def _select_decision_comparison_paths(
+def _decision_path_payload(
+    *,
+    path_role: str,
+    path_name: str,
+    path_points: list[dict[str, Any]],
+    selection_reason: str,
+) -> dict[str, Any]:
+    meta = _stock_path_family_metadata(path_name)
+    role = clean_string(path_role) or clean_string(path_name)
+    normalized_name = clean_string(path_name).lower()
+    decision_path_id = role if role == "minimum_required_path" else f"{role}__{normalized_name}"
+    return {
+        "decision_path_id": decision_path_id,
+        "path_role": role,
+        "path_name": normalized_name,
+        "path_label": meta["path_label"],
+        "path_family": meta["path_family"],
+        "path_family_label": meta["path_family_label"],
+        "timing_shape": meta["timing_shape"],
+        "outcome_bias": meta["outcome_bias"],
+        "path_description": meta["path_description"],
+        "selection_reason": clean_string(selection_reason),
+        "path_points": path_points,
+    }
+
+
+def _build_decision_comparison_path_pool(
     *,
     required_stock_path_to_buy: pd.DataFrame,
     anchor_candidate_slug: str,
@@ -4463,7 +4495,7 @@ def _select_decision_comparison_paths(
     entry_spot: float,
 ) -> list[dict[str, Any]]:
     path_grid = _build_path_grid(snapshot_date, target_date)
-    selected_paths: list[dict[str, Any]] = []
+    path_pool: list[dict[str, Any]] = []
     required_points = _single_option_required_path_points(
         required_stock_path_to_buy,
         candidate_slug=anchor_candidate_slug,
@@ -4472,25 +4504,20 @@ def _select_decision_comparison_paths(
         entry_spot=float(entry_spot),
     )
     if required_points:
-        selected_paths.append(
-            {
-                "path_role": "minimum_required_path",
-                "path_name": "minimum_required_path",
-                "path_label": "Minimum Required Path",
-                "path_points": required_points,
-            }
+        path_pool.append(
+            _decision_path_payload(
+                path_role="minimum_required_path",
+                path_name="minimum_required_path",
+                path_points=required_points,
+                selection_reason="Contract-specific required path included as the threshold reference.",
+            )
         )
     used_path_names = {"minimum_required_path"} if required_points else set()
     for role, preset_candidates in SINGLE_OPTION_REPRESENTATIVE_PATH_ROLES:
-        if len(selected_paths) >= 8:
-            break
-        chosen_name = ""
-        chosen_points: dict[str, float] = {}
         for preset in preset_candidates:
             preset_name = clean_string(preset).lower()
             if preset_name in used_path_names:
                 continue
-            chosen_name = preset_name
             if preset_name in THESIS_STOCK_PATH_PRESETS:
                 chosen_points = _default_stock_path_points(
                     preset=preset_name,
@@ -4505,51 +4532,305 @@ def _select_decision_comparison_paths(
                     target_price=float(target_price),
                     target_horizon_label=target_horizon_label,
                 )
-            break
-        if not chosen_name or not chosen_points:
-            continue
-        stock_path = _build_stock_path_from_named_points(
-            path_grid,
-            named_points=chosen_points,
-            path_id=f"decision-{role}",
-            path_name=chosen_name,
-            entry_spot=float(entry_spot),
-        )
-        selected_paths.append(
-            {
-                "path_role": role,
-                "path_name": chosen_name,
-                "path_label": _humanize_named_path(chosen_name, kind="stock"),
-                "path_points": list(stock_path.path_points),
-            }
-        )
-        used_path_names.add(chosen_name)
-    if len(selected_paths) < 5:
-        for fallback in ["range_bound_near_flat", "violent_two_sided_quarter", "plus_20_pct_in_1q"]:
-            if len(selected_paths) >= 5 or fallback in used_path_names:
+            if not chosen_points:
                 continue
             stock_path = _build_stock_path_from_named_points(
                 path_grid,
-                named_points=_stock_path_gallery_named_points(
-                    preset=fallback,
-                    entry_spot=float(entry_spot),
-                    target_price=float(target_price),
-                    target_horizon_label=target_horizon_label,
-                ),
-                path_id=f"decision-{fallback}",
-                path_name=fallback,
+                named_points=chosen_points,
+                path_id=f"decision-{role}-{preset_name}",
+                path_name=preset_name,
                 entry_spot=float(entry_spot),
             )
-            selected_paths.append(
-                {
-                    "path_role": fallback,
-                    "path_name": fallback,
-                    "path_label": _humanize_named_path(fallback, kind="stock"),
-                    "path_points": list(stock_path.path_points),
-                }
+            path_pool.append(
+                _decision_path_payload(
+                    path_role=role,
+                    path_name=preset_name,
+                    path_points=list(stock_path.path_points),
+                    selection_reason=f"Candidate {role.replace('_', ' ')} shape from the stock-path library.",
+                )
             )
-            used_path_names.add(fallback)
-    return selected_paths[:8]
+            used_path_names.add(preset_name)
+    for fallback in ["range_bound_near_flat", "violent_two_sided_quarter", "plus_20_pct_in_1q"]:
+        if fallback in used_path_names:
+            continue
+        stock_path = _build_stock_path_from_named_points(
+            path_grid,
+            named_points=_stock_path_gallery_named_points(
+                preset=fallback,
+                entry_spot=float(entry_spot),
+                target_price=float(target_price),
+                target_horizon_label=target_horizon_label,
+            ),
+            path_id=f"decision-{fallback}",
+            path_name=fallback,
+            entry_spot=float(entry_spot),
+        )
+        path_pool.append(
+            _decision_path_payload(
+                path_role=fallback,
+                path_name=fallback,
+                path_points=list(stock_path.path_points),
+                selection_reason="Fallback scenario-library shape used to preserve decision-path coverage.",
+            )
+        )
+        used_path_names.add(fallback)
+    return path_pool
+
+
+_DECISION_PATH_OUTCOME_ORDER = {
+    "clear_option_win": 0,
+    "wins_but_not_enough": 1,
+    "stock_better": 2,
+    "fail_too_narrow_or_expiry_issue": 3,
+}
+_DECISION_PATH_ROLE_PRIORITY = {
+    "minimum_required_path": 0,
+    "early_rally_path": 1,
+    "steady_grind_up_path": 2,
+    "late_rally_path": 3,
+    "false_breakout_failed_path": 4,
+    "recovery_path": 5,
+    "earnings_gap_path": 6,
+    "range_bound_near_flat": 7,
+    "violent_two_sided_quarter": 8,
+    "plus_20_pct_in_1q": 9,
+}
+_DECISION_PATH_OUTCOME_REASON = {
+    "clear_option_win": "clear option-win coverage",
+    "wins_but_not_enough": "wins-but-not-enough coverage",
+    "stock_better": "stock-better benchmark coverage",
+    "fail_too_narrow_or_expiry_issue": "failure or too-narrow coverage",
+}
+
+
+def _decision_path_base_score(row: dict[str, Any]) -> float:
+    outcome = clean_string(row.get("outcome_label")) or "fail_too_narrow_or_expiry_issue"
+    role = clean_string(row.get("path_role"))
+    difference = abs(_single_option_num(row.get("difference_vs_stock"), 0.0))
+    outperformance = finite_or_none(row.get("outperformance_multiple"))
+    outcome_base = {
+        "clear_option_win": 86.0,
+        "wins_but_not_enough": 82.0,
+        "stock_better": 78.0,
+        "fail_too_narrow_or_expiry_issue": 74.0,
+    }.get(outcome, 70.0)
+    role_bonus = max(0.0, 14.0 - float(_DECISION_PATH_ROLE_PRIORITY.get(role, 12)))
+    threshold_bonus = 12.0 if role == "minimum_required_path" else 0.0
+    magnitude_bonus = min(18.0, difference / 25.0)
+    outperformance_bonus = min(6.0, max(0.0, float(outperformance or 0.0))) if outperformance is not None else 0.0
+    return round(outcome_base + role_bonus + threshold_bonus + magnitude_bonus + outperformance_bonus, 4)
+
+
+def _select_curated_single_option_decision_paths(
+    path_pool: list[dict[str, Any]],
+    pool_outcomes: pd.DataFrame,
+    *,
+    minimum_count: int = 5,
+    maximum_count: int = 8,
+) -> list[dict[str, Any]]:
+    """Pick a deterministic, explainable subset for the single-option chart."""
+
+    if not path_pool or pool_outcomes.empty:
+        return []
+    paths_by_id = {
+        clean_string(path.get("decision_path_id")): dict(path)
+        for path in path_pool
+        if clean_string(path.get("decision_path_id"))
+    }
+    if not paths_by_id:
+        return []
+    outcome_lookup = {
+        clean_string(row.get("decision_path_id")): row
+        for row in pool_outcomes.drop_duplicates(subset=["decision_path_id"], keep="first").to_dict("records")
+        if clean_string(row.get("decision_path_id"))
+    }
+    enriched: list[dict[str, Any]] = []
+    for original_index, path in enumerate(path_pool):
+        decision_path_id = clean_string(path.get("decision_path_id"))
+        outcome = outcome_lookup.get(decision_path_id)
+        if outcome is None:
+            continue
+        merged = {**path, **outcome}
+        merged["_original_index"] = original_index
+        merged["_base_score"] = _decision_path_base_score(merged)
+        enriched.append(merged)
+    if not enriched:
+        return []
+
+    def sort_key(row: dict[str, Any]) -> tuple[float, int, int, int, str]:
+        return (
+            -float(row.get("_base_score") or 0.0),
+            int(_DECISION_PATH_ROLE_PRIORITY.get(clean_string(row.get("path_role")), 99)),
+            int(_DECISION_PATH_OUTCOME_ORDER.get(clean_string(row.get("outcome_label")), 99)),
+            int(row.get("_original_index") or 0),
+            clean_string(row.get("path_name")),
+        )
+
+    selected: list[dict[str, Any]] = []
+    selected_ids: set[str] = set()
+    selected_families: set[str] = set()
+    selected_timings: set[str] = set()
+    selected_outcomes: set[str] = set()
+
+    def choose(row: dict[str, Any], reason_prefix: str) -> None:
+        if len(selected) >= int(maximum_count):
+            return
+        decision_path_id = clean_string(row.get("decision_path_id"))
+        if not decision_path_id or decision_path_id in selected_ids:
+            return
+        chosen = dict(paths_by_id[decision_path_id])
+        outcome_label = clean_string(row.get("outcome_label")) or "fail_too_narrow_or_expiry_issue"
+        family_label = clean_string(row.get("path_family_label")) or clean_string(chosen.get("path_family_label"))
+        timing_shape = clean_string(row.get("timing_shape")) or clean_string(chosen.get("timing_shape"))
+        chosen["display_order"] = len(selected) + 1
+        chosen["outcome_label"] = outcome_label
+        chosen["selection_score"] = round(float(row.get("_base_score") or 0.0), 4)
+        chosen["selection_reason"] = clean_string(
+            f"{reason_prefix}; {family_label} / {timing_shape}; {_DECISION_PATH_OUTCOME_REASON.get(outcome_label, 'outcome coverage')}."
+        )
+        chosen["is_curated_decision_path"] = True
+        selected.append(chosen)
+        selected_ids.add(decision_path_id)
+        selected_families.add(clean_string(row.get("path_family")) or clean_string(chosen.get("path_family")))
+        selected_timings.add(timing_shape)
+        selected_outcomes.add(outcome_label)
+
+    required = [row for row in enriched if clean_string(row.get("path_role")) == "minimum_required_path"]
+    if required:
+        choose(sorted(required, key=sort_key)[0], "Contract-specific threshold path")
+
+    for outcome_label in SINGLE_OPTION_OUTCOME_LABELS:
+        candidates = [
+            row
+            for row in enriched
+            if clean_string(row.get("outcome_label")) == outcome_label
+            and clean_string(row.get("decision_path_id")) not in selected_ids
+        ]
+        if candidates:
+            choose(sorted(candidates, key=sort_key)[0], f"Representative {clean_string(outcome_label).replace('_', ' ')} path")
+
+    while len(selected) < min(int(minimum_count), len(enriched)) and len(selected) < int(maximum_count):
+        remaining = [
+            row
+            for row in enriched
+            if clean_string(row.get("decision_path_id")) not in selected_ids
+        ]
+        if not remaining:
+            break
+
+        def fill_key(row: dict[str, Any]) -> tuple[float, int, int, int, str]:
+            family = clean_string(row.get("path_family"))
+            timing = clean_string(row.get("timing_shape"))
+            outcome = clean_string(row.get("outcome_label"))
+            diversity_score = float(row.get("_base_score") or 0.0)
+            diversity_score += 22.0 if family and family not in selected_families else 0.0
+            diversity_score += 14.0 if timing and timing not in selected_timings else 0.0
+            diversity_score += 12.0 if outcome and outcome not in selected_outcomes else 0.0
+            return (
+                -diversity_score,
+                int(_DECISION_PATH_ROLE_PRIORITY.get(clean_string(row.get("path_role")), 99)),
+                int(_DECISION_PATH_OUTCOME_ORDER.get(outcome, 99)),
+                int(row.get("_original_index") or 0),
+                clean_string(row.get("path_name")),
+            )
+
+        choose(sorted(remaining, key=fill_key)[0], "Added for family, timing, and explanatory coverage")
+
+    if len(selected) < int(maximum_count):
+        remaining = [
+            row
+            for row in enriched
+            if clean_string(row.get("decision_path_id")) not in selected_ids
+        ]
+        for row in sorted(remaining, key=sort_key):
+            if len(selected) >= int(maximum_count):
+                break
+            family = clean_string(row.get("path_family"))
+            timing = clean_string(row.get("timing_shape"))
+            outcome = clean_string(row.get("outcome_label"))
+            if family in selected_families and timing in selected_timings and outcome in selected_outcomes:
+                continue
+            choose(row, "Added because it expands the decision-path explanation set")
+
+    return selected
+
+
+def _single_option_decision_path_selection_frame(
+    *,
+    selected_paths: list[dict[str, Any]],
+    path_outcomes: pd.DataFrame,
+    candidate_slug: str,
+    candidate_short_label: str,
+) -> pd.DataFrame:
+    if not selected_paths or path_outcomes.empty:
+        return pd.DataFrame()
+    outcome_lookup = {
+        clean_string(row.get("decision_path_id")): row
+        for row in path_outcomes.to_dict("records")
+        if clean_string(row.get("decision_path_id"))
+    }
+    rows: list[dict[str, Any]] = []
+    for order, path in enumerate(selected_paths, start=1):
+        decision_path_id = clean_string(path.get("decision_path_id"))
+        outcome = outcome_lookup.get(decision_path_id, {})
+        rows.append(
+            {
+                "candidate_slug": candidate_slug,
+                "candidate_short_label": candidate_short_label,
+                "decision_path_id": decision_path_id,
+                "path_role": clean_string(path.get("path_role")),
+                "path_name": clean_string(path.get("path_name")),
+                "path_label": clean_string(path.get("path_label")),
+                "path_family": clean_string(path.get("path_family")),
+                "path_family_label": clean_string(path.get("path_family_label")),
+                "timing_shape": clean_string(path.get("timing_shape")),
+                "outcome_bias": clean_string(path.get("outcome_bias")),
+                "outcome_label": clean_string(outcome.get("outcome_label")) or clean_string(path.get("outcome_label")),
+                "display_order": int(path.get("display_order") or order),
+                "selection_score": finite_or_none(path.get("selection_score")),
+                "selection_reason": clean_string(path.get("selection_reason")),
+                "exit_stock_price": finite_or_none(outcome.get("exit_stock_price")),
+                "difference_vs_stock": finite_or_none(outcome.get("difference_vs_stock")),
+                "outperformance_multiple": finite_or_none(outcome.get("outperformance_multiple")),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _select_decision_comparison_paths(
+    *,
+    required_stock_path_to_buy: pd.DataFrame,
+    anchor_candidate_slug: str,
+    snapshot_date: date,
+    target_date: date,
+    target_price: float,
+    target_horizon_label: str,
+    entry_spot: float,
+) -> list[dict[str, Any]]:
+    path_pool = _build_decision_comparison_path_pool(
+        required_stock_path_to_buy=required_stock_path_to_buy,
+        anchor_candidate_slug=anchor_candidate_slug,
+        snapshot_date=snapshot_date,
+        target_date=target_date,
+        target_price=target_price,
+        target_horizon_label=target_horizon_label,
+        entry_spot=entry_spot,
+    )
+    selected: list[dict[str, Any]] = []
+    seen_roles: set[str] = set()
+    for path in path_pool:
+        role = clean_string(path.get("path_role"))
+        if role in seen_roles:
+            continue
+        chosen = dict(path)
+        chosen["display_order"] = len(selected) + 1
+        chosen["selection_score"] = 0.0
+        chosen["is_curated_decision_path"] = True
+        selected.append(chosen)
+        seen_roles.add(role)
+        if len(selected) >= 8:
+            break
+    return selected
 
 
 def _evaluate_candidate_on_decision_paths(
@@ -4568,6 +4849,7 @@ def _evaluate_candidate_on_decision_paths(
     minimum_outperformance_multiple: float,
     strong_outperformance_multiple: float,
     include_trace_rows: bool = True,
+    max_paths: int | None = 8,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     strike_value = _single_option_num(spec.get("strike_label"), 0.0)
     representative_rows: list[dict[str, Any]] = []
@@ -4575,10 +4857,23 @@ def _evaluate_candidate_on_decision_paths(
     timing_rows: list[dict[str, Any]] = []
     normalized_exit_rule = clean_string(exit_rule).lower() or "sell_on_thesis_completion"
 
-    for display_order, path in enumerate(selected_paths[:8], start=1):
+    paths_to_evaluate = selected_paths if max_paths is None else selected_paths[: int(max_paths)]
+    for fallback_display_order, path in enumerate(paths_to_evaluate, start=1):
         path_points = list(path.get("path_points") or [])
         if not path_points:
             continue
+        decision_path_id = clean_string(path.get("decision_path_id")) or clean_string(path.get("path_role"))
+        path_role = clean_string(path.get("path_role"))
+        path_name = clean_string(path.get("path_name"))
+        path_label = clean_string(path.get("path_label")) or _humanize_named_path(path_name, kind="stock")
+        path_family = clean_string(path.get("path_family"))
+        path_family_label = clean_string(path.get("path_family_label"))
+        timing_shape = clean_string(path.get("timing_shape"))
+        outcome_bias = clean_string(path.get("outcome_bias"))
+        path_description = clean_string(path.get("path_description"))
+        selection_reason = clean_string(path.get("selection_reason"))
+        selection_score = finite_or_none(path.get("selection_score"))
+        display_order = int(path.get("display_order") or fallback_display_order)
         path_evaluations: list[dict[str, Any]] = []
         first_cross_strike_day: int | None = None
         for step_index, point in enumerate(path_points):
@@ -4601,9 +4896,18 @@ def _evaluate_candidate_on_decision_paths(
                     {
                         "candidate_slug": candidate_slug,
                         "candidate_short_label": candidate_short_label,
-                        "path_role": path["path_role"],
-                        "path_name": path["path_name"],
-                        "path_label": path["path_label"],
+                        "decision_path_id": decision_path_id,
+                        "path_role": path_role,
+                        "path_name": path_name,
+                        "path_label": path_label,
+                        "path_family": path_family,
+                        "path_family_label": path_family_label,
+                        "timing_shape": timing_shape,
+                        "outcome_bias": outcome_bias,
+                        "path_description": path_description,
+                        "selection_score": selection_score,
+                        "selection_reason": selection_reason,
+                        "is_curated_decision_path": bool(path.get("is_curated_decision_path", False)),
                         "display_order": display_order,
                         "step_index": int(point.get("step_index") if point.get("step_index") is not None else step_index),
                         "date": clean_string(point.get("date")),
@@ -4670,9 +4974,18 @@ def _evaluate_candidate_on_decision_paths(
                 "candidate_slug": candidate_slug,
                 "candidate_label": candidate_label,
                 "candidate_short_label": candidate_short_label,
-                "path_role": path["path_role"],
-                "path_name": path["path_name"],
-                "path_label": path["path_label"],
+                "decision_path_id": decision_path_id,
+                "path_role": path_role,
+                "path_name": path_name,
+                "path_label": path_label,
+                "path_family": path_family,
+                "path_family_label": path_family_label,
+                "timing_shape": timing_shape,
+                "outcome_bias": outcome_bias,
+                "path_description": path_description,
+                "selection_score": selection_score,
+                "selection_reason": selection_reason,
+                "is_curated_decision_path": bool(path.get("is_curated_decision_path", False)),
                 "display_order": display_order,
                 "exit_rule": normalized_exit_rule,
                 "exit_date": clean_string(exit_point.get("date")),
@@ -4699,8 +5012,16 @@ def _evaluate_candidate_on_decision_paths(
             {
                 "candidate_slug": candidate_slug,
                 "candidate_short_label": candidate_short_label,
-                "path_role": path["path_role"],
-                "path_label": path["path_label"],
+                "decision_path_id": decision_path_id,
+                "path_role": path_role,
+                "path_name": path_name,
+                "path_label": path_label,
+                "path_family": path_family,
+                "path_family_label": path_family_label,
+                "timing_shape": timing_shape,
+                "selection_score": selection_score,
+                "selection_reason": selection_reason,
+                "is_curated_decision_path": bool(path.get("is_curated_decision_path", False)),
                 "first_cross_above_strike_day": first_cross_strike_day,
                 "exit_requested_days": int(exit_eval.get("requested_days") or 0),
                 "exit_effective_days": int(exit_eval.get("effective_days") or 0),
@@ -4750,7 +5071,7 @@ def _build_single_option_decision_markdown(
         "",
         "In plain terms: what stock paths make one selected call worth buying instead of buying stock?",
         "",
-        "This section asks whether the selected call is worth buying instead of buying the stock under multiple representative stock-path families. It is not a universal recommendation engine; it is a path-relative decision read using the same frozen valuation engine as the rest of the bundle.",
+        "This section asks whether the selected call is worth buying instead of buying the stock under a curated set of decision paths. The broad path gallery stays separate as a scenario library; this view keeps only the paths that explain the selected option.",
         "",
         "## Summary Bullets",
         "",
@@ -4764,7 +5085,8 @@ def _build_single_option_decision_markdown(
             "",
             "## Files To Open",
             "",
-            "- `charts/single_option_decision_view.png`: hero path chart, bullets, IV sensitivity, and entry sensitivity.",
+            "- `charts/single_option_decision_view.png`: curated decision-path chart, bullets, IV sensitivity, and entry sensitivity.",
+            "- `tables/single_option_decision_path_selections.csv`: selected decision paths with family, outcome label, score, and reason.",
             "- `tables/single_option_path_outcomes.csv`: path-by-path option-vs-stock outcomes.",
             "- `tables/single_option_iv_sensitivity.csv`: low/base/high IV sensitivity for the same selected option.",
             "- `tables/single_option_entry_sensitivity.csv`: cheap/reference/expensive entry sensitivity.",
@@ -4832,7 +5154,7 @@ def _build_single_option_decision_outputs(
         active_iv_horizons,
         default_value=0.0,
     )
-    selected_paths = _select_decision_comparison_paths(
+    path_pool = _build_decision_comparison_path_pool(
         required_stock_path_to_buy=required_stock_path_to_buy,
         anchor_candidate_slug=selected_slug,
         snapshot_date=snapshot_date,
@@ -4841,6 +5163,24 @@ def _build_single_option_decision_outputs(
         target_horizon_label=target_horizon_label,
         entry_spot=float(entry_spot),
     )
+    _, pool_outcomes, _ = _evaluate_candidate_on_decision_paths(
+        spec,
+        candidate_slug=selected_slug,
+        candidate_label=candidate_label,
+        candidate_short_label=candidate_short_label,
+        selected_paths=path_pool,
+        target_price=float(target_price),
+        active_iv_path=active_iv_path,
+        comparison_capital=float(comparison_capital),
+        premium_used=float(premium_used),
+        exit_rule=normalized_exit_rule,
+        target_return_pct=float(target_return_pct),
+        minimum_outperformance_multiple=float(minimum_outperformance_multiple),
+        strong_outperformance_multiple=float(strong_outperformance_multiple),
+        include_trace_rows=False,
+        max_paths=None,
+    )
+    selected_paths = _select_curated_single_option_decision_paths(path_pool, pool_outcomes)
     representative_paths, path_outcomes, timing_sensitivity = _evaluate_candidate_on_decision_paths(
         spec,
         candidate_slug=selected_slug,
@@ -4859,8 +5199,14 @@ def _build_single_option_decision_outputs(
     )
     if path_outcomes.empty:
         return outputs
+    decision_path_selections = _single_option_decision_path_selection_frame(
+        selected_paths=selected_paths,
+        path_outcomes=path_outcomes,
+        candidate_slug=selected_slug,
+        candidate_short_label=candidate_short_label,
+    )
     qualifying_count = int(path_outcomes.get("qualifies_as_winning_path_family", pd.Series(dtype=bool)).fillna(False).sum())
-    evaluated_count = int(path_outcomes["path_role"].nunique())
+    evaluated_count = int(path_outcomes["decision_path_id"].nunique()) if "decision_path_id" in path_outcomes.columns else int(path_outcomes["path_role"].nunique())
     too_narrow = qualifying_count < int(required_winning_path_families)
     family_counts = pd.DataFrame(
         [
@@ -5037,6 +5383,7 @@ def _build_single_option_decision_outputs(
     )
     return {
         "single_option_decision_summary": summary,
+        "single_option_decision_path_selections": decision_path_selections,
         "single_option_representative_paths": representative_paths,
         "single_option_path_outcomes": path_outcomes,
         "single_option_path_family_counts": family_counts,
@@ -8800,6 +9147,7 @@ def _build_contract_selection_core(
         candidate_comparison=candidates,
         strike_comparison=strike_comparison,
         expiry_comparison=expiry_comparison,
+        stock_path_library=gallery_outputs["stock_path_library"],
         stock_path_gallery=gallery_outputs["stock_path_gallery"],
         iv_path_gallery=gallery_outputs["iv_path_gallery"],
         stock_path_examples=simulation_outputs["stock_path_examples"],
@@ -8870,6 +9218,7 @@ def _build_contract_selection_core(
         chain_overview_candidates=chain_overview_outputs["chain_overview_candidates"],
         chain_overview_markdown=chain_overview_outputs["chain_overview_markdown"],
         single_option_decision_summary=single_option_outputs["single_option_decision_summary"],
+        single_option_decision_path_selections=single_option_outputs["single_option_decision_path_selections"],
         single_option_representative_paths=single_option_outputs["single_option_representative_paths"],
         single_option_path_outcomes=single_option_outputs["single_option_path_outcomes"],
         single_option_path_family_counts=single_option_outputs["single_option_path_family_counts"],

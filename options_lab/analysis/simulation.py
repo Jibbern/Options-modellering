@@ -55,6 +55,201 @@ IV_PATH_GALLERY_PRESETS = [
     "iv_down_then_stays_low",
     "earnings_build_then_crush",
 ]
+STOCK_PATH_FAMILY_DEFINITIONS: dict[str, dict[str, str]] = {
+    "minimum_required_path": {
+        "path_family": "minimum_required_path",
+        "path_family_label": "Minimum Required Path",
+        "timing_shape": "contract_specific_threshold",
+        "outcome_bias": "required_threshold",
+        "path_description": "Minimum stock path required for the selected option to clear the active decision goal.",
+    },
+    "early_rally": {
+        "path_family": "early_rally",
+        "path_family_label": "Early Rally",
+        "timing_shape": "front_loaded_upside",
+        "outcome_bias": "option_friendly_if_held",
+        "path_description": "Upside arrives early enough to help convex options before theta decay dominates.",
+    },
+    "late_rally": {
+        "path_family": "late_rally",
+        "path_family_label": "Late Rally",
+        "timing_shape": "back_loaded_upside",
+        "outcome_bias": "timing_sensitive",
+        "path_description": "The endpoint can be bullish, but the move arrives late and can leave calls behind stock.",
+    },
+    "steady_grind_up": {
+        "path_family": "steady_grind_up",
+        "path_family_label": "Steady Grind-Up",
+        "timing_shape": "smooth_uptrend",
+        "outcome_bias": "balanced_bullish",
+        "path_description": "A steady upward path that tests whether the option works without a dramatic spike.",
+    },
+    "false_breakout": {
+        "path_family": "false_breakout",
+        "path_family_label": "False Breakout",
+        "timing_shape": "spike_then_giveback",
+        "outcome_bias": "exit_rule_sensitive",
+        "path_description": "An early move can briefly help, but giveback tests whether the option needs perfect timing.",
+    },
+    "recovery": {
+        "path_family": "recovery",
+        "path_family_label": "Recovery",
+        "timing_shape": "down_then_recover",
+        "outcome_bias": "drawdown_sensitive",
+        "path_description": "Down first, then recovery; useful for seeing whether the contract can survive a bad start.",
+    },
+    "earnings_gap": {
+        "path_family": "earnings_gap",
+        "path_family_label": "Earnings Gap",
+        "timing_shape": "event_gap_then_follow_through",
+        "outcome_bias": "event_sensitive",
+        "path_description": "Event-style gap behavior that can separate stock-path effect from timing and IV risk.",
+    },
+    "quarter_pullback": {
+        "path_family": "quarter_pullback",
+        "path_family_label": "Quarter-Up Then Pullback",
+        "timing_shape": "quarterly_spike_then_pullback",
+        "outcome_bias": "profit_taking_sensitive",
+        "path_description": "A strong move fades before the target window, testing whether gains must be harvested early.",
+    },
+    "range_bound": {
+        "path_family": "range_bound",
+        "path_family_label": "Range-Bound",
+        "timing_shape": "sideways_chop",
+        "outcome_bias": "stock_or_wait",
+        "path_description": "Mostly sideways behavior that exposes premium decay and weak edge cases.",
+    },
+    "volatile_two_sided": {
+        "path_family": "volatile_two_sided",
+        "path_family_label": "Volatile Two-Sided",
+        "timing_shape": "large_swings",
+        "outcome_bias": "timing_and_exit_sensitive",
+        "path_description": "Large swings in both directions, useful for stress-testing path dependence.",
+    },
+    "downside_failure": {
+        "path_family": "downside_failure",
+        "path_family_label": "Downside Failure",
+        "timing_shape": "bleed_lower",
+        "outcome_bias": "option_failure",
+        "path_description": "A weak path where the bullish option should normally fail or remain too narrow.",
+    },
+    "overshoot_mean_revert": {
+        "path_family": "overshoot_mean_revert",
+        "path_family_label": "Overshoot Then Mean-Revert",
+        "timing_shape": "overshoot_then_settle",
+        "outcome_bias": "exit_rule_sensitive",
+        "path_description": "The endpoint can look fine, but the route tests whether early overshoot matters more than finish.",
+    },
+    "custom_or_active": {
+        "path_family": "custom_or_active",
+        "path_family_label": "Custom / Active Assumption",
+        "timing_shape": "user_defined",
+        "outcome_bias": "assumption_specific",
+        "path_description": "User-provided or active assumed path, kept separate from the built-in scenario library.",
+    },
+}
+
+_STOCK_PATH_FAMILY_BY_PRESET = {
+    "minimum_required_path": "minimum_required_path",
+    "rally_early_then_fade_then_rally_again": "early_rally",
+    "early_breakout_to_target": "early_rally",
+    "plus_20_pct_in_1m": "early_rally",
+    "plus_30_pct_in_1m": "early_rally",
+    "plus_20_pct_in_1q": "steady_grind_up",
+    "plus_30_pct_in_1q": "steady_grind_up",
+    "late_breakout": "late_rally",
+    "late_breakout_to_target": "late_rally",
+    "reaches_target_late_near_expiry": "late_rally",
+    "slow_grind_up": "steady_grind_up",
+    "slow_grind_to_target": "steady_grind_up",
+    "two_stage_bull_run": "steady_grind_up",
+    "rally_then_long_range_then_second_leg_up": "steady_grind_up",
+    "false_breakout_then_recover": "false_breakout",
+    "early_move_above_strike_then_giveback": "false_breakout",
+    "rally_retrace_finish_target": "false_breakout",
+    "down_first_then_recovery": "recovery",
+    "down_then_recover_to_target": "recovery",
+    "earnings_gap_down_then_recovery": "recovery",
+    "quarter_down_then_next_quarter_recovery": "recovery",
+    "earnings_gap_up_then_fade": "earnings_gap",
+    "quarter_up_then_pullback": "quarter_pullback",
+    "quarter_up_then_hard_pullback": "quarter_pullback",
+    "range_bound_near_flat": "range_bound",
+    "high_vol_sideways_then_breakout": "volatile_two_sided",
+    "high_swing_quarterly_path": "volatile_two_sided",
+    "violent_two_sided_quarter": "volatile_two_sided",
+    "violent_path_to_target": "volatile_two_sided",
+    "slow_bleed_then_capitulation_then_bounce": "downside_failure",
+    "two_quarters_down_then_flat_then_recovery": "downside_failure",
+    "overshoot_then_mean_revert": "overshoot_mean_revert",
+    "overshoot_then_settle_at_target": "overshoot_mean_revert",
+    "fast_overshoot_then_sideways": "overshoot_mean_revert",
+    "weak_start_then_acceleration": "recovery",
+    "active_assumed_path": "custom_or_active",
+}
+
+
+def stock_path_family_metadata(path_name: str) -> dict[str, str]:
+    """Return stable product labels for a named stock-path shape."""
+
+    normalized = clean_string(path_name).lower()
+    family_key = _STOCK_PATH_FAMILY_BY_PRESET.get(normalized, "custom_or_active")
+    family = dict(STOCK_PATH_FAMILY_DEFINITIONS[family_key])
+    family["path_name"] = normalized
+    family["path_label"] = humanize_named_path(normalized, kind="stock")
+    return family
+
+
+def build_stock_path_library_rows(*, active_path_name: str | None = None) -> pd.DataFrame:
+    """Return one-row-per-path metadata for the full stock-path scenario library."""
+
+    active_name = clean_string(active_path_name).lower()
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def add_path(path_name: str, *, library_role: str, display_order: int, is_active: bool = False) -> None:
+        normalized = clean_string(path_name).lower()
+        if not normalized or normalized in seen:
+            return
+        seen.add(normalized)
+        meta = stock_path_family_metadata(normalized)
+        rows.append(
+            {
+                "path_name": normalized,
+                "path_label": meta["path_label"],
+                "path_family": meta["path_family"],
+                "path_family_label": meta["path_family_label"],
+                "timing_shape": meta["timing_shape"],
+                "outcome_bias": meta["outcome_bias"],
+                "library_role": library_role,
+                "display_order": int(display_order),
+                "is_active_assumed": bool(is_active),
+                "path_description": meta["path_description"],
+            }
+        )
+
+    add_path("minimum_required_path", library_role="contract_specific_decision_path", display_order=0)
+    for index, preset_name in enumerate(STOCK_PATH_GALLERY_PRESETS, start=10):
+        add_path(preset_name, library_role="broad_scenario_gallery", display_order=index, is_active=preset_name == active_name)
+    for index, preset_name in enumerate(
+        [
+            "early_breakout_to_target",
+            "slow_grind_to_target",
+            "down_then_recover_to_target",
+            "rally_retrace_finish_target",
+            "late_breakout_to_target",
+            "overshoot_then_settle_at_target",
+            "fast_overshoot_then_sideways",
+            "weak_start_then_acceleration",
+            "two_stage_bull_run",
+            "violent_path_to_target",
+        ],
+        start=100,
+    ):
+        add_path(preset_name, library_role="target_endpoint_thesis_path", display_order=index, is_active=preset_name == active_name)
+    if active_name and active_name not in seen:
+        add_path(active_name, library_role="active_custom_assumption", display_order=999, is_active=True)
+    return pd.DataFrame(rows).sort_values(["display_order", "path_name"]).reset_index(drop=True)
 
 
 @dataclass(frozen=True)
@@ -490,6 +685,7 @@ def build_stock_path_gallery_rows(
     active_name = clean_string(active_path_name).lower()
     active_in_gallery = active_name in STOCK_PATH_GALLERY_PRESETS
     for display_order, preset_name in enumerate(STOCK_PATH_GALLERY_PRESETS, start=1):
+        metadata = stock_path_family_metadata(preset_name)
         example = build_stock_path_from_named_points(
             grid,
             named_points=stock_path_gallery_named_points(
@@ -507,6 +703,11 @@ def build_stock_path_gallery_rows(
                 {
                     "path_name": preset_name,
                     "path_label": humanize_named_path(preset_name, kind="stock"),
+                    "path_family": metadata["path_family"],
+                    "path_family_label": metadata["path_family_label"],
+                    "timing_shape": metadata["timing_shape"],
+                    "outcome_bias": metadata["outcome_bias"],
+                    "path_description": metadata["path_description"],
                     "path_role": "gallery_named_path",
                     "display_order": display_order,
                     "date": point.get("date"),
@@ -517,6 +718,7 @@ def build_stock_path_gallery_rows(
                 }
             )
     if not active_in_gallery:
+        metadata = stock_path_family_metadata(active_name or "active_assumed_path")
         active_example = build_stock_path_from_named_points(
             grid,
             named_points=active_named_points,
@@ -529,6 +731,11 @@ def build_stock_path_gallery_rows(
                 {
                     "path_name": active_name or "active_assumed_path",
                     "path_label": humanize_named_path("active_assumed_path", kind="stock"),
+                    "path_family": metadata["path_family"],
+                    "path_family_label": metadata["path_family_label"],
+                    "timing_shape": metadata["timing_shape"],
+                    "outcome_bias": metadata["outcome_bias"],
+                    "path_description": metadata["path_description"],
                     "path_role": "active_assumed_path",
                     "display_order": len(STOCK_PATH_GALLERY_PRESETS) + 1,
                     "date": point.get("date"),

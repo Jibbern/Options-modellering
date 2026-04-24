@@ -7012,10 +7012,12 @@ def _render_contract_selection_body(
     strike_comparison_under_path = _load_csv(artifact_dir / "strike_comparison_under_path.csv")
     expiry_comparison_under_path = _load_csv(artifact_dir / "expiry_comparison_under_path.csv")
     path_risk_summary = _load_csv(artifact_dir / "path_risk_summary.csv")
+    stock_path_library = _load_csv(artifact_dir / "stock_path_library.csv")
     chain_overview_summary = _load_csv(artifact_dir / "chain_overview_summary.csv")
     chain_overview_candidates = _load_csv(artifact_dir / "chain_overview_candidates.csv")
     chain_overview_markdown = _load_markdown(artifact_dir / "chain_overview.md")
     single_option_summary = _load_csv(artifact_dir / "single_option_decision_summary.csv")
+    single_option_decision_paths = _load_csv(artifact_dir / "single_option_decision_path_selections.csv")
     single_option_path_outcomes = _load_csv(artifact_dir / "single_option_path_outcomes.csv")
     single_option_iv_sensitivity = _load_csv(artifact_dir / "single_option_iv_sensitivity.csv")
     single_option_entry_sensitivity = _load_csv(artifact_dir / "single_option_entry_sensitivity.csv")
@@ -7324,6 +7326,20 @@ def _render_contract_selection_body(
         ],
         limit=1,
     )
+    single_option_decision_paths_table = subset_frame(
+        single_option_decision_paths,
+        [
+            "path_label",
+            "path_family_label",
+            "timing_shape",
+            "outcome_label",
+            "selection_score",
+            "selection_reason",
+            "difference_vs_stock",
+            "outperformance_multiple",
+        ],
+        limit=8,
+    )
     single_option_outcomes_table = subset_frame(
         single_option_path_outcomes,
         [
@@ -7337,6 +7353,18 @@ def _render_contract_selection_body(
             "outcome_note",
         ],
         limit=8,
+    )
+    stock_path_library_table = subset_frame(
+        stock_path_library,
+        [
+            "path_label",
+            "path_family_label",
+            "timing_shape",
+            "outcome_bias",
+            "library_role",
+            "path_description",
+        ],
+        limit=32,
     )
     single_option_iv_table = subset_frame(
         single_option_iv_sensitivity,
@@ -7452,11 +7480,12 @@ def _render_contract_selection_body(
         + _render_inline_dataframe("Chain Overview Candidate Table", chain_overview_table, table_id="chain-overview-candidates", published=published)
         + render_chart_section(
             "Single-Option Decision View",
-            "This frozen section asks what stock paths make the selected call worth buying instead of buying stock. It renders saved analysis artifacts only.",
+            "This frozen section asks what stock paths make the selected call worth buying instead of buying stock. It uses a curated decision-path subset, while the broad scenario gallery remains separate.",
             ["single_option_decision_view.png"],
         )
         + render_markdown_panel("Single-Option Decision Notes", single_option_markdown)
         + _render_inline_dataframe("Single-Option Summary", single_option_summary_table, table_id="single-option-summary", published=published)
+        + _render_inline_dataframe("Curated Decision Path Selection", single_option_decision_paths_table, table_id="single-option-decision-paths", published=published)
         + _render_inline_dataframe("Single-Option Path Outcomes", single_option_outcomes_table, table_id="single-option-path-outcomes", published=published)
         + _render_inline_dataframe("Single-Option IV Sensitivity", single_option_iv_table, table_id="single-option-iv", published=published)
         + _render_inline_dataframe("Single-Option Entry Sensitivity", single_option_entry_table, table_id="single-option-entry", published=published)
@@ -7484,6 +7513,12 @@ def _render_contract_selection_body(
             ["required_path_vs_assumed_path.png", "required_path_strategy_compare.png"],
         )
         + _render_inline_dataframe("Required vs Assumed Path Summary", required_vs_assumed_table, table_id="required-vs-assumed", published=published)
+        + render_chart_section(
+            "Stock Path Gallery",
+            "The full named stock-path library is a browsing surface for possible futures. It is intentionally broader than the single-option decision chart.",
+            ["stock_path_gallery.png"],
+        )
+        + _render_inline_dataframe("Stock Path Library Metadata", stock_path_library_table, table_id="stock-path-library", published=published)
         + render_chart_section(
             "Representative Paths",
             "Representative paths keep stock and IV separate, so you can see how the same thesis behaves under different noisy futures without treating them as forecasts.",
