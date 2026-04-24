@@ -366,6 +366,7 @@ def test_cli_parser_rejects_unknown_commands():
         parser.parse_args(["definitely-not-a-command"])
 
 
+@pytest.mark.slow
 def test_cli_analyze_and_publish_commands_emit_bundle_backed_json(capsys, temp_analysis_root: Path):
     analyze_exit = main(
         [

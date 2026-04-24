@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from options_lab.analysis import (
     build_contract_selection_analysis,
@@ -26,6 +27,19 @@ from options_lab.io import load_chain
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_ROOT = PROJECT_ROOT / "data"
+
+
+@pytest.fixture(scope="module")
+def late_breakout_contract_selection_result():
+    return build_contract_selection_analysis(
+        ticker="GPRE",
+        snapshot_date="2026-04-12",
+        target_price=20.0,
+        target_date="2026-07-15",
+        data_root=DATA_ROOT,
+        stock_path_preset="late_breakout",
+        iv_path_preset="flat",
+    )
 
 
 def test_path_case_variants_keep_custom_paths_separate_from_builtin_presets():
@@ -130,6 +144,7 @@ def test_thesis_mode_keeps_target_galleries_when_no_long_calls_exist():
     assert "charts/current_vs_justified_premium.png" not in outputs["thesis_mode_markdown"]
 
 
+@pytest.mark.slow
 def test_contract_selection_analysis_builds_candidates_path_cases_and_selector_outputs():
     result = build_contract_selection_analysis(
         ticker="GPRE",
@@ -628,6 +643,7 @@ def test_contract_selection_analysis_builds_candidates_path_cases_and_selector_o
     assert result.report_metadata["research_context"]["options_overview"]
 
 
+@pytest.mark.slow
 def test_contract_selection_analysis_supports_target_option_value_required_path_outputs():
     result = build_contract_selection_analysis(
         ticker="GPRE",
@@ -644,6 +660,7 @@ def test_contract_selection_analysis_supports_target_option_value_required_path_
     assert result.required_path_summary["required_path_difficulty"].notna().any()
 
 
+@pytest.mark.slow
 def test_contract_selection_analysis_generates_simulated_path_outputs():
     result = build_contract_selection_analysis(
         ticker="GPRE",
@@ -749,16 +766,11 @@ def test_contract_selection_analysis_generates_simulated_path_outputs():
     }
 
 
-def test_contract_selection_analysis_builds_expanded_path_gallery_and_path_centric_long_call_outputs():
-    result = build_contract_selection_analysis(
-        ticker="GPRE",
-        snapshot_date="2026-04-12",
-        target_price=20.0,
-        target_date="2026-07-15",
-        data_root=DATA_ROOT,
-        stock_path_preset="late_breakout",
-        iv_path_preset="flat",
-    )
+@pytest.mark.slow
+def test_contract_selection_analysis_builds_expanded_path_gallery_and_path_centric_long_call_outputs(
+    late_breakout_contract_selection_result,
+):
+    result = late_breakout_contract_selection_result
 
     expected_gallery_paths = {
         "rally_early_then_fade_then_rally_again",
@@ -925,16 +937,9 @@ def test_contract_selection_analysis_builds_expanded_path_gallery_and_path_centr
     assert set(late_breakout_robustness["iv_expanded_family"]) >= {"strike", "expiry", "best_of"}
 
 
-def test_contract_selection_analysis_builds_stock_and_iv_path_galleries():
-    result = build_contract_selection_analysis(
-        ticker="GPRE",
-        snapshot_date="2026-04-12",
-        target_price=20.0,
-        target_date="2026-07-15",
-        data_root=DATA_ROOT,
-        stock_path_preset="late_breakout",
-        iv_path_preset="flat",
-    )
+@pytest.mark.slow
+def test_contract_selection_analysis_builds_stock_and_iv_path_galleries(late_breakout_contract_selection_result):
+    result = late_breakout_contract_selection_result
 
     assert not result.stock_path_gallery.empty
     assert not result.iv_path_gallery.empty
@@ -1033,16 +1038,9 @@ def test_named_stock_path_presets_generate_non_flat_shapes():
         assert any(abs(value - 16.0) > 0.25 for value in prices[1:-1])
 
 
-def test_contract_selection_analysis_builds_assumed_path_long_call_views():
-    result = build_contract_selection_analysis(
-        ticker="GPRE",
-        snapshot_date="2026-04-12",
-        target_price=20.0,
-        target_date="2026-07-15",
-        data_root=DATA_ROOT,
-        stock_path_preset="late_breakout",
-        iv_path_preset="flat",
-    )
+@pytest.mark.slow
+def test_contract_selection_analysis_builds_assumed_path_long_call_views(late_breakout_contract_selection_result):
+    result = late_breakout_contract_selection_result
 
     assert not result.long_call_value_over_path_strike_view.empty
     assert not result.long_call_value_over_path_expiry_view.empty
@@ -1264,6 +1262,7 @@ def test_selector_cards_emit_no_clear_edge_when_rows_compress():
     assert "does not separate the families enough" in overall["reason"]
 
 
+@pytest.mark.slow
 def test_scenario_publish_embeds_contract_selection_path_case_data_and_ui_controls(temp_analysis_root: Path):
     contract_result = build_contract_selection_analysis(
         ticker="GPRE",

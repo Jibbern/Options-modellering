@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from options_lab.analysis import (
     build_contract_selection_analysis,
@@ -42,6 +43,7 @@ def test_strike_expiry_tradeoff_plot_writes_empty_state_for_no_long_calls(temp_w
     assert output_path.exists()
 
 
+@pytest.mark.slow
 def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_html(temp_analysis_root: Path):
     result = build_contract_selection_analysis(
         ticker="GPRE",
@@ -532,6 +534,7 @@ def test_publish_analysis_bundle_renders_dashboard_from_canonical_bundle(temp_an
     assert "file:///" not in html
 
 
+@pytest.mark.slow
 def test_contract_selection_publish_uses_bundle_relative_dashboard_links_without_local_path_leaks(temp_analysis_root: Path):
     scenario_result = build_scenario_analysis(
         ticker="GPRE",
@@ -591,6 +594,7 @@ def test_contract_selection_publish_uses_bundle_relative_dashboard_links_without
     assert "Source Snapshot Files" not in published_summary_csv
 
 
+@pytest.mark.slow
 def test_publish_dashboard_ignores_stray_publish_files_and_uses_bundle_file_map(temp_analysis_root: Path):
     result = build_contract_selection_analysis(
         ticker="GPRE",
@@ -622,6 +626,7 @@ def test_publish_dashboard_ignores_stray_publish_files_and_uses_bundle_file_map(
     assert "zzz_noise.png" not in html
 
 
+@pytest.mark.slow
 def test_scenario_publish_carries_explicit_related_contract_run_context(temp_analysis_root: Path):
     contract_result = build_contract_selection_analysis(
         ticker="GPRE",

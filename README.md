@@ -40,6 +40,28 @@ Curated output command:
 
 - `build-model-outputs`
 
+## Development
+
+Install the local dependency set with:
+
+```powershell
+..\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+`requirements.txt` is constrained by `constraints.txt`, which pins the known-good direct dependency versions used by the current test environment.
+
+The default test command runs the fast suite only:
+
+```powershell
+..\.venv\Scripts\python.exe -m pytest -q
+```
+
+Large end-to-end bundle and publish tests are marked `slow` and are skipped by default. Run them explicitly with:
+
+```powershell
+..\.venv\Scripts\python.exe -m pytest -q -m slow
+```
+
 Examples:
 
 ```powershell

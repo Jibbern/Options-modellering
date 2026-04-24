@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from options_lab.analysis import (
     build_contract_selection_analysis,
     build_replay_analysis,
@@ -17,6 +19,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_ROOT = PROJECT_ROOT / "data"
 
 
+@pytest.mark.slow
 def test_dashboards_library_is_rebuilt_only_from_bundle_publishes(temp_workspace_root: Path):
     analysis_root = temp_workspace_root / "analysis_outputs"
     dashboards_root = temp_workspace_root / "Dashboards"

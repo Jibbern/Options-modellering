@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import textwrap
 from typing import Any
+import warnings
 
 import matplotlib
 
@@ -266,10 +267,20 @@ def _apply_date_ticks(ax, tick_map: pd.DataFrame, *, label_column: str = "date")
 def _finalize(fig, output_path: str | Path) -> Path:
     path = Path(output_path)
     ensure_directory(path.parent)
-    fig.tight_layout()
+    _apply_tight_layout(fig)
     fig.savefig(windows_extended_path(path), dpi=160, bbox_inches="tight")
     plt.close(fig)
     return path
+
+
+def _apply_tight_layout(fig, **kwargs: Any) -> None:
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="This figure includes Axes that are not compatible with tight_layout.*",
+            category=UserWarning,
+        )
+        fig.tight_layout(**kwargs)
 
 
 def _empty_state_chart(
@@ -1340,7 +1351,7 @@ def _sort_action_frame(frame: pd.DataFrame, *, limit: int | None = None) -> pd.D
 def _finalize_decision_chart(fig, output_path: str | Path, *, bottom: float = 0.12) -> Path:
     path = Path(output_path)
     ensure_directory(path.parent)
-    fig.tight_layout(rect=(0, bottom, 1, 1))
+    _apply_tight_layout(fig, rect=(0, bottom, 1, 1))
     fig.savefig(windows_extended_path(path), dpi=160, bbox_inches="tight")
     plt.close(fig)
     return path
@@ -1354,7 +1365,7 @@ def _action_chart_caption(fig, text: str) -> None:
 def _finalize_caption_chart(fig, output_path: str | Path, *, bottom: float = 0.09, top: float = 0.94) -> Path:
     path = Path(output_path)
     ensure_directory(path.parent)
-    fig.tight_layout(rect=(0, bottom, 1, top))
+    _apply_tight_layout(fig, rect=(0, bottom, 1, top))
     fig.savefig(windows_extended_path(path), dpi=160, bbox_inches="tight")
     plt.close(fig)
     return path

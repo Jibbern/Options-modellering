@@ -1,0 +1,8 @@
+# Direct dependency versions used for the known-good local test environment.
+# Install with: python -m pip install -r requirements.txt
+ibapi==9.81.1.post1
+matplotlib==3.10.8
+numpy==2.4.3
+pandas==3.0.1
+pytest==9.0.2
+requests==2.33.0
