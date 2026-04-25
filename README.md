@@ -389,7 +389,7 @@ The product now separates two different path surfaces deliberately:
 - stock path gallery / IV path gallery: named scenario templates used for first-pass thesis thinking
 - path library metadata: stable family labels, timing shapes, and outcome-bias labels for the named scenario library
 - single-option decision paths: a deterministic 5-8 path subset selected for one specific contract, with outcome labels and selection reasons
-- single-option required-edge paths: frozen 1.5x and 2.0x option-over-stock threshold paths that show what stock route the selected call needs before it beats buying stock
+- single-option required-edge paths: frozen 1.5x and 2.0x option-over-stock threshold paths that show what stock route the selected call needs before it beats buying stock; near-zero stock P/L does not count as clearing the edge
 - representative paths: heuristic examples selected from simulation or conditioning, used as secondary support after the named galleries
 
 The primary same-future stock benchmark is also explicit now:
@@ -423,7 +423,7 @@ Definitions:
 - assumed path: the user-selected stock path and IV path that drive the main modeled trace over time
 - path library: the broad named stock-path gallery plus family/timing/outcome-bias metadata in `stock_path_library.csv`
 - decision path: a curated, contract-specific stock path selected for the single-option chart and persisted in `single_option_decision_path_selections.csv`
-- required-edge path: a selected-option stock route persisted in `single_option_required_path_to_beat_stock_1_5x.csv` and `single_option_required_path_to_beat_stock_2_0x.csv` that answers how high and how early the stock must move before the option beats stock by the configured edge
+- required-edge path: a selected-option stock route persisted in `single_option_required_path_to_beat_stock_1_5x.csv` and `single_option_required_path_to_beat_stock_2_0x.csv` that answers how high and how early the stock must move before the option beats stock by the configured edge; entry P/L is anchored to zero and the edge test starts only after stock P/L clears `--minimum-edge-stock-return-pct`
 - IV path: the volatility-shift path applied across the same canonical horizons as the stock path
 - simulated / representative path: a generated stock path plus a separate IV path used as an explicit example future under the active assumptions; these are not forecasts
 - path pair: one stock path plus one IV path plus valuation-over-time for the same candidate set
@@ -437,6 +437,7 @@ Definitions:
 - `--simulated-path-count`
 - `--representative-selection-mode`
 - `--simulation-seed`
+- `--minimum-edge-stock-return-pct`
 
 The default behavior is still analysis-first and bundle-first: required-path outputs are always written, and representative simulated path pairs are added by default as a second layer.
 

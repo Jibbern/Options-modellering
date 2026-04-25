@@ -4,6 +4,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from options_lab.analysis import contract_selection as contract_selection_module
 from options_lab.analysis import (
     build_contract_selection_analysis,
     build_scenario_analysis,
@@ -342,6 +343,241 @@ def test_single_option_decision_view_renders_stock_better_paths_with_required_ed
         summary_bullets=pd.DataFrame([{"bullet_order": 1, "bullet_text": "No representative path beats stock by the required threshold."}]),
         output_path=output_path,
         title="Synthetic single-option decision",
+    )
+
+    assert result == output_path
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+
+
+def test_single_option_entry_profit_is_zero_after_premium_anchor(monkeypatch):
+    def fake_evaluate_at_point(*args, **kwargs):
+        return {
+            "estimated_value": 150.0,
+            "stock_profit_loss": 0.0,
+            "profit_loss": 50.0,
+            "requested_days": kwargs.get("horizon_days", 0),
+            "effective_days": kwargs.get("horizon_days", 0),
+        }
+
+    monkeypatch.setattr(contract_selection_module, "_evaluate_at_point", fake_evaluate_at_point)
+
+    evaluation = contract_selection_module._single_option_adjusted_evaluation(
+        {},
+        spot_price=15.23,
+        horizon_days=0,
+        iv_shift_points=0.0,
+        comparison_capital=1000.0,
+        premium_used=100.0,
+    )
+
+    assert evaluation["profit_loss"] == 0.0
+    assert evaluation["difference_vs_stock"] == 0.0
+    assert evaluation["entry_premium_anchor_applied"] is True
+    assert evaluation["mark_to_market_profit_loss_before_entry_anchor"] == 50.0
+
+
+def test_single_option_required_edge_does_not_clear_on_zero_stock_profit(monkeypatch):
+    def fake_adjusted_evaluation(*args, spot_price: float, **kwargs):
+        stock_profit = 0.0 if float(spot_price) <= 10.0 else 100.0
+        return {
+            "estimated_value": 120.0,
+            "profit_loss": 20.0,
+            "stock_profit_loss": stock_profit,
+            "difference_vs_stock": 20.0 - stock_profit,
+            "requested_days": kwargs.get("horizon_days", 30),
+            "effective_days": kwargs.get("horizon_days", 30),
+        }
+
+    monkeypatch.setattr(contract_selection_module, "_single_option_adjusted_evaluation", fake_adjusted_evaluation)
+
+    required_spot, _evaluation, status = contract_selection_module._single_option_required_spot_for_edge(
+        {},
+        horizon_days=30,
+        iv_shift_points=0.0,
+        comparison_capital=1000.0,
+        premium_used=100.0,
+        edge_multiple=1.5,
+        entry_spot=10.0,
+        target_price=15.0,
+        strike_value=15.0,
+        observed_max_spot=16.0,
+        minimum_stock_profit_floor=50.0,
+    )
+
+    assert required_spot is None
+    assert status in {"needs_iv_or_entry_support", "unreached_in_search_range"}
+
+
+def test_single_option_required_edge_dates_use_snapshot_plus_requested_days(monkeypatch):
+    def fake_required_spot(*args, horizon_days: int, entry_spot: float, **kwargs):
+        return (
+            float(entry_spot) + float(horizon_days) / 10.0,
+            {"stock_profit_loss": 100.0, "profit_loss": 200.0},
+            "solved",
+        )
+
+    monkeypatch.setattr(contract_selection_module, "_single_option_required_spot_for_edge", fake_required_spot)
+    snapshot = pd.Timestamp("2026-04-12").date()
+    frame = contract_selection_module._single_option_required_edge_path_frame(
+        {},
+        candidate_slug="long-call",
+        candidate_short_label="15C Dec-26",
+        representative_paths=pd.DataFrame(
+            [
+                {"requested_days": 0, "date": "2026-04-19", "spot_price": 15.23},
+                {"requested_days": 30, "date": "2026-04-13", "spot_price": 20.0},
+                {"requested_days": 60, "date": "2026-04-10", "spot_price": 22.0},
+            ]
+        ),
+        snapshot_date=snapshot,
+        target_date=pd.Timestamp("2026-07-15").date(),
+        target_price=20.0,
+        entry_spot=15.23,
+        active_iv_path={},
+        comparison_capital=1000.0,
+        premium_used=341.96,
+        edge_multiple=1.5,
+        minimum_stock_profit_floor=50.0,
+    )
+
+    assert frame["requested_days"].tolist() == [0, 30, 60]
+    assert frame["date"].tolist() == ["2026-04-12", "2026-05-12", "2026-06-11"]
+
+
+def test_single_option_edge_gap_driver_separates_stock_move_from_timing_iv_entry():
+    path_outcomes = pd.DataFrame(
+        [
+            {
+                "decision_path_id": "needs_stock",
+                "path_label": "Needs Stock",
+                "outcome_label": "stock_better",
+                "display_order": 1,
+                "exit_requested_days": 30,
+                "exit_stock_price": 18.0,
+                "profit_loss": 50.0,
+                "stock_profit_loss": 150.0,
+                "outperformance_multiple": 0.33,
+                "first_cross_above_strike_day": 20,
+            },
+            {
+                "decision_path_id": "late_enough_stock",
+                "path_label": "Late Enough Stock",
+                "outcome_label": "stock_better",
+                "display_order": 2,
+                "exit_requested_days": 60,
+                "exit_stock_price": 24.0,
+                "profit_loss": 110.0,
+                "stock_profit_loss": 220.0,
+                "outperformance_multiple": 0.50,
+                "first_cross_above_strike_day": 55,
+            },
+            {
+                "decision_path_id": "flat_tiny_gap",
+                "path_label": "Flat Tiny Gap",
+                "outcome_label": "fail_too_narrow_or_expiry_issue",
+                "display_order": 3,
+                "exit_requested_days": 5,
+                "exit_stock_price": 15.4,
+                "profit_loss": -2.0,
+                "stock_profit_loss": 8.0,
+                "outperformance_multiple": None,
+                "first_cross_above_strike_day": None,
+            },
+        ]
+    )
+    min_edge_path = pd.DataFrame(
+        [
+            {"requested_days": 5, "required_stock_price": None, "status": "no_meaningful_edge_at_this_horizon"},
+            {"requested_days": 30, "required_stock_price": 20.0, "status": "solved"},
+            {"requested_days": 60, "required_stock_price": 20.0, "status": "solved"},
+        ]
+    )
+
+    edge_gap, closest = contract_selection_module._single_option_edge_gap_outputs(
+        path_outcomes=path_outcomes,
+        min_edge_path=min_edge_path,
+        strong_edge_path=min_edge_path,
+        minimum_outperformance_multiple=1.5,
+        strong_outperformance_multiple=2.0,
+        minimum_stock_profit_floor=50.0,
+    )
+
+    by_id = edge_gap.set_index("decision_path_id")
+    assert by_id.loc["needs_stock", "edge_failure_driver"] == "stock_move"
+    assert by_id.loc["needs_stock", "extra_stock_move_needed"] == 2.0
+    assert by_id.loc["late_enough_stock", "edge_failure_driver"] in {"timing", "iv_or_entry", "timing_iv_or_entry"}
+    assert bool(by_id.loc["late_enough_stock", "earlier_timing_needed"]) is True
+    assert bool(by_id.loc["late_enough_stock", "iv_support_needed"]) is True
+    assert bool(by_id.loc["late_enough_stock", "entry_discount_needed"]) is True
+    assert closest.iloc[0]["decision_path_id"] == "late_enough_stock"
+
+
+def test_single_option_decision_view_renders_when_required_edge_unavailable(temp_workspace_root: Path):
+    output_path = temp_workspace_root / "single_option_decision_view_unavailable.png"
+    result = plot_single_option_decision_view(
+        summary=pd.DataFrame(
+            [
+                {
+                    "ticker": "GPRE",
+                    "candidate_short_label": "15C Dec-26",
+                    "premium_used": 341.96,
+                    "base_iv": 0.55,
+                    "breakeven": 18.42,
+                    "max_loss": 341.96,
+                    "dte": 250,
+                    "exit_rule": "sell_on_thesis_completion",
+                }
+            ]
+        ),
+        representative_paths=pd.DataFrame(
+            [
+                {"decision_path_id": "flat", "path_label": "Flat", "display_order": 1, "requested_days": 0, "date": "2026-04-12", "spot_price": 15.23},
+                {"decision_path_id": "flat", "path_label": "Flat", "display_order": 1, "requested_days": 30, "date": "2026-05-12", "spot_price": 15.5},
+            ]
+        ),
+        path_outcomes=pd.DataFrame(
+            [
+                {
+                    "decision_path_id": "flat",
+                    "path_label": "Flat",
+                    "outcome_label": "fail_too_narrow_or_expiry_issue",
+                    "qualifies_as_winning_path_family": False,
+                    "difference_vs_stock": -20.0,
+                    "stock_profit_loss": 10.0,
+                }
+            ]
+        ),
+        required_edge_paths=pd.DataFrame(
+            [
+                {
+                    "edge_path_name": "required_path_to_beat_stock_1_5x",
+                    "edge_label": "Required 1.5x Edge",
+                    "edge_multiple": 1.5,
+                    "display_order": 1,
+                    "requested_days": 30,
+                    "date": "2026-05-12",
+                    "required_stock_price": None,
+                    "status": "no_meaningful_edge_at_this_horizon",
+                }
+            ]
+        ),
+        edge_gap_by_path_family=pd.DataFrame(
+            [
+                {
+                    "decision_path_id": "flat",
+                    "path_label": "Flat",
+                    "edge_failure_driver": "no_meaningful_stock_edge",
+                    "is_closest_to_edge": False,
+                }
+            ]
+        ),
+        closest_representative_path_to_edge=pd.DataFrame(),
+        iv_sensitivity=pd.DataFrame([{"iv_mode_label": "Base IV", "display_order": 1, "difference_vs_stock": -20.0}]),
+        entry_sensitivity=pd.DataFrame([{"entry_scenario_label": "Reference", "display_order": 1, "average_difference_vs_stock": -20.0}]),
+        summary_bullets=pd.DataFrame([{"bullet_order": 1, "bullet_text": "No representative path clears the threshold."}]),
+        output_path=output_path,
+        title="Unavailable edge",
     )
 
     assert result == output_path

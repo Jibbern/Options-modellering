@@ -151,6 +151,7 @@ SINGLE_OPTION_ENTRY_PRICE_MODES = [
     "ask_or_mid",
 ]
 SINGLE_OPTION_DEFAULT_IV_MODES = ("low", "base", "high")
+DEFAULT_SINGLE_OPTION_MIN_EDGE_STOCK_RETURN_PCT = 0.05
 SINGLE_OPTION_REPRESENTATIVE_PATH_ROLES = [
     (
         "early_rally_path",
@@ -4299,7 +4300,9 @@ def _single_option_adjusted_evaluation(
     )
     estimated_value = _single_option_num(raw.get("estimated_value"), 0.0)
     stock_profit_loss = _single_option_num(raw.get("stock_profit_loss"), 0.0)
-    adjusted_profit = estimated_value - float(premium_used)
+    mark_to_market_profit = estimated_value - float(premium_used)
+    entry_anchor_applied = int(horizon_days) <= 0
+    adjusted_profit = 0.0 if entry_anchor_applied else mark_to_market_profit
     adjusted_return = adjusted_profit / float(comparison_capital) if comparison_capital else None
     raw.update(
         {
@@ -4309,6 +4312,8 @@ def _single_option_adjusted_evaluation(
             "difference_vs_stock": round(float(adjusted_profit - stock_profit_loss), 4),
             "comparison_profit_loss": round(float(adjusted_profit), 4),
             "modeled_profit_loss_before_entry_adjustment": raw.get("profit_loss"),
+            "mark_to_market_profit_loss_before_entry_anchor": round(float(mark_to_market_profit), 4),
+            "entry_premium_anchor_applied": bool(entry_anchor_applied),
         }
     )
     return raw
@@ -5061,7 +5066,8 @@ def _single_option_edge_gap_value(
     comparison_capital: float,
     premium_used: float,
     edge_multiple: float,
-) -> tuple[float, dict[str, Any]]:
+    minimum_stock_profit_floor: float,
+) -> tuple[float, dict[str, Any], bool]:
     evaluation = _single_option_adjusted_evaluation(
         spec,
         spot_price=float(spot_price),
@@ -5072,8 +5078,25 @@ def _single_option_edge_gap_value(
     )
     profit = _single_option_num(evaluation.get("profit_loss"), 0.0)
     stock_profit = _single_option_num(evaluation.get("stock_profit_loss"), 0.0)
-    required_profit = float(edge_multiple) * stock_profit if stock_profit > 0 else 0.0
-    return profit - required_profit, evaluation
+    required_profit = float(edge_multiple) * stock_profit
+    meaningful_stock_profit = stock_profit > float(minimum_stock_profit_floor)
+    profitable_option = profit > 0
+    clears_edge = bool(meaningful_stock_profit and profitable_option and profit >= required_profit)
+    if not meaningful_stock_profit:
+        gap = profit - (float(edge_multiple) * float(minimum_stock_profit_floor))
+    else:
+        gap = profit - required_profit
+    evaluation.update(
+        {
+            "minimum_stock_profit_floor": round(float(minimum_stock_profit_floor), 4),
+            "meaningful_stock_profit_for_edge": bool(meaningful_stock_profit),
+            "option_profitable_for_edge": bool(profitable_option),
+            "required_edge_profit_loss": round(float(required_profit), 4),
+            "edge_gap_to_threshold": round(float(gap), 4),
+            "clears_required_edge": clears_edge,
+        }
+    )
+    return gap, evaluation, clears_edge
 
 
 def _single_option_required_spot_for_edge(
@@ -5088,9 +5111,10 @@ def _single_option_required_spot_for_edge(
     target_price: float,
     strike_value: float,
     observed_max_spot: float,
+    minimum_stock_profit_floor: float,
 ) -> tuple[float | None, dict[str, Any] | None, str]:
     lower = max(0.01, float(entry_spot))
-    lower_gap, lower_eval = _single_option_edge_gap_value(
+    lower_gap, lower_eval, lower_clears = _single_option_edge_gap_value(
         spec,
         spot_price=lower,
         horizon_days=int(horizon_days),
@@ -5098,20 +5122,25 @@ def _single_option_required_spot_for_edge(
         comparison_capital=float(comparison_capital),
         premium_used=float(premium_used),
         edge_multiple=float(edge_multiple),
+        minimum_stock_profit_floor=float(minimum_stock_profit_floor),
     )
-    if lower_gap >= 0:
-        return lower, lower_eval, "already_clears_at_entry_spot"
+    if int(horizon_days) <= 0:
+        return None, lower_eval, "no_meaningful_edge_at_this_horizon"
+    if lower_clears and _single_option_num(lower_eval.get("stock_profit_loss"), 0.0) > float(minimum_stock_profit_floor):
+        return lower, lower_eval, "solved"
 
     upper = max(
         lower * 1.08,
+        lower + (float(minimum_stock_profit_floor) / max(float(comparison_capital), 1.0)) * lower,
         float(target_price) * 1.15,
         float(strike_value or target_price) * 1.20,
         float(observed_max_spot or target_price) * 1.20,
     )
     upper_eval: dict[str, Any] | None = None
     upper_gap = lower_gap
+    upper_clears = False
     for _ in range(14):
-        upper_gap, upper_eval = _single_option_edge_gap_value(
+        upper_gap, upper_eval, upper_clears = _single_option_edge_gap_value(
             spec,
             spot_price=upper,
             horizon_days=int(horizon_days),
@@ -5119,19 +5148,26 @@ def _single_option_required_spot_for_edge(
             comparison_capital=float(comparison_capital),
             premium_used=float(premium_used),
             edge_multiple=float(edge_multiple),
+            minimum_stock_profit_floor=float(minimum_stock_profit_floor),
         )
-        if upper_gap >= 0:
+        if upper_clears:
             break
         upper *= 1.35
-    if upper_gap < 0 or upper_eval is None:
-        return None, upper_eval, "unreached_in_search_range"
+    if not upper_clears or upper_eval is None:
+        if upper_eval is None:
+            return None, None, "unreached_in_search_range"
+        if _single_option_num(upper_eval.get("stock_profit_loss"), 0.0) <= float(minimum_stock_profit_floor):
+            return None, upper_eval, "no_meaningful_edge_at_this_horizon"
+        if _single_option_num(upper_eval.get("profit_loss"), 0.0) <= 0:
+            return None, upper_eval, "needs_iv_or_entry_support"
+        return None, upper_eval, "needs_iv_or_entry_support"
 
     lo = lower
     hi = upper
     best_eval = upper_eval
     for _ in range(52):
         mid = (lo + hi) / 2.0
-        mid_gap, mid_eval = _single_option_edge_gap_value(
+        _mid_gap, mid_eval, mid_clears = _single_option_edge_gap_value(
             spec,
             spot_price=mid,
             horizon_days=int(horizon_days),
@@ -5139,8 +5175,9 @@ def _single_option_required_spot_for_edge(
             comparison_capital=float(comparison_capital),
             premium_used=float(premium_used),
             edge_multiple=float(edge_multiple),
+            minimum_stock_profit_floor=float(minimum_stock_profit_floor),
         )
-        if mid_gap >= 0:
+        if mid_clears:
             hi = mid
             best_eval = mid_eval
         else:
@@ -5162,16 +5199,13 @@ def _single_option_required_edge_path_frame(
     comparison_capital: float,
     premium_used: float,
     edge_multiple: float,
+    minimum_stock_profit_floor: float,
 ) -> pd.DataFrame:
     if representative_paths.empty:
         path_grid = _build_path_grid(snapshot_date, target_date)
-        horizons = pd.DataFrame(path_grid)
-        horizons["date"] = [
-            (snapshot_date + timedelta(days=int(row.get("requested_days") or 0))).isoformat()
-            for row in path_grid
-        ]
+        horizons = pd.DataFrame(path_grid)[["requested_days"]]
     else:
-        horizons = representative_paths[["requested_days", "date"]].drop_duplicates().copy()
+        horizons = representative_paths[["requested_days"]].drop_duplicates().copy()
     horizons["requested_days"] = pd.to_numeric(horizons.get("requested_days"), errors="coerce").fillna(0).astype(int)
     horizons = horizons.sort_values("requested_days").drop_duplicates(subset=["requested_days"], keep="first")
     if horizons.empty:
@@ -5200,10 +5234,12 @@ def _single_option_required_edge_path_frame(
             target_price=float(target_price),
             strike_value=float(strike_value),
             observed_max_spot=float(observed_max),
+            minimum_stock_profit_floor=float(minimum_stock_profit_floor),
         )
         stock_profit = _single_option_num((evaluation or {}).get("stock_profit_loss"), 0.0)
         profit = _single_option_num((evaluation or {}).get("profit_loss"), 0.0)
-        required_profit = float(edge_multiple) * stock_profit if stock_profit > 0 else 0.0
+        required_profit = float(edge_multiple) * stock_profit if stock_profit > float(minimum_stock_profit_floor) else None
+        required_date = snapshot_date + timedelta(days=requested_days)
         rows.append(
             {
                 "candidate_slug": candidate_slug,
@@ -5213,15 +5249,19 @@ def _single_option_required_edge_path_frame(
                 "edge_multiple": float(edge_multiple),
                 "display_order": 1 if float(edge_multiple) <= 1.5 else 2,
                 "step_index": step_index,
-                "date": clean_string(row.get("date")) or (snapshot_date + timedelta(days=requested_days)).isoformat(),
+                "date": required_date.isoformat(),
                 "requested_days": requested_days,
                 "required_stock_price": round(float(required_spot), 4) if required_spot is not None else None,
                 "spot_price": round(float(required_spot), 4) if required_spot is not None else None,
                 "return_pct": (float(required_spot) / float(entry_spot) - 1.0) if required_spot is not None and entry_spot else None,
                 "iv_shift_points": round(iv_shift, 4),
-                "required_option_profit_loss": round(float(required_profit), 4),
+                "minimum_stock_profit_floor": round(float(minimum_stock_profit_floor), 4),
+                "required_option_profit_loss": round(float(required_profit), 4) if required_profit is not None else None,
                 "estimated_option_profit_loss": round(float(profit), 4) if evaluation is not None else None,
+                "stock_profit_loss_at_required_edge": round(float(stock_profit), 4) if evaluation is not None else None,
+                "edge_gap_to_threshold": finite_or_none((evaluation or {}).get("edge_gap_to_threshold")),
                 "status": status,
+                "is_required_edge_solved": bool(status == "solved" and required_spot is not None),
             }
         )
     return pd.DataFrame(rows)
@@ -5230,7 +5270,10 @@ def _single_option_required_edge_path_frame(
 def _edge_required_price_at(edge_path: pd.DataFrame, requested_days: int) -> float | None:
     if edge_path.empty:
         return None
-    data = edge_path.dropna(subset=["required_stock_price"]).copy()
+    data = edge_path.copy()
+    if "status" in data.columns:
+        data = data.loc[data["status"].astype(str).eq("solved")].copy()
+    data = data.dropna(subset=["required_stock_price"]).copy()
     if data.empty:
         return None
     data["requested_days"] = pd.to_numeric(data.get("requested_days"), errors="coerce")
@@ -5248,6 +5291,7 @@ def _single_option_edge_gap_outputs(
     strong_edge_path: pd.DataFrame,
     minimum_outperformance_multiple: float,
     strong_outperformance_multiple: float,
+    minimum_stock_profit_floor: float,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     if path_outcomes.empty:
         return pd.DataFrame(), pd.DataFrame()
@@ -5259,26 +5303,61 @@ def _single_option_edge_gap_outputs(
         stock_profit = _single_option_num(row.get("stock_profit_loss"), 0.0)
         required_profit = float(minimum_outperformance_multiple) * stock_profit if stock_profit > 0 else 0.0
         strong_required_profit = float(strong_outperformance_multiple) * stock_profit if stock_profit > 0 else 0.0
+        meaningful_stock_profit = stock_profit > float(minimum_stock_profit_floor)
         min_required_price = _edge_required_price_at(min_edge_path, requested_days)
         strong_required_price = _edge_required_price_at(strong_edge_path, requested_days)
-        extra_move = (
+        raw_extra_move = (
             max(0.0, float(min_required_price) - float(exit_stock))
             if min_required_price is not None and exit_stock is not None
             else None
         )
-        extra_move_pct = (extra_move / float(exit_stock)) if extra_move is not None and exit_stock else None
+        edge_gap_dollars = profit - required_profit
+        edge_gap_multiple = (
+            float(row.get("outperformance_multiple")) - float(minimum_outperformance_multiple)
+            if finite_or_none(row.get("outperformance_multiple")) is not None
+            else None
+        )
         first_cross_day = finite_or_none(row.get("first_cross_above_strike_day"))
         outcome_label = clean_string(row.get("outcome_label"))
-        if first_cross_day is None:
-            timing_note = "too_low_and_never_crosses_strike"
-        elif extra_move is not None and extra_move > 0 and float(first_cross_day) > 45:
+        edge_clears = bool(meaningful_stock_profit and profit > 0 and edge_gap_dollars >= 0)
+        needs_stock_move = bool(raw_extra_move is not None and raw_extra_move > 0 and not edge_clears)
+        earlier_timing_needed = bool(
+            not edge_clears
+            and (
+                (first_cross_day is not None and float(first_cross_day) > 45)
+                or bool(row.get("clamped_to_expiry"))
+            )
+        )
+        iv_support_needed = bool(not edge_clears and not needs_stock_move and meaningful_stock_profit)
+        entry_discount_needed = bool(not edge_clears and meaningful_stock_profit and profit > 0)
+        if not meaningful_stock_profit:
+            driver = "no_meaningful_stock_edge"
+            timing_note = "stock_move_too_small_for_edge_test"
+        elif needs_stock_move and earlier_timing_needed:
+            driver = "stock_move_and_timing"
             timing_note = "too_low_and_too_late"
-        elif extra_move is not None and extra_move > 0:
+        elif needs_stock_move:
+            driver = "stock_move"
             timing_note = "needs_more_stock_move"
-        elif outcome_label == "stock_better":
-            timing_note = "needs_earlier_timing_or_better_entry"
+        elif earlier_timing_needed and (iv_support_needed or entry_discount_needed):
+            driver = "timing_iv_or_entry"
+            timing_note = "needs_earlier_timing_or_iv_entry_support"
+        elif earlier_timing_needed:
+            driver = "timing"
+            timing_note = "needs_earlier_timing"
+        elif iv_support_needed or entry_discount_needed:
+            driver = "iv_or_entry"
+            timing_note = "needs_iv_or_entry_support"
         else:
+            driver = "clears_or_near_edge"
             timing_note = "clears_or_near_edge"
+        extra_move = raw_extra_move if needs_stock_move else (0.0 if edge_clears else None)
+        extra_move_pct = (extra_move / float(exit_stock)) if extra_move is not None and exit_stock else None
+        normalized_edge_gap = (
+            edge_gap_dollars / max(abs(required_profit), float(minimum_stock_profit_floor), 1.0)
+            if meaningful_stock_profit
+            else None
+        )
         rows.append(
             {
                 "candidate_slug": clean_string(row.get("candidate_slug")),
@@ -5297,42 +5376,63 @@ def _single_option_edge_gap_outputs(
                 "exit_stock_price": exit_stock,
                 "required_stock_price_1_5x": min_required_price,
                 "required_stock_price_2_0x": strong_required_price,
+                "extra_stock_move_needed": extra_move,
                 "extra_stock_move_needed_1_5x": extra_move,
                 "extra_stock_move_needed_pct_1_5x": extra_move_pct,
+                "earlier_timing_needed": earlier_timing_needed,
+                "iv_support_needed": iv_support_needed,
+                "entry_discount_needed": entry_discount_needed,
+                "edge_failure_driver": driver,
+                "meaningful_stock_profit_for_edge": meaningful_stock_profit,
                 "profit_loss": profit,
                 "stock_profit_loss": stock_profit,
                 "required_profit_loss_1_5x": required_profit,
                 "required_profit_loss_2_0x": strong_required_profit,
-                "edge_gap_to_1_5x_dollars": profit - required_profit,
+                "edge_gap_to_1_5x_dollars": edge_gap_dollars,
                 "edge_gap_to_2_0x_dollars": profit - strong_required_profit,
                 "outperformance_multiple": finite_or_none(row.get("outperformance_multiple")),
-                "edge_gap_to_1_5x_multiple": (
-                    float(row.get("outperformance_multiple")) - float(minimum_outperformance_multiple)
-                    if finite_or_none(row.get("outperformance_multiple")) is not None
-                    else None
-                ),
+                "edge_gap_to_1_5x_multiple": edge_gap_multiple,
+                "edge_gap_to_1_5x_normalized": normalized_edge_gap,
                 "timing_gap_note": timing_note,
             }
         )
     gap_by_path = pd.DataFrame(rows)
     if gap_by_path.empty:
         return pd.DataFrame(), pd.DataFrame()
-    gap_by_path = gap_by_path.sort_values(
-        ["edge_gap_to_1_5x_dollars", "extra_stock_move_needed_1_5x", "display_order"],
-        ascending=[False, True, True],
-        na_position="last",
-    ).reset_index(drop=True)
+    meaningful = gap_by_path.loc[gap_by_path["meaningful_stock_profit_for_edge"].fillna(False)].copy()
+    if meaningful.empty:
+        ordered = gap_by_path.sort_values(
+            ["exit_stock_price", "edge_gap_to_1_5x_dollars", "display_order"],
+            ascending=[False, False, True],
+            na_position="last",
+        )
+    else:
+        ordered = meaningful.sort_values(
+            ["edge_gap_to_1_5x_normalized", "edge_gap_to_1_5x_dollars", "display_order"],
+            ascending=[False, False, True],
+            na_position="last",
+        )
+    closest_id = clean_string(ordered.iloc[0].get("decision_path_id")) if not ordered.empty else ""
+    gap_by_path = gap_by_path.sort_values(["display_order", "decision_path_id"], na_position="last").reset_index(drop=True)
     gap_by_path["is_closest_to_edge"] = False
-    gap_by_path.loc[0, "is_closest_to_edge"] = True
-    closest = gap_by_path.head(1).copy()
+    if closest_id:
+        gap_by_path.loc[gap_by_path["decision_path_id"].astype(str).eq(closest_id), "is_closest_to_edge"] = True
+    closest = gap_by_path.loc[gap_by_path["is_closest_to_edge"].fillna(False)].head(1).copy()
+    if closest.empty:
+        gap_by_path.loc[0, "is_closest_to_edge"] = True
+        closest = gap_by_path.head(1).copy()
     closest_row = closest.iloc[0].to_dict()
     extra_move = finite_or_none(closest_row.get("extra_stock_move_needed_1_5x"))
     exit_stock = finite_or_none(closest_row.get("exit_stock_price"))
     if extra_move is not None and extra_move > 0:
         pct_text = f"{(extra_move / exit_stock) * 100:.1f}%" if exit_stock else "n/a"
         annotation = f"Closest miss needs about ${extra_move:,.2f} more stock move ({pct_text}) by this path's exit."
-    elif clean_string(closest_row.get("outcome_label")) == "stock_better":
+    elif not bool(closest_row.get("meaningful_stock_profit_for_edge")):
+        annotation = "Closest miss is not a meaningful bullish edge test because stock P/L is too small."
+    elif clean_string(closest_row.get("edge_failure_driver")) in {"timing", "timing_iv_or_entry"}:
         annotation = "Closest miss needs earlier timing, a better entry, or stronger IV support to clear stock."
+    elif clean_string(closest_row.get("edge_failure_driver")) == "iv_or_entry":
+        annotation = "Closest miss has enough stock move, but needs better IV support or a lower entry premium."
     else:
         annotation = "Closest path clears or nearly clears the configured option-over-stock edge."
     closest["annotation_text"] = annotation
@@ -5415,6 +5515,7 @@ def _build_single_option_decision_outputs(
     minimum_outperformance_multiple: float,
     strong_outperformance_multiple: float,
     required_winning_path_families: int,
+    minimum_edge_stock_return_pct: float,
     entry_price_mode: str,
     exit_rule: str,
     target_return_pct: float,
@@ -5436,6 +5537,7 @@ def _build_single_option_decision_outputs(
         return outputs
     position: StrategyPosition = spec["position"]
     premium_used, premium_source = _single_option_entry_premium(position, mode=normalized_entry_mode)
+    minimum_stock_profit_floor = float(comparison_capital) * float(minimum_edge_stock_return_pct)
     candidate_label = clean_string(candidate.get("candidate_label"))
     candidate_short_label = _single_option_candidate_short_label(candidate)
     selected_slug = clean_string(candidate.get("candidate_slug") or spec.get("candidate_slug"))
@@ -5519,6 +5621,7 @@ def _build_single_option_decision_outputs(
         comparison_capital=float(comparison_capital),
         premium_used=float(premium_used),
         edge_multiple=float(minimum_outperformance_multiple),
+        minimum_stock_profit_floor=float(minimum_stock_profit_floor),
     )
     required_edge_2_0x = _single_option_required_edge_path_frame(
         spec,
@@ -5533,6 +5636,7 @@ def _build_single_option_decision_outputs(
         comparison_capital=float(comparison_capital),
         premium_used=float(premium_used),
         edge_multiple=float(strong_outperformance_multiple),
+        minimum_stock_profit_floor=float(minimum_stock_profit_floor),
     )
     edge_gap_by_path_family, closest_to_edge = _single_option_edge_gap_outputs(
         path_outcomes=path_outcomes,
@@ -5540,6 +5644,7 @@ def _build_single_option_decision_outputs(
         strong_edge_path=required_edge_2_0x,
         minimum_outperformance_multiple=float(minimum_outperformance_multiple),
         strong_outperformance_multiple=float(strong_outperformance_multiple),
+        minimum_stock_profit_floor=float(minimum_stock_profit_floor),
     )
     qualifying_count = int(path_outcomes.get("qualifies_as_winning_path_family", pd.Series(dtype=bool)).fillna(False).sum())
     evaluated_count = int(path_outcomes["decision_path_id"].nunique()) if "decision_path_id" in path_outcomes.columns else int(path_outcomes["path_role"].nunique())
@@ -5679,6 +5784,8 @@ def _build_single_option_decision_outputs(
                 "single_option_target_return_pct": float(target_return_pct),
                 "minimum_outperformance_multiple": float(minimum_outperformance_multiple),
                 "strong_outperformance_multiple": float(strong_outperformance_multiple),
+                "minimum_edge_stock_return_pct": float(minimum_edge_stock_return_pct),
+                "minimum_edge_stock_profit_floor": round(float(minimum_stock_profit_floor), 4),
                 "required_winning_path_families": int(required_winning_path_families),
                 "single_option_decision_status": status,
                 "too_narrow_under_representative_paths": bool(too_narrow),
@@ -8618,6 +8725,7 @@ def _build_contract_selection_core(
     minimum_outperformance_multiple: float = 1.5,
     strong_outperformance_multiple: float = 2.0,
     required_winning_path_families: int = 2,
+    minimum_edge_stock_return_pct: float = DEFAULT_SINGLE_OPTION_MIN_EDGE_STOCK_RETURN_PCT,
     entry_price_mode: str = "conservative_mid_plus_slippage",
     single_option_exit_rule: str = "sell_on_thesis_completion",
     single_option_target_return_pct: float = 0.50,
@@ -8656,6 +8764,8 @@ def _build_contract_selection_core(
         raise ValueError("strong_outperformance_multiple must be at least minimum_outperformance_multiple.")
     if int(required_winning_path_families) < 1:
         raise ValueError("required_winning_path_families must be at least 1.")
+    if float(minimum_edge_stock_return_pct) < 0:
+        raise ValueError("minimum_edge_stock_return_pct must be non-negative.")
     if clean_string(entry_price_mode).lower() not in SINGLE_OPTION_ENTRY_PRICE_MODES:
         raise ValueError(f"entry_price_mode must be one of {SINGLE_OPTION_ENTRY_PRICE_MODES!r}.")
     if clean_string(single_option_exit_rule).lower() not in SINGLE_OPTION_EXIT_RULE_CHOICES:
@@ -9169,6 +9279,7 @@ def _build_contract_selection_core(
         minimum_outperformance_multiple=float(minimum_outperformance_multiple),
         strong_outperformance_multiple=float(strong_outperformance_multiple),
         required_winning_path_families=int(required_winning_path_families),
+        minimum_edge_stock_return_pct=float(minimum_edge_stock_return_pct),
         entry_price_mode=clean_string(entry_price_mode).lower(),
         exit_rule=clean_string(single_option_exit_rule).lower(),
         target_return_pct=float(single_option_target_return_pct),
@@ -9398,6 +9509,7 @@ def _build_contract_selection_core(
             "minimum_outperformance_multiple": float(minimum_outperformance_multiple),
             "strong_outperformance_multiple": float(strong_outperformance_multiple),
             "required_winning_path_families": int(required_winning_path_families),
+            "minimum_edge_stock_return_pct": float(minimum_edge_stock_return_pct),
             "entry_price_mode": clean_string(entry_price_mode).lower(),
             "single_option_exit_rule": clean_string(single_option_exit_rule).lower(),
             "single_option_target_return_pct": float(single_option_target_return_pct),
@@ -9408,6 +9520,7 @@ def _build_contract_selection_core(
             "minimum_outperformance_multiple": float(minimum_outperformance_multiple),
             "strong_outperformance_multiple": float(strong_outperformance_multiple),
             "required_winning_path_families": int(required_winning_path_families),
+            "minimum_edge_stock_return_pct": float(minimum_edge_stock_return_pct),
             "candidate_scope": "bullish_long_calls_only",
             "stock_benchmark": "long_stock_baseline",
         },

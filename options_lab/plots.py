@@ -2413,6 +2413,14 @@ def plot_single_option_decision_view(
     if not edge_paths.empty:
         edge_paths["requested_days"] = pd.to_numeric(edge_paths.get("requested_days"), errors="coerce").fillna(0)
         edge_paths["required_stock_price"] = pd.to_numeric(edge_paths.get("required_stock_price"), errors="coerce")
+        if "status" not in edge_paths.columns:
+            edge_paths["status"] = "solved"
+    valid_edge_paths = pd.DataFrame()
+    if not edge_paths.empty:
+        valid_edge_paths = edge_paths.loc[
+            edge_paths["status"].astype(str).eq("solved")
+            & pd.to_numeric(edge_paths["required_stock_price"], errors="coerce").notna()
+        ].copy()
     identity_col = "decision_path_id" if "decision_path_id" in outcomes.columns and "decision_path_id" in paths.columns else "path_role"
     outcomes = outcomes.drop_duplicates(subset=[identity_col]).copy()
     outcome_lookup = {
@@ -2520,12 +2528,12 @@ def plot_single_option_decision_view(
                 "color": str(spec["color"]),
             }
         )
-    if not edge_paths.empty:
+    if not valid_edge_paths.empty:
         edge_styles = {
             "required_path_to_beat_stock_1_5x": {"color": "#1F4E79", "linestyle": "-", "linewidth": 4.2, "label": "Required 1.5x edge"},
             "required_path_to_beat_stock_2_0x": {"color": "#3B1E78", "linestyle": "--", "linewidth": 3.7, "label": "Required 2.0x strong edge"},
         }
-        for edge_name, group in edge_paths.dropna(subset=["required_stock_price"]).sort_values(["display_order", "requested_days"]).groupby("edge_path_name", sort=False):
+        for edge_name, group in valid_edge_paths.sort_values(["display_order", "requested_days"]).groupby("edge_path_name", sort=False):
             ordered = group.sort_values("requested_days")
             if ordered.empty:
                 continue
@@ -2557,12 +2565,17 @@ def plot_single_option_decision_view(
                 zorder=8,
             )
     y_values = pd.to_numeric(paths["spot_price"], errors="coerce").dropna()
-    if not edge_paths.empty:
-        y_values = pd.concat([y_values, pd.to_numeric(edge_paths.get("required_stock_price"), errors="coerce").dropna()], ignore_index=True)
+    if not valid_edge_paths.empty:
+        y_values = pd.concat([y_values, pd.to_numeric(valid_edge_paths.get("required_stock_price"), errors="coerce").dropna()], ignore_index=True)
     y_min = float(y_values.min()) if not y_values.empty else 0.0
     y_max = float(y_values.max()) if not y_values.empty else 1.0
     y_span = max(y_max - y_min, 1.0)
     label_gap = y_span * 0.055
+    label_floor = y_min + y_span * 0.035
+    label_ceiling = y_max - y_span * 0.035
+    if label_floor >= label_ceiling:
+        label_floor = y_min
+        label_ceiling = y_max
     placed_labels: list[tuple[float, float]] = []
     for item in sorted(terminal_labels, key=lambda row: (float(row["x"]), float(row["y"]))):
         base_x = float(item["x"])
@@ -2572,7 +2585,7 @@ def plot_single_option_decision_view(
             candidate_offsets.extend([idx * label_gap, -idx * label_gap])
         label_y = base_y
         for offset in candidate_offsets:
-            proposed_y = min(max(base_y + offset, y_min - y_span * 0.08), y_max + y_span * 0.08)
+            proposed_y = min(max(base_y + offset, label_floor), label_ceiling)
             collision = any(
                 abs(proposed_y - used_y) < label_gap and abs(base_x - used_x) < 45.0
                 for used_x, used_y in placed_labels
@@ -2616,6 +2629,19 @@ def plot_single_option_decision_view(
                 bbox=dict(boxstyle="round,pad=0.30", facecolor="#FFFDF9", edgecolor="#DED8CE", linewidth=0.8),
                 zorder=9,
             )
+    if edge_paths.empty or valid_edge_paths.empty:
+        ax_hero.text(
+            0.03,
+            0.79 if no_path_clears and closest_annotation else 0.885,
+            "Required edge cannot be cleared by stock move alone under current premium/IV assumptions.",
+            transform=ax_hero.transAxes,
+            fontsize=8.9,
+            fontweight="bold",
+            color="#4C1D95",
+            va="top",
+            bbox=dict(boxstyle="round,pad=0.30", facecolor="#F5F3FF", edgecolor="#C4B5FD", linewidth=0.8),
+            zorder=9,
+        )
     ax_hero.set_title("What stock path is required for this option to beat stock?", loc="left", fontsize=15.6, fontweight="bold", pad=12)
     ax_hero.set_xlabel("Time From Snapshot")
     ax_hero.set_ylabel("Stock Price ($)")
@@ -2687,13 +2713,26 @@ def plot_single_option_decision_view(
     ]
     ax_note.text(0.02, 0.94, "Outcome Encoding", transform=ax_note.transAxes, fontsize=11.8, fontweight="bold", color="#292524", va="top")
     y_note = 0.78
+    solved_edge_names = set(valid_edge_paths.get("edge_path_name", pd.Series(dtype=str)).astype(str)) if not valid_edge_paths.empty else set()
     edge_note_lines = [
-        ("#1F4E79", "-", "Required 1.5x edge"),
-        ("#3B1E78", "--", "Required 2.0x edge"),
+        ("required_path_to_beat_stock_1_5x", "#1F4E79", "-", "Required 1.5x edge"),
+        ("required_path_to_beat_stock_2_0x", "#3B1E78", "--", "Required 2.0x edge"),
     ]
-    for color, linestyle, label in edge_note_lines:
-        ax_note.plot([0.04, 0.12], [y_note, y_note], transform=ax_note.transAxes, color=color, linestyle=linestyle, linewidth=3.0)
-        ax_note.text(0.17, y_note, label, transform=ax_note.transAxes, fontsize=8.5, color="#292524", va="center", fontweight="bold")
+    for edge_name, color, linestyle, label in edge_note_lines:
+        is_available = edge_name in solved_edge_names
+        legend_label = label if is_available else f"{label} (unavailable)"
+        legend_alpha = 0.95 if is_available else 0.35
+        ax_note.plot([0.04, 0.12], [y_note, y_note], transform=ax_note.transAxes, color=color, linestyle=linestyle, linewidth=3.0, alpha=legend_alpha)
+        ax_note.text(
+            0.17,
+            y_note,
+            legend_label,
+            transform=ax_note.transAxes,
+            fontsize=8.5,
+            color="#292524" if is_available else "#78716C",
+            va="center",
+            fontweight="bold" if is_available else "normal",
+        )
         y_note -= 0.12
     for label, marker_text in outcome_lines:
         key = next((name for name, spec in SINGLE_OPTION_OUTCOME_SPECS.items() if spec["label"] == label), "")

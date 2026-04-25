@@ -289,6 +289,7 @@ def _add_contract_selection_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--minimum-outperformance-multiple", type=float, default=1.5)
     parser.add_argument("--strong-outperformance-multiple", type=float, default=2.0)
     parser.add_argument("--required-winning-path-families", type=int, default=2)
+    parser.add_argument("--minimum-edge-stock-return-pct", type=float, default=0.05)
     parser.add_argument("--entry-price-mode", default="conservative_mid_plus_slippage", choices=["conservative_mid_plus_slippage", "mid", "ask_or_mid"])
     parser.add_argument("--single-option-exit-rule", default="sell_on_thesis_completion", choices=["hold_to_expiry", "sell_at_target_return", "sell_on_thesis_completion"])
     parser.add_argument("--single-option-target-return-pct", type=float, default=0.50)
@@ -934,6 +935,7 @@ def main(argv: list[str] | None = None) -> int:
                 minimum_outperformance_multiple=args.minimum_outperformance_multiple,
                 strong_outperformance_multiple=args.strong_outperformance_multiple,
                 required_winning_path_families=args.required_winning_path_families,
+                minimum_edge_stock_return_pct=args.minimum_edge_stock_return_pct,
                 entry_price_mode=args.entry_price_mode,
                 single_option_exit_rule=args.single_option_exit_rule,
                 single_option_target_return_pct=args.single_option_target_return_pct,
