@@ -7019,6 +7019,10 @@ def _render_contract_selection_body(
     single_option_summary = _load_csv(artifact_dir / "single_option_decision_summary.csv")
     single_option_decision_paths = _load_csv(artifact_dir / "single_option_decision_path_selections.csv")
     single_option_path_outcomes = _load_csv(artifact_dir / "single_option_path_outcomes.csv")
+    single_option_required_edge_1_5x = _load_csv(artifact_dir / "single_option_required_path_to_beat_stock_1_5x.csv")
+    single_option_required_edge_2_0x = _load_csv(artifact_dir / "single_option_required_path_to_beat_stock_2_0x.csv")
+    single_option_closest_edge = _load_csv(artifact_dir / "single_option_closest_representative_path_to_edge.csv")
+    single_option_edge_gap_by_family = _load_csv(artifact_dir / "single_option_edge_gap_by_path_family.csv")
     single_option_iv_sensitivity = _load_csv(artifact_dir / "single_option_iv_sensitivity.csv")
     single_option_entry_sensitivity = _load_csv(artifact_dir / "single_option_entry_sensitivity.csv")
     single_option_markdown = _load_markdown(artifact_dir / "single_option_decision.md")
@@ -7354,6 +7358,55 @@ def _render_contract_selection_body(
         ],
         limit=8,
     )
+    single_option_required_edge_table = subset_frame(
+        pd.concat([single_option_required_edge_1_5x, single_option_required_edge_2_0x], ignore_index=True)
+        if (single_option_required_edge_1_5x is not None or single_option_required_edge_2_0x is not None)
+        else pd.DataFrame(),
+        [
+            "edge_label",
+            "requested_days",
+            "date",
+            "required_stock_price",
+            "return_pct",
+            "iv_shift_points",
+            "required_option_profit_loss",
+            "status",
+        ],
+        limit=12,
+    )
+    single_option_closest_edge_table = subset_frame(
+        single_option_closest_edge,
+        [
+            "path_label",
+            "path_family_label",
+            "timing_shape",
+            "outcome_label",
+            "exit_stock_price",
+            "required_stock_price_1_5x",
+            "extra_stock_move_needed_1_5x",
+            "edge_gap_to_1_5x_dollars",
+            "timing_gap_note",
+            "annotation_text",
+        ],
+        limit=1,
+    )
+    single_option_edge_gap_table = subset_frame(
+        single_option_edge_gap_by_family,
+        [
+            "path_label",
+            "path_family_label",
+            "timing_shape",
+            "outcome_label",
+            "exit_stock_price",
+            "required_stock_price_1_5x",
+            "extra_stock_move_needed_1_5x",
+            "edge_gap_to_1_5x_dollars",
+            "edge_gap_to_1_5x_multiple",
+            "timing_gap_note",
+            "is_closest_to_edge",
+        ],
+        limit=8,
+    )
     stock_path_library_table = subset_frame(
         stock_path_library,
         [
@@ -7487,6 +7540,9 @@ def _render_contract_selection_body(
         + _render_inline_dataframe("Single-Option Summary", single_option_summary_table, table_id="single-option-summary", published=published)
         + _render_inline_dataframe("Curated Decision Path Selection", single_option_decision_paths_table, table_id="single-option-decision-paths", published=published)
         + _render_inline_dataframe("Single-Option Path Outcomes", single_option_outcomes_table, table_id="single-option-path-outcomes", published=published)
+        + _render_inline_dataframe("Required Edge Paths", single_option_required_edge_table, table_id="single-option-required-edge-paths", published=published)
+        + _render_inline_dataframe("Closest Representative Path To Edge", single_option_closest_edge_table, table_id="single-option-closest-edge", published=published)
+        + _render_inline_dataframe("Edge Gap By Path Family", single_option_edge_gap_table, table_id="single-option-edge-gap", published=published)
         + _render_inline_dataframe("Single-Option IV Sensitivity", single_option_iv_table, table_id="single-option-iv", published=published)
         + _render_inline_dataframe("Single-Option Entry Sensitivity", single_option_entry_table, table_id="single-option-entry", published=published)
         + '<section class="panel"><h2>Market Context / Trust Summary</h2><p class="section-intro">These tables show which local market data actually drove the run, how trustworthy each expiry is, and why the chosen spot and risk-free inputs were accepted.</p>'

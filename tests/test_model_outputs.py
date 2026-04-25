@@ -1494,6 +1494,86 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
                 "outcome_note": "Stock is cleaner on this path after option premium.",
             }
         ],
+        "single_option_required_path_to_beat_stock_1_5x.csv": [
+            {
+                "candidate_slug": "long-call-2026-12-18-15-00",
+                "candidate_short_label": "15C Dec-26",
+                "edge_path_name": "required_path_to_beat_stock_1_5x",
+                "edge_label": "Required 1.5x Edge",
+                "edge_multiple": "1.5",
+                "display_order": "1",
+                "step_index": "2",
+                "date": "2026-12-18",
+                "requested_days": "250",
+                "required_stock_price": "34.0",
+                "spot_price": "34.0",
+                "return_pct": "1.23",
+                "iv_shift_points": "0.0",
+                "required_option_profit_loss": "1800.0",
+                "estimated_option_profit_loss": "1800.0",
+                "status": "solved",
+            }
+        ],
+        "single_option_required_path_to_beat_stock_2_0x.csv": [
+            {
+                "candidate_slug": "long-call-2026-12-18-15-00",
+                "candidate_short_label": "15C Dec-26",
+                "edge_path_name": "required_path_to_beat_stock_2_0x",
+                "edge_label": "Required 2.0x Strong Edge",
+                "edge_multiple": "2.0",
+                "display_order": "2",
+                "step_index": "2",
+                "date": "2026-12-18",
+                "requested_days": "250",
+                "required_stock_price": "41.0",
+                "spot_price": "41.0",
+                "return_pct": "1.69",
+                "iv_shift_points": "0.0",
+                "required_option_profit_loss": "2400.0",
+                "estimated_option_profit_loss": "2400.0",
+                "status": "solved",
+            }
+        ],
+        "single_option_closest_representative_path_to_edge.csv": [
+            {
+                "candidate_slug": "long-call-2026-12-18-15-00",
+                "candidate_short_label": "15C Dec-26",
+                "decision_path_id": "late_rally_path__late_breakout_to_target",
+                "path_label": "Late Breakout",
+                "path_family_label": "Late Rally",
+                "timing_shape": "back_loaded_upside",
+                "outcome_label": "stock_better",
+                "exit_stock_price": "30.0",
+                "required_stock_price_1_5x": "34.0",
+                "extra_stock_move_needed_1_5x": "4.0",
+                "edge_gap_to_1_5x_dollars": "-35.0",
+                "timing_gap_note": "needs_more_stock_move",
+                "is_closest_to_edge": "True",
+                "annotation_text": "Closest miss needs about $4.00 more stock move or earlier timing.",
+            }
+        ],
+        "single_option_edge_gap_by_path_family.csv": [
+            {
+                "candidate_slug": "long-call-2026-12-18-15-00",
+                "candidate_short_label": "15C Dec-26",
+                "decision_path_id": "late_rally_path__late_breakout_to_target",
+                "path_label": "Late Breakout",
+                "path_family": "late_rally",
+                "path_family_label": "Late Rally",
+                "timing_shape": "back_loaded_upside",
+                "outcome_label": "stock_better",
+                "exit_stock_price": "30.0",
+                "required_stock_price_1_5x": "34.0",
+                "required_stock_price_2_0x": "41.0",
+                "extra_stock_move_needed_1_5x": "4.0",
+                "extra_stock_move_needed_2_0x": "11.0",
+                "edge_gap_to_1_5x_dollars": "-35.0",
+                "edge_gap_to_1_5x_multiple": "0.9",
+                "timing_gap_note": "needs_more_stock_move",
+                "is_closest_to_edge": "True",
+                "annotation_text": "Closest miss needs about $4.00 more stock move or earlier timing.",
+            }
+        ],
         "single_option_path_family_counts.csv": [
             {
                 "candidate_slug": "long-call-2026-12-18-15-00",
@@ -1949,6 +2029,10 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
                 "single_option_decision_path_selections.csv": "tables/single_option_decision_path_selections.csv",
                 "single_option_representative_paths.csv": "tables/single_option_representative_paths.csv",
                 "single_option_path_outcomes.csv": "tables/single_option_path_outcomes.csv",
+                "single_option_required_path_to_beat_stock_1_5x.csv": "tables/single_option_required_path_to_beat_stock_1_5x.csv",
+                "single_option_required_path_to_beat_stock_2_0x.csv": "tables/single_option_required_path_to_beat_stock_2_0x.csv",
+                "single_option_closest_representative_path_to_edge.csv": "tables/single_option_closest_representative_path_to_edge.csv",
+                "single_option_edge_gap_by_path_family.csv": "tables/single_option_edge_gap_by_path_family.csv",
                 "single_option_path_family_counts.csv": "tables/single_option_path_family_counts.csv",
                 "single_option_timing_sensitivity.csv": "tables/single_option_timing_sensitivity.csv",
                 "single_option_iv_sensitivity.csv": "tables/single_option_iv_sensitivity.csv",
@@ -2144,6 +2228,10 @@ def test_build_model_outputs_projects_primary_contract_selection_artifacts(temp_
     assert (promoted_dir / "00_core_view" / "single_option_decision_summary.csv").exists()
     assert (promoted_dir / "00_core_view" / "single_option_decision_path_selections.csv").exists()
     assert (promoted_dir / "00_core_view" / "single_option_path_outcomes.csv").exists()
+    assert (promoted_dir / "00_core_view" / "single_option_required_path_to_beat_stock_1_5x.csv").exists()
+    assert (promoted_dir / "00_core_view" / "single_option_required_path_to_beat_stock_2_0x.csv").exists()
+    assert (promoted_dir / "00_core_view" / "single_option_closest_representative_path_to_edge.csv").exists()
+    assert (promoted_dir / "00_core_view" / "single_option_edge_gap_by_path_family.csv").exists()
     assert (promoted_dir / "00_core_view" / "single_option_iv_sensitivity.csv").exists()
     assert (promoted_dir / "00_core_view" / "single_option_entry_sensitivity.csv").exists()
     assert (promoted_dir / "01_thesis_view" / "thesis_mode.md").exists()
@@ -2249,6 +2337,8 @@ def test_build_model_outputs_projects_primary_contract_selection_artifacts(temp_
     assert "04_secondary/stock_vs_option_decision_chart.png" in start_here
     assert "summary.md" in start_here
     assert "single_option_decision_path_selections.csv" in start_here
+    assert "single_option_required_path_to_beat_stock_1_5x.csv" in start_here
+    assert "single_option_edge_gap_by_path_family.csv" in start_here
     assert "stock_path_library.csv" in start_here
     assert "stock_path_gallery.png" in start_here
     assert "iv_path_gallery.png" in start_here
@@ -2329,6 +2419,10 @@ def test_build_model_outputs_projects_primary_contract_selection_artifacts(temp_
     assert "00_core_view/top_candidate_stress_cards.png" in projection_manifest["promoted_files"]
     assert "00_core_view/single_option_decision_view.png" in projection_manifest["promoted_files"]
     assert "00_core_view/single_option_decision_path_selections.csv" in projection_manifest["promoted_files"]
+    assert "00_core_view/single_option_required_path_to_beat_stock_1_5x.csv" in projection_manifest["promoted_files"]
+    assert "00_core_view/single_option_required_path_to_beat_stock_2_0x.csv" in projection_manifest["promoted_files"]
+    assert "00_core_view/single_option_closest_representative_path_to_edge.csv" in projection_manifest["promoted_files"]
+    assert "00_core_view/single_option_edge_gap_by_path_family.csv" in projection_manifest["promoted_files"]
     assert "00_core_view/bullish_long_call_watchlist.csv" in projection_manifest["promoted_files"]
     assert "00_core_view/bullish_long_call_triggers.csv" in projection_manifest["promoted_files"]
     assert "00_core_view/chain_overview_summary.csv" in projection_manifest["promoted_files"]

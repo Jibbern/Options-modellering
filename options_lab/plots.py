@@ -2389,6 +2389,9 @@ def plot_single_option_decision_view(
     summary: pd.DataFrame,
     representative_paths: pd.DataFrame,
     path_outcomes: pd.DataFrame,
+    required_edge_paths: pd.DataFrame | None = None,
+    edge_gap_by_path_family: pd.DataFrame | None = None,
+    closest_representative_path_to_edge: pd.DataFrame | None = None,
     iv_sensitivity: pd.DataFrame,
     entry_sensitivity: pd.DataFrame,
     summary_bullets: pd.DataFrame,
@@ -2402,8 +2405,14 @@ def plot_single_option_decision_view(
     summary_row = summary.iloc[0].to_dict()
     paths = representative_paths.copy()
     outcomes = path_outcomes.copy()
+    edge_paths = required_edge_paths.copy() if required_edge_paths is not None else pd.DataFrame()
+    edge_gap = edge_gap_by_path_family.copy() if edge_gap_by_path_family is not None else pd.DataFrame()
+    closest_edge = closest_representative_path_to_edge.copy() if closest_representative_path_to_edge is not None else pd.DataFrame()
     paths["requested_days"] = pd.to_numeric(paths.get("requested_days"), errors="coerce").fillna(0)
     paths["spot_price"] = pd.to_numeric(paths.get("spot_price"), errors="coerce")
+    if not edge_paths.empty:
+        edge_paths["requested_days"] = pd.to_numeric(edge_paths.get("requested_days"), errors="coerce").fillna(0)
+        edge_paths["required_stock_price"] = pd.to_numeric(edge_paths.get("required_stock_price"), errors="coerce")
     identity_col = "decision_path_id" if "decision_path_id" in outcomes.columns and "decision_path_id" in paths.columns else "path_role"
     outcomes = outcomes.drop_duplicates(subset=[identity_col]).copy()
     outcome_lookup = {
@@ -2459,22 +2468,48 @@ def plot_single_option_decision_view(
 
     _style_axes(ax_hero)
     terminal_labels: list[dict[str, object]] = []
+    closest_id = ""
+    closest_annotation = ""
+    if closest_edge.empty and not edge_gap.empty:
+        fallback_gap = edge_gap.copy()
+        if "is_closest_to_edge" in fallback_gap.columns:
+            closest_mask = fallback_gap["is_closest_to_edge"].astype(str).str.lower().isin({"true", "1", "yes"})
+            if closest_mask.any():
+                fallback_gap = fallback_gap.loc[closest_mask]
+        elif "edge_gap_to_1_5x_dollars" in fallback_gap.columns:
+            fallback_gap["edge_gap_to_1_5x_dollars"] = pd.to_numeric(fallback_gap["edge_gap_to_1_5x_dollars"], errors="coerce")
+            fallback_gap = fallback_gap.sort_values("edge_gap_to_1_5x_dollars", ascending=False, na_position="last")
+        closest_edge = fallback_gap.head(1).copy()
+    if not closest_edge.empty:
+        closest_row = closest_edge.iloc[0].to_dict()
+        closest_id = clean_string(closest_row.get(identity_col)) or clean_string(closest_row.get("decision_path_id")) or clean_string(closest_row.get("path_role"))
+        closest_annotation = clean_string(closest_row.get("annotation_text"))
+        if not closest_annotation:
+            extra_move = finite_or_none(closest_row.get("extra_stock_move_needed_1_5x"))
+            timing_note = clean_string(closest_row.get("timing_gap_note")).replace("_", " ")
+            if extra_move is not None and extra_move > 0:
+                closest_annotation = f"Closest miss needs about ${extra_move:,.2f} more stock move; timing read: {timing_note or 'check path timing'}."
+            elif timing_note:
+                closest_annotation = f"Closest miss timing read: {timing_note}."
+    no_path_clears = not bool(outcomes.get("qualifies_as_winning_path_family", pd.Series(dtype=bool)).fillna(False).any())
     for display_idx, (path_id, group) in enumerate(paths.sort_values(["display_order", "requested_days"]).groupby(identity_col, sort=False), start=1):
         outcome = outcome_lookup.get(clean_string(path_id), {})
         outcome_label = clean_string(outcome.get("outcome_label")) or "fail_too_narrow_or_expiry_issue"
         spec = SINGLE_OPTION_OUTCOME_SPECS.get(outcome_label, SINGLE_OPTION_OUTCOME_SPECS["fail_too_narrow_or_expiry_issue"])
         label = clean_string(outcome.get("path_label")) or clean_string(group.iloc[0].get("path_label"))
+        is_closest = clean_string(path_id) == closest_id
         ax_hero.plot(
             group["requested_days"],
             group["spot_price"],
             color=str(spec["color"]),
             marker=str(spec["marker"]),
             linestyle=spec["linestyle"],
-            linewidth=3.0 if outcome_label == "clear_option_win" else 2.3,
-            markersize=5.2,
+            linewidth=3.0 if is_closest else 1.85,
+            markersize=5.4 if is_closest else 4.6,
             markevery=max(1, len(group.index) // 4),
-            label=f"{label} - {spec['label']}",
-            alpha=0.94,
+            label=f"{label} - {spec['label']}" + (" (closest miss)" if is_closest and no_path_clears else ""),
+            alpha=0.86 if is_closest else 0.36,
+            zorder=4 if is_closest else 2,
         )
         terminal = group.sort_values("requested_days").iloc[-1]
         terminal_labels.append(
@@ -2485,7 +2520,45 @@ def plot_single_option_decision_view(
                 "color": str(spec["color"]),
             }
         )
+    if not edge_paths.empty:
+        edge_styles = {
+            "required_path_to_beat_stock_1_5x": {"color": "#1F4E79", "linestyle": "-", "linewidth": 4.2, "label": "Required 1.5x edge"},
+            "required_path_to_beat_stock_2_0x": {"color": "#3B1E78", "linestyle": "--", "linewidth": 3.7, "label": "Required 2.0x strong edge"},
+        }
+        for edge_name, group in edge_paths.dropna(subset=["required_stock_price"]).sort_values(["display_order", "requested_days"]).groupby("edge_path_name", sort=False):
+            ordered = group.sort_values("requested_days")
+            if ordered.empty:
+                continue
+            style = edge_styles.get(
+                clean_string(edge_name),
+                {"color": "#1F2937", "linestyle": "-.", "linewidth": 3.4, "label": clean_string(ordered.iloc[0].get("edge_label")) or "Required edge"},
+            )
+            ax_hero.plot(
+                ordered["requested_days"],
+                ordered["required_stock_price"],
+                color=str(style["color"]),
+                linestyle=str(style["linestyle"]),
+                linewidth=float(style["linewidth"]),
+                alpha=0.98,
+                marker="",
+                label=str(style["label"]),
+                zorder=7,
+            )
+            terminal = ordered.iloc[-1]
+            ax_hero.text(
+                float(terminal.get("requested_days") or 0) + 2.0,
+                float(terminal.get("required_stock_price") or 0),
+                str(style["label"]),
+                fontsize=8.8,
+                fontweight="bold",
+                color=str(style["color"]),
+                va="center",
+                clip_on=False,
+                zorder=8,
+            )
     y_values = pd.to_numeric(paths["spot_price"], errors="coerce").dropna()
+    if not edge_paths.empty:
+        y_values = pd.concat([y_values, pd.to_numeric(edge_paths.get("required_stock_price"), errors="coerce").dropna()], ignore_index=True)
     y_min = float(y_values.min()) if not y_values.empty else 0.0
     y_max = float(y_values.max()) if not y_values.empty else 1.0
     y_span = max(y_max - y_min, 1.0)
@@ -2518,7 +2591,32 @@ def plot_single_option_decision_view(
             linespacing=1.05,
             clip_on=False,
         )
-    ax_hero.set_title("Curated decision paths for this option", loc="left", fontsize=15.6, fontweight="bold", pad=12)
+    if no_path_clears:
+        ax_hero.text(
+            0.03,
+            0.965,
+            "No representative path clears the option-over-stock threshold.",
+            transform=ax_hero.transAxes,
+            fontsize=10.6,
+            fontweight="bold",
+            color="#7C2D12",
+            va="top",
+            bbox=dict(boxstyle="round,pad=0.36", facecolor="#FFF7ED", edgecolor="#FDBA74", linewidth=1.0),
+            zorder=9,
+        )
+        if closest_annotation:
+            ax_hero.text(
+                0.03,
+                0.885,
+                _wrap_chart_text(closest_annotation, width=72),
+                transform=ax_hero.transAxes,
+                fontsize=8.8,
+                color="#44403C",
+                va="top",
+                bbox=dict(boxstyle="round,pad=0.30", facecolor="#FFFDF9", edgecolor="#DED8CE", linewidth=0.8),
+                zorder=9,
+            )
+    ax_hero.set_title("What stock path is required for this option to beat stock?", loc="left", fontsize=15.6, fontweight="bold", pad=12)
     ax_hero.set_xlabel("Time From Snapshot")
     ax_hero.set_ylabel("Stock Price ($)")
     _format_money_axis(ax_hero)
@@ -2589,6 +2687,14 @@ def plot_single_option_decision_view(
     ]
     ax_note.text(0.02, 0.94, "Outcome Encoding", transform=ax_note.transAxes, fontsize=11.8, fontweight="bold", color="#292524", va="top")
     y_note = 0.78
+    edge_note_lines = [
+        ("#1F4E79", "-", "Required 1.5x edge"),
+        ("#3B1E78", "--", "Required 2.0x edge"),
+    ]
+    for color, linestyle, label in edge_note_lines:
+        ax_note.plot([0.04, 0.12], [y_note, y_note], transform=ax_note.transAxes, color=color, linestyle=linestyle, linewidth=3.0)
+        ax_note.text(0.17, y_note, label, transform=ax_note.transAxes, fontsize=8.5, color="#292524", va="center", fontweight="bold")
+        y_note -= 0.12
     for label, marker_text in outcome_lines:
         key = next((name for name, spec in SINGLE_OPTION_OUTCOME_SPECS.items() if spec["label"] == label), "")
         spec = SINGLE_OPTION_OUTCOME_SPECS.get(key, SINGLE_OPTION_OUTCOME_SPECS["fail_too_narrow_or_expiry_issue"])
@@ -2599,7 +2705,7 @@ def plot_single_option_decision_view(
 
     caption = (
         "Fixed: selected option, stock benchmark, exit rule, and thresholds are frozen in analysis. "
-        "The hero chart shows only the curated decision paths; IV and premium are isolated below so the path question stays readable."
+        "Representative paths are muted; required-edge paths show the stock route needed before this option beats stock by the configured threshold."
     )
     _action_chart_caption(fig, caption)
     return _finalize_caption_chart(fig, output_path, bottom=0.11, top=0.98)

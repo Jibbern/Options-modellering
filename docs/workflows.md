@@ -14,6 +14,7 @@ Temporary test roots, browser caches, and staging folders are implementation noi
 - required path: the minimum stock path needed for a contract or family to clear a goal such as break-even, +25%, +50%, outperforming stock, or a target option value
 - assumed path: the active stock path and IV path selected for the main trace through time
 - IV path: the volatility-shift curve sampled across the same horizons as the stock path
+- required-edge path: a selected-option stock route that shows the 1.5x and 2.0x option-over-stock thresholds directly in the single-option decision view
 - compare-vs-stock: explicit long-stock baseline rows plus delta-versus-stock PnL and return columns in the contract-selection bundle
 
 The active assumed stock path can now use shaped named presets as well as manual points. The current named path presets include:
@@ -165,7 +166,7 @@ Each selected library path gets its own same-future chart family:
 
 Read those files path by path when the real question is: "if the stock takes this route, which long calls win?"
 
-The single-option decision view is deliberately narrower than the gallery. It evaluates the selected call across the decision path pool, then persists only 5-8 curated paths in `single_option_decision_path_selections.csv`. Those rows carry the selected path family, timing shape, outcome label, score, and reason, and only those paths are plotted in `single_option_decision_view.png`.
+The single-option decision view is deliberately narrower than the gallery. It evaluates the selected call across the decision path pool, then persists only 5-8 curated representative paths in `single_option_decision_path_selections.csv`. Those rows carry the selected path family, timing shape, outcome label, score, and reason. The chart mutes those representative paths and overlays the frozen required-edge paths from `single_option_required_path_to_beat_stock_1_5x.csv` and `single_option_required_path_to_beat_stock_2_0x.csv`, so a stock-better run still answers what higher or earlier stock path is required. `single_option_closest_representative_path_to_edge.csv` and `single_option_edge_gap_by_path_family.csv` explain the closest miss and whether each family misses because price is too low, timing is too late, or both.
 
 Each path also gets IV-path packs. The single-anchor IV pack fixes the stock path and anchor long call, then varies IV only. The IV-expanded packs apply the same IV regimes to the strike ladder, expiry ladder, and best-of long-call set. Use the value charts to see whether IV saves or crushes option value, the delta charts to see whether the option still beats stock, checkpoint CSVs for key dates, and `iv_robustness_summary.csv` for the compact decision read: survives lower IV, needs IV support, or stock still dominates.
 

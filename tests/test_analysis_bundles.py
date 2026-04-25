@@ -138,6 +138,10 @@ def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_h
     assert (bundle.bundle_dir / "tables" / "single_option_decision_path_selections.csv").exists()
     assert (bundle.bundle_dir / "tables" / "single_option_representative_paths.csv").exists()
     assert (bundle.bundle_dir / "tables" / "single_option_path_outcomes.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "single_option_required_path_to_beat_stock_1_5x.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "single_option_required_path_to_beat_stock_2_0x.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "single_option_closest_representative_path_to_edge.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "single_option_edge_gap_by_path_family.csv").exists()
     assert (bundle.bundle_dir / "tables" / "single_option_path_family_counts.csv").exists()
     assert (bundle.bundle_dir / "tables" / "single_option_timing_sensitivity.csv").exists()
     assert (bundle.bundle_dir / "tables" / "single_option_iv_sensitivity.csv").exists()
@@ -357,6 +361,8 @@ def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_h
     assert "summary/single_option_decision.md" in summary_text
     assert "tables/single_option_decision_path_selections.csv" in summary_text
     assert "tables/single_option_path_outcomes.csv" in summary_text
+    assert "tables/single_option_required_path_to_beat_stock_1_5x.csv" in summary_text
+    assert "tables/single_option_edge_gap_by_path_family.csv" in summary_text
     assert "charts/single_option_decision_view.png" in summary_text
     assert "tables/action_board_candidates.csv" in summary_text
     assert "tables/decision_triggers.csv" in summary_text
@@ -399,6 +405,8 @@ def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_h
     assert "stock_path_gallery.png" in summary_text
     assert "stock_path_library.csv" in summary_text
     assert "single_option_decision_path_selections.csv" in summary_text
+    assert "single_option_required_path_to_beat_stock_1_5x.csv" in summary_text
+    assert "single_option_edge_gap_by_path_family.csv" in summary_text
     assert "iv_path_gallery.png" in summary_text
     assert "compare_vs_stock_path_delta.png" in summary_text
     assert "options_show_edge" not in summary_text
@@ -456,6 +464,8 @@ def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_h
     assert "Single-Option Decision View" in single_option_text
     assert "what stock paths make one selected call worth buying instead of buying stock" in single_option_text
     assert "single_option_decision_path_selections.csv" in single_option_text
+    assert "single_option_required_path_to_beat_stock_1_5x.csv" in single_option_text
+    assert "single_option_edge_gap_by_path_family.csv" in single_option_text
     assert "Chain Overview / Compare Options" in chain_overview_text
     assert "bullish long calls against long stock" in chain_overview_text
     assert "C:/Users" not in chain_overview_text
@@ -511,6 +521,16 @@ def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_h
     assert summary_text.index("## Best-Of Long-Call Comparison") < summary_text.index("## Representative Path Summary")
     path_risk_csv = (bundle.bundle_dir / "tables" / "path_risk_summary.csv").read_text(encoding="utf-8")
     assert "4.999999999999999" not in path_risk_csv
+
+
+def test_contract_selection_publish_dashboard_reads_edge_artifacts_without_recomputing_analysis():
+    source = (PROJECT_ROOT / "options_lab" / "publish" / "dashboard.py").read_text(encoding="utf-8")
+
+    assert "build_contract_selection_analysis" not in source
+    assert "single_option_required_path_to_beat_stock_1_5x.csv" in source
+    assert "single_option_required_path_to_beat_stock_2_0x.csv" in source
+    assert "single_option_closest_representative_path_to_edge.csv" in source
+    assert "single_option_edge_gap_by_path_family.csv" in source
 
 
 def test_publish_analysis_bundle_renders_dashboard_from_canonical_bundle(temp_analysis_root: Path):

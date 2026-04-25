@@ -29,6 +29,7 @@ from options_lab.analysis.simulation import (
     stock_path_family_metadata,
 )
 from options_lab.io import load_chain
+from options_lab.plots import plot_single_option_decision_view
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -213,6 +214,141 @@ def test_curated_single_option_decision_path_selection_prefers_outcome_and_famil
     assert len({path["path_family"] for path in selected}) >= 5
 
 
+def test_single_option_decision_view_renders_stock_better_paths_with_required_edges(temp_workspace_root: Path):
+    output_path = temp_workspace_root / "single_option_decision_view.png"
+    summary = pd.DataFrame(
+        [
+            {
+                "ticker": "GPRE",
+                "candidate_short_label": "15C Dec-26",
+                "premium_used": 320.0,
+                "base_iv": 0.55,
+                "breakeven": 18.2,
+                "max_loss": 320.0,
+                "dte": 240,
+                "exit_rule": "sell_on_thesis_completion",
+            }
+        ]
+    )
+    representative_paths = pd.DataFrame(
+        [
+            {
+                "decision_path_id": path_id,
+                "path_label": label,
+                "display_order": order,
+                "requested_days": days,
+                "date": f"2026-{month:02d}-15",
+                "spot_price": price,
+            }
+            for order, (path_id, label, prices) in enumerate(
+                [
+                    ("late", "Late Rally", [16.0, 17.0, 20.0]),
+                    ("steady", "Steady Grind", [16.0, 18.0, 21.0]),
+                    ("false", "False Breakout", [16.0, 22.0, 18.5]),
+                ],
+                start=1,
+            )
+            for days, month, price in zip([0, 45, 90], [4, 5, 7], prices)
+        ]
+    )
+    path_outcomes = pd.DataFrame(
+        [
+            {
+                "decision_path_id": path_id,
+                "path_label": label,
+                "outcome_label": "stock_better",
+                "display_order": order,
+                "difference_vs_stock": -gap,
+                "stock_profit_loss": 400.0 + gap,
+                "outperformance_multiple": 0.8,
+                "qualifies_as_winning_path_family": False,
+            }
+            for order, (path_id, label, gap) in enumerate(
+                [
+                    ("late", "Late Rally", 80.0),
+                    ("steady", "Steady Grind", 45.0),
+                    ("false", "False Breakout", 130.0),
+                ],
+                start=1,
+            )
+        ]
+    )
+    required_edge_paths = pd.DataFrame(
+        [
+            {
+                "edge_path_name": edge_name,
+                "edge_label": edge_label,
+                "edge_multiple": multiple,
+                "display_order": display_order,
+                "requested_days": days,
+                "date": f"2026-{month:02d}-15",
+                "required_stock_price": price,
+                "return_pct": (price / 16.0) - 1.0,
+                "iv_shift_points": 0.0,
+                "required_option_profit_loss": 600.0,
+                "status": "solved",
+            }
+            for display_order, (edge_name, edge_label, multiple, prices) in enumerate(
+                [
+                    ("required_path_to_beat_stock_1_5x", "Required 1.5x Edge", 1.5, [16.0, 21.0, 25.0]),
+                    ("required_path_to_beat_stock_2_0x", "Required 2.0x Strong Edge", 2.0, [16.0, 23.0, 28.0]),
+                ],
+                start=1,
+            )
+            for days, month, price in zip([0, 45, 90], [4, 5, 7], prices)
+        ]
+    )
+    closest_edge = pd.DataFrame(
+        [
+            {
+                "decision_path_id": "steady",
+                "path_label": "Steady Grind",
+                "annotation_text": "Closest miss needs about $4.00 more stock move or earlier timing.",
+                "edge_gap_to_1_5x_dollars": -45.0,
+            }
+        ]
+    )
+    edge_gap = pd.DataFrame(
+        [
+            {
+                "decision_path_id": "steady",
+                "path_label": "Steady Grind",
+                "path_family_label": "Steady Grind-Up",
+                "timing_shape": "smooth_uptrend",
+                "outcome_label": "stock_better",
+                "exit_stock_price": 21.0,
+                "required_stock_price_1_5x": 25.0,
+                "extra_stock_move_needed_1_5x": 4.0,
+                "edge_gap_to_1_5x_dollars": -45.0,
+                "timing_gap_note": "needs_more_stock_move",
+                "is_closest_to_edge": True,
+            }
+        ]
+    )
+
+    result = plot_single_option_decision_view(
+        summary=summary,
+        representative_paths=representative_paths,
+        path_outcomes=path_outcomes,
+        required_edge_paths=required_edge_paths,
+        edge_gap_by_path_family=edge_gap,
+        closest_representative_path_to_edge=closest_edge,
+        iv_sensitivity=pd.DataFrame(
+            [{"iv_mode_label": "Base IV", "display_order": 1, "difference_vs_stock": -45.0, "sensitivity_note": "Base IV."}]
+        ),
+        entry_sensitivity=pd.DataFrame(
+            [{"entry_scenario_label": "Reference", "display_order": 1, "premium_used": 320.0, "average_difference_vs_stock": -45.0}]
+        ),
+        summary_bullets=pd.DataFrame([{"bullet_order": 1, "bullet_text": "No representative path beats stock by the required threshold."}]),
+        output_path=output_path,
+        title="Synthetic single-option decision",
+    )
+
+    assert result == output_path
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+
+
 def test_thesis_mode_keeps_target_galleries_when_no_long_calls_exist():
     outputs = _build_thesis_mode_outputs(
         ticker="PBI",
@@ -325,6 +461,10 @@ def test_contract_selection_analysis_builds_candidates_path_cases_and_selector_o
     assert not result.single_option_iv_sensitivity.empty
     assert not result.single_option_entry_sensitivity.empty
     assert not result.single_option_summary_bullets.empty
+    assert not result.single_option_required_path_to_beat_stock_1_5x.empty
+    assert not result.single_option_required_path_to_beat_stock_2_0x.empty
+    assert not result.single_option_closest_representative_path_to_edge.empty
+    assert not result.single_option_edge_gap_by_path_family.empty
     assert "Single-Option Decision View" in result.single_option_decision_markdown
     assert not result.chain_overview_summary.empty
     assert not result.chain_overview_candidates.empty
@@ -391,6 +531,25 @@ def test_contract_selection_analysis_builds_candidates_path_cases_and_selector_o
     assert single_summary["required_winning_path_families"] == 2
     assert single_summary["entry_price_mode"] == "conservative_mid_plus_slippage"
     assert single_summary["exit_rule"] == "sell_on_thesis_completion"
+    assert result.single_option_required_path_to_beat_stock_1_5x["edge_path_name"].eq("required_path_to_beat_stock_1_5x").all()
+    assert result.single_option_required_path_to_beat_stock_2_0x["edge_path_name"].eq("required_path_to_beat_stock_2_0x").all()
+    assert {
+        "decision_path_id",
+        "path_family_label",
+        "required_stock_price_1_5x",
+        "required_stock_price_2_0x",
+        "extra_stock_move_needed_1_5x",
+        "edge_gap_to_1_5x_dollars",
+        "timing_gap_note",
+        "is_closest_to_edge",
+    } <= set(result.single_option_edge_gap_by_path_family.columns)
+    assert result.single_option_edge_gap_by_path_family["decision_path_id"].nunique() == result.single_option_decision_path_selections["decision_path_id"].nunique()
+    assert result.single_option_edge_gap_by_path_family["is_closest_to_edge"].fillna(False).sum() == 1
+    assert {
+        "decision_path_id",
+        "annotation_text",
+        "edge_gap_to_1_5x_dollars",
+    } <= set(result.single_option_closest_representative_path_to_edge.columns)
     assert {
         "difference_vs_stock",
         "stock_profit_loss",

@@ -362,6 +362,10 @@ class ContractSelectionComputation:
     single_option_decision_path_selections: pd.DataFrame
     single_option_representative_paths: pd.DataFrame
     single_option_path_outcomes: pd.DataFrame
+    single_option_required_path_to_beat_stock_1_5x: pd.DataFrame
+    single_option_required_path_to_beat_stock_2_0x: pd.DataFrame
+    single_option_closest_representative_path_to_edge: pd.DataFrame
+    single_option_edge_gap_by_path_family: pd.DataFrame
     single_option_path_family_counts: pd.DataFrame
     single_option_timing_sensitivity: pd.DataFrame
     single_option_iv_sensitivity: pd.DataFrame
@@ -4249,6 +4253,10 @@ def _single_option_empty_outputs() -> dict[str, Any]:
         "single_option_decision_path_selections": pd.DataFrame(),
         "single_option_representative_paths": pd.DataFrame(),
         "single_option_path_outcomes": pd.DataFrame(),
+        "single_option_required_path_to_beat_stock_1_5x": pd.DataFrame(),
+        "single_option_required_path_to_beat_stock_2_0x": pd.DataFrame(),
+        "single_option_closest_representative_path_to_edge": pd.DataFrame(),
+        "single_option_edge_gap_by_path_family": pd.DataFrame(),
         "single_option_path_family_counts": pd.DataFrame(),
         "single_option_timing_sensitivity": pd.DataFrame(),
         "single_option_iv_sensitivity": pd.DataFrame(),
@@ -5040,6 +5048,297 @@ def _evaluate_candidate_on_decision_paths(
     return pd.DataFrame(representative_rows), pd.DataFrame(outcome_rows), pd.DataFrame(timing_rows)
 
 
+def _single_option_edge_path_key(edge_multiple: float) -> str:
+    return f"required_path_to_beat_stock_{str(float(edge_multiple)).replace('.', '_')}x"
+
+
+def _single_option_edge_gap_value(
+    spec: dict[str, Any],
+    *,
+    spot_price: float,
+    horizon_days: int,
+    iv_shift_points: float,
+    comparison_capital: float,
+    premium_used: float,
+    edge_multiple: float,
+) -> tuple[float, dict[str, Any]]:
+    evaluation = _single_option_adjusted_evaluation(
+        spec,
+        spot_price=float(spot_price),
+        horizon_days=int(horizon_days),
+        iv_shift_points=float(iv_shift_points),
+        comparison_capital=float(comparison_capital),
+        premium_used=float(premium_used),
+    )
+    profit = _single_option_num(evaluation.get("profit_loss"), 0.0)
+    stock_profit = _single_option_num(evaluation.get("stock_profit_loss"), 0.0)
+    required_profit = float(edge_multiple) * stock_profit if stock_profit > 0 else 0.0
+    return profit - required_profit, evaluation
+
+
+def _single_option_required_spot_for_edge(
+    spec: dict[str, Any],
+    *,
+    horizon_days: int,
+    iv_shift_points: float,
+    comparison_capital: float,
+    premium_used: float,
+    edge_multiple: float,
+    entry_spot: float,
+    target_price: float,
+    strike_value: float,
+    observed_max_spot: float,
+) -> tuple[float | None, dict[str, Any] | None, str]:
+    lower = max(0.01, float(entry_spot))
+    lower_gap, lower_eval = _single_option_edge_gap_value(
+        spec,
+        spot_price=lower,
+        horizon_days=int(horizon_days),
+        iv_shift_points=float(iv_shift_points),
+        comparison_capital=float(comparison_capital),
+        premium_used=float(premium_used),
+        edge_multiple=float(edge_multiple),
+    )
+    if lower_gap >= 0:
+        return lower, lower_eval, "already_clears_at_entry_spot"
+
+    upper = max(
+        lower * 1.08,
+        float(target_price) * 1.15,
+        float(strike_value or target_price) * 1.20,
+        float(observed_max_spot or target_price) * 1.20,
+    )
+    upper_eval: dict[str, Any] | None = None
+    upper_gap = lower_gap
+    for _ in range(14):
+        upper_gap, upper_eval = _single_option_edge_gap_value(
+            spec,
+            spot_price=upper,
+            horizon_days=int(horizon_days),
+            iv_shift_points=float(iv_shift_points),
+            comparison_capital=float(comparison_capital),
+            premium_used=float(premium_used),
+            edge_multiple=float(edge_multiple),
+        )
+        if upper_gap >= 0:
+            break
+        upper *= 1.35
+    if upper_gap < 0 or upper_eval is None:
+        return None, upper_eval, "unreached_in_search_range"
+
+    lo = lower
+    hi = upper
+    best_eval = upper_eval
+    for _ in range(52):
+        mid = (lo + hi) / 2.0
+        mid_gap, mid_eval = _single_option_edge_gap_value(
+            spec,
+            spot_price=mid,
+            horizon_days=int(horizon_days),
+            iv_shift_points=float(iv_shift_points),
+            comparison_capital=float(comparison_capital),
+            premium_used=float(premium_used),
+            edge_multiple=float(edge_multiple),
+        )
+        if mid_gap >= 0:
+            hi = mid
+            best_eval = mid_eval
+        else:
+            lo = mid
+    return hi, best_eval, "solved"
+
+
+def _single_option_required_edge_path_frame(
+    spec: dict[str, Any],
+    *,
+    candidate_slug: str,
+    candidate_short_label: str,
+    representative_paths: pd.DataFrame,
+    snapshot_date: date,
+    target_date: date,
+    target_price: float,
+    entry_spot: float,
+    active_iv_path: dict[str, float],
+    comparison_capital: float,
+    premium_used: float,
+    edge_multiple: float,
+) -> pd.DataFrame:
+    if representative_paths.empty:
+        path_grid = _build_path_grid(snapshot_date, target_date)
+        horizons = pd.DataFrame(path_grid)
+        horizons["date"] = [
+            (snapshot_date + timedelta(days=int(row.get("requested_days") or 0))).isoformat()
+            for row in path_grid
+        ]
+    else:
+        horizons = representative_paths[["requested_days", "date"]].drop_duplicates().copy()
+    horizons["requested_days"] = pd.to_numeric(horizons.get("requested_days"), errors="coerce").fillna(0).astype(int)
+    horizons = horizons.sort_values("requested_days").drop_duplicates(subset=["requested_days"], keep="first")
+    if horizons.empty:
+        return pd.DataFrame()
+    observed_max = _single_option_num(
+        pd.to_numeric(representative_paths.get("spot_price", pd.Series(dtype=float)), errors="coerce").max()
+        if not representative_paths.empty
+        else target_price,
+        float(target_price),
+    )
+    strike_value = _single_option_num(spec.get("strike_label"), float(target_price))
+    path_key = _single_option_edge_path_key(edge_multiple)
+    edge_label = f"Required path to beat stock {float(edge_multiple):.1f}x"
+    rows: list[dict[str, Any]] = []
+    for step_index, row in enumerate(horizons.to_dict("records")):
+        requested_days = int(row.get("requested_days") or 0)
+        iv_shift = float(active_iv_path.get(f"{requested_days}d", 0.0))
+        required_spot, evaluation, status = _single_option_required_spot_for_edge(
+            spec,
+            horizon_days=requested_days,
+            iv_shift_points=iv_shift,
+            comparison_capital=float(comparison_capital),
+            premium_used=float(premium_used),
+            edge_multiple=float(edge_multiple),
+            entry_spot=float(entry_spot),
+            target_price=float(target_price),
+            strike_value=float(strike_value),
+            observed_max_spot=float(observed_max),
+        )
+        stock_profit = _single_option_num((evaluation or {}).get("stock_profit_loss"), 0.0)
+        profit = _single_option_num((evaluation or {}).get("profit_loss"), 0.0)
+        required_profit = float(edge_multiple) * stock_profit if stock_profit > 0 else 0.0
+        rows.append(
+            {
+                "candidate_slug": candidate_slug,
+                "candidate_short_label": candidate_short_label,
+                "edge_path_name": path_key,
+                "edge_label": edge_label,
+                "edge_multiple": float(edge_multiple),
+                "display_order": 1 if float(edge_multiple) <= 1.5 else 2,
+                "step_index": step_index,
+                "date": clean_string(row.get("date")) or (snapshot_date + timedelta(days=requested_days)).isoformat(),
+                "requested_days": requested_days,
+                "required_stock_price": round(float(required_spot), 4) if required_spot is not None else None,
+                "spot_price": round(float(required_spot), 4) if required_spot is not None else None,
+                "return_pct": (float(required_spot) / float(entry_spot) - 1.0) if required_spot is not None and entry_spot else None,
+                "iv_shift_points": round(iv_shift, 4),
+                "required_option_profit_loss": round(float(required_profit), 4),
+                "estimated_option_profit_loss": round(float(profit), 4) if evaluation is not None else None,
+                "status": status,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _edge_required_price_at(edge_path: pd.DataFrame, requested_days: int) -> float | None:
+    if edge_path.empty:
+        return None
+    data = edge_path.dropna(subset=["required_stock_price"]).copy()
+    if data.empty:
+        return None
+    data["requested_days"] = pd.to_numeric(data.get("requested_days"), errors="coerce")
+    data["required_stock_price"] = pd.to_numeric(data.get("required_stock_price"), errors="coerce")
+    data = data.dropna(subset=["requested_days", "required_stock_price"]).sort_values("requested_days")
+    if data.empty:
+        return None
+    return float(np.interp(float(requested_days), data["requested_days"].to_numpy(), data["required_stock_price"].to_numpy()))
+
+
+def _single_option_edge_gap_outputs(
+    *,
+    path_outcomes: pd.DataFrame,
+    min_edge_path: pd.DataFrame,
+    strong_edge_path: pd.DataFrame,
+    minimum_outperformance_multiple: float,
+    strong_outperformance_multiple: float,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    if path_outcomes.empty:
+        return pd.DataFrame(), pd.DataFrame()
+    rows: list[dict[str, Any]] = []
+    for row in path_outcomes.to_dict("records"):
+        requested_days = int(_single_option_num(row.get("exit_requested_days"), 0.0))
+        exit_stock = finite_or_none(row.get("exit_stock_price"))
+        profit = _single_option_num(row.get("profit_loss"), 0.0)
+        stock_profit = _single_option_num(row.get("stock_profit_loss"), 0.0)
+        required_profit = float(minimum_outperformance_multiple) * stock_profit if stock_profit > 0 else 0.0
+        strong_required_profit = float(strong_outperformance_multiple) * stock_profit if stock_profit > 0 else 0.0
+        min_required_price = _edge_required_price_at(min_edge_path, requested_days)
+        strong_required_price = _edge_required_price_at(strong_edge_path, requested_days)
+        extra_move = (
+            max(0.0, float(min_required_price) - float(exit_stock))
+            if min_required_price is not None and exit_stock is not None
+            else None
+        )
+        extra_move_pct = (extra_move / float(exit_stock)) if extra_move is not None and exit_stock else None
+        first_cross_day = finite_or_none(row.get("first_cross_above_strike_day"))
+        outcome_label = clean_string(row.get("outcome_label"))
+        if first_cross_day is None:
+            timing_note = "too_low_and_never_crosses_strike"
+        elif extra_move is not None and extra_move > 0 and float(first_cross_day) > 45:
+            timing_note = "too_low_and_too_late"
+        elif extra_move is not None and extra_move > 0:
+            timing_note = "needs_more_stock_move"
+        elif outcome_label == "stock_better":
+            timing_note = "needs_earlier_timing_or_better_entry"
+        else:
+            timing_note = "clears_or_near_edge"
+        rows.append(
+            {
+                "candidate_slug": clean_string(row.get("candidate_slug")),
+                "candidate_short_label": clean_string(row.get("candidate_short_label")),
+                "decision_path_id": clean_string(row.get("decision_path_id")),
+                "path_role": clean_string(row.get("path_role")),
+                "path_name": clean_string(row.get("path_name")),
+                "path_label": clean_string(row.get("path_label")),
+                "path_family": clean_string(row.get("path_family")),
+                "path_family_label": clean_string(row.get("path_family_label")),
+                "timing_shape": clean_string(row.get("timing_shape")),
+                "outcome_label": outcome_label,
+                "display_order": int(_single_option_num(row.get("display_order"), 0.0)),
+                "exit_requested_days": requested_days,
+                "exit_date": clean_string(row.get("exit_date")),
+                "exit_stock_price": exit_stock,
+                "required_stock_price_1_5x": min_required_price,
+                "required_stock_price_2_0x": strong_required_price,
+                "extra_stock_move_needed_1_5x": extra_move,
+                "extra_stock_move_needed_pct_1_5x": extra_move_pct,
+                "profit_loss": profit,
+                "stock_profit_loss": stock_profit,
+                "required_profit_loss_1_5x": required_profit,
+                "required_profit_loss_2_0x": strong_required_profit,
+                "edge_gap_to_1_5x_dollars": profit - required_profit,
+                "edge_gap_to_2_0x_dollars": profit - strong_required_profit,
+                "outperformance_multiple": finite_or_none(row.get("outperformance_multiple")),
+                "edge_gap_to_1_5x_multiple": (
+                    float(row.get("outperformance_multiple")) - float(minimum_outperformance_multiple)
+                    if finite_or_none(row.get("outperformance_multiple")) is not None
+                    else None
+                ),
+                "timing_gap_note": timing_note,
+            }
+        )
+    gap_by_path = pd.DataFrame(rows)
+    if gap_by_path.empty:
+        return pd.DataFrame(), pd.DataFrame()
+    gap_by_path = gap_by_path.sort_values(
+        ["edge_gap_to_1_5x_dollars", "extra_stock_move_needed_1_5x", "display_order"],
+        ascending=[False, True, True],
+        na_position="last",
+    ).reset_index(drop=True)
+    gap_by_path["is_closest_to_edge"] = False
+    gap_by_path.loc[0, "is_closest_to_edge"] = True
+    closest = gap_by_path.head(1).copy()
+    closest_row = closest.iloc[0].to_dict()
+    extra_move = finite_or_none(closest_row.get("extra_stock_move_needed_1_5x"))
+    exit_stock = finite_or_none(closest_row.get("exit_stock_price"))
+    if extra_move is not None and extra_move > 0:
+        pct_text = f"{(extra_move / exit_stock) * 100:.1f}%" if exit_stock else "n/a"
+        annotation = f"Closest miss needs about ${extra_move:,.2f} more stock move ({pct_text}) by this path's exit."
+    elif clean_string(closest_row.get("outcome_label")) == "stock_better":
+        annotation = "Closest miss needs earlier timing, a better entry, or stronger IV support to clear stock."
+    else:
+        annotation = "Closest path clears or nearly clears the configured option-over-stock edge."
+    closest["annotation_text"] = annotation
+    return gap_by_path, closest
+
+
 def _build_single_option_decision_markdown(
     *,
     ticker: str,
@@ -5087,6 +5386,8 @@ def _build_single_option_decision_markdown(
             "",
             "- `charts/single_option_decision_view.png`: curated decision-path chart, bullets, IV sensitivity, and entry sensitivity.",
             "- `tables/single_option_decision_path_selections.csv`: selected decision paths with family, outcome label, score, and reason.",
+            "- `tables/single_option_required_path_to_beat_stock_1_5x.csv`: stock path required to clear the option-over-stock threshold.",
+            "- `tables/single_option_edge_gap_by_path_family.csv`: closest miss and required-stock gap for each selected path.",
             "- `tables/single_option_path_outcomes.csv`: path-by-path option-vs-stock outcomes.",
             "- `tables/single_option_iv_sensitivity.csv`: low/base/high IV sensitivity for the same selected option.",
             "- `tables/single_option_entry_sensitivity.csv`: cheap/reference/expensive entry sensitivity.",
@@ -5204,6 +5505,41 @@ def _build_single_option_decision_outputs(
         path_outcomes=path_outcomes,
         candidate_slug=selected_slug,
         candidate_short_label=candidate_short_label,
+    )
+    required_edge_1_5x = _single_option_required_edge_path_frame(
+        spec,
+        candidate_slug=selected_slug,
+        candidate_short_label=candidate_short_label,
+        representative_paths=representative_paths,
+        snapshot_date=snapshot_date,
+        target_date=target_date,
+        target_price=float(target_price),
+        entry_spot=float(entry_spot),
+        active_iv_path=active_iv_path,
+        comparison_capital=float(comparison_capital),
+        premium_used=float(premium_used),
+        edge_multiple=float(minimum_outperformance_multiple),
+    )
+    required_edge_2_0x = _single_option_required_edge_path_frame(
+        spec,
+        candidate_slug=selected_slug,
+        candidate_short_label=candidate_short_label,
+        representative_paths=representative_paths,
+        snapshot_date=snapshot_date,
+        target_date=target_date,
+        target_price=float(target_price),
+        entry_spot=float(entry_spot),
+        active_iv_path=active_iv_path,
+        comparison_capital=float(comparison_capital),
+        premium_used=float(premium_used),
+        edge_multiple=float(strong_outperformance_multiple),
+    )
+    edge_gap_by_path_family, closest_to_edge = _single_option_edge_gap_outputs(
+        path_outcomes=path_outcomes,
+        min_edge_path=required_edge_1_5x,
+        strong_edge_path=required_edge_2_0x,
+        minimum_outperformance_multiple=float(minimum_outperformance_multiple),
+        strong_outperformance_multiple=float(strong_outperformance_multiple),
     )
     qualifying_count = int(path_outcomes.get("qualifies_as_winning_path_family", pd.Series(dtype=bool)).fillna(False).sum())
     evaluated_count = int(path_outcomes["decision_path_id"].nunique()) if "decision_path_id" in path_outcomes.columns else int(path_outcomes["path_role"].nunique())
@@ -5386,6 +5722,10 @@ def _build_single_option_decision_outputs(
         "single_option_decision_path_selections": decision_path_selections,
         "single_option_representative_paths": representative_paths,
         "single_option_path_outcomes": path_outcomes,
+        "single_option_required_path_to_beat_stock_1_5x": required_edge_1_5x,
+        "single_option_required_path_to_beat_stock_2_0x": required_edge_2_0x,
+        "single_option_closest_representative_path_to_edge": closest_to_edge,
+        "single_option_edge_gap_by_path_family": edge_gap_by_path_family,
         "single_option_path_family_counts": family_counts,
         "single_option_timing_sensitivity": timing_sensitivity,
         "single_option_iv_sensitivity": iv_sensitivity,
@@ -9221,6 +9561,10 @@ def _build_contract_selection_core(
         single_option_decision_path_selections=single_option_outputs["single_option_decision_path_selections"],
         single_option_representative_paths=single_option_outputs["single_option_representative_paths"],
         single_option_path_outcomes=single_option_outputs["single_option_path_outcomes"],
+        single_option_required_path_to_beat_stock_1_5x=single_option_outputs["single_option_required_path_to_beat_stock_1_5x"],
+        single_option_required_path_to_beat_stock_2_0x=single_option_outputs["single_option_required_path_to_beat_stock_2_0x"],
+        single_option_closest_representative_path_to_edge=single_option_outputs["single_option_closest_representative_path_to_edge"],
+        single_option_edge_gap_by_path_family=single_option_outputs["single_option_edge_gap_by_path_family"],
         single_option_path_family_counts=single_option_outputs["single_option_path_family_counts"],
         single_option_timing_sensitivity=single_option_outputs["single_option_timing_sensitivity"],
         single_option_iv_sensitivity=single_option_outputs["single_option_iv_sensitivity"],
