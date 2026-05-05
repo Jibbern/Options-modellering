@@ -52,6 +52,10 @@ EXPECTED_COLUMNS = [
     "last_trade",
 ]
 
+NORMALIZED_DECIMAL_PERCENT_SOURCES = {
+    "barchart_options_screener",
+}
+
 
 @dataclass(frozen=True)
 class OptionContract:
@@ -178,10 +182,33 @@ def _rename_columns(raw_df: pd.DataFrame) -> pd.DataFrame:
     return renamed
 
 
+def _uses_normalized_decimal_percent_units(metadata: SnapshotMetadata) -> bool:
+    source_values = {
+        clean_string(metadata.source).lower(),
+        clean_string((metadata.extra or {}).get("source")).lower(),
+        clean_string((metadata.extra or {}).get("storage_location")).lower(),
+        clean_string((metadata.extra or {}).get("snapshot_scope")).lower(),
+    }
+    return bool(source_values & NORMALIZED_DECIMAL_PERCENT_SOURCES)
+
+
+def _parse_percent_or_decimal(value: Any, *, normalized_decimal: bool) -> float | None:
+    text = clean_string(value)
+    if not text:
+        return None
+    if text.endswith("%"):
+        return parse_number(text, percent=True)
+    number = parse_number(text)
+    if number is None:
+        return None
+    return float(number) if normalized_decimal else float(number) / 100.0
+
+
 def _normalize_contracts(raw_df: pd.DataFrame, metadata: SnapshotMetadata) -> pd.DataFrame:
     renamed = _rename_columns(raw_df)
     renamed = renamed.apply(lambda column: column.map(clean_string))
     renamed["raw_row"] = raw_df.to_dict(orient="records")
+    normalized_decimal_units = _uses_normalized_decimal_percent_units(metadata)
 
     # Retail exports often include footer rows, blank separator rows, or other
     # non-contract records. A valid option type and strike keeps the filter
@@ -209,9 +236,13 @@ def _normalize_contracts(raw_df: pd.DataFrame, metadata: SnapshotMetadata) -> pd
     contracts["volume"] = contracts["volume"].apply(parse_int)
     contracts["open_interest"] = contracts["open_interest"].apply(parse_int)
     contracts["oi_change"] = contracts["oi_change"].apply(lambda value: parse_int(value, unch_as_zero=True))
-    contracts["iv"] = contracts["iv"].apply(lambda value: parse_number(value, percent=True))
+    contracts["iv"] = contracts["iv"].apply(
+        lambda value: _parse_percent_or_decimal(value, normalized_decimal=normalized_decimal_units)
+    )
     contracts["delta"] = contracts["delta"].apply(parse_number)
-    contracts["moneyness"] = contracts["moneyness"].apply(lambda value: parse_number(value, percent=True))
+    contracts["moneyness"] = contracts["moneyness"].apply(
+        lambda value: _parse_percent_or_decimal(value, normalized_decimal=normalized_decimal_units)
+    )
     contracts["last_trade"] = contracts["last_trade"].apply(parse_date)
     contracts["quote_count"] = contracts[["bid", "mid", "ask", "last"]].notna().sum(axis=1)
     contracts["has_quote"] = contracts["quote_count"] > 0
@@ -224,22 +255,29 @@ def _normalize_contracts(raw_df: pd.DataFrame, metadata: SnapshotMetadata) -> pd
         "entry_premium_realistic",
         "entry_premium_selected",
         "exit_premium_conservative",
-        "iv_rank",
-        "iv_percentile",
         "gamma",
         "theta",
         "vega",
         "rho",
-        "itm_probability",
-        "otm_probability",
-        "profit_probability",
-        "moneyness_decimal",
         "barchart_be_bid",
         "barchart_be_ask",
         "barchart_be_mid",
     ]:
         if column in contracts.columns:
             contracts[column] = contracts[column].apply(parse_number)
+    for column in [
+        "implied_volatility",
+        "iv_rank",
+        "iv_percentile",
+        "itm_probability",
+        "otm_probability",
+        "profit_probability",
+        "moneyness_decimal",
+    ]:
+        if column in contracts.columns:
+            contracts[column] = contracts[column].apply(
+                lambda value: _parse_percent_or_decimal(value, normalized_decimal=normalized_decimal_units)
+            )
     if "model_eligible" in contracts.columns:
         contracts["model_eligible"] = contracts["model_eligible"].astype(str).str.lower().isin({"true", "1", "yes"})
     contracts = contracts.sort_values(["option_type", "strike"]).reset_index(drop=True)

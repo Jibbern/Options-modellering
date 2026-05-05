@@ -851,6 +851,11 @@ def _build_candidate_row(
         "option_data_source": clean_string(quote_meta.get("source") or chain.metadata.source or source_storage_location) or None,
         "option_data_trust": clean_string(quote_meta.get("trust") or metadata_extra.get("trust")) or None,
         "entry_price_mode": clean_string(quote_meta.get("entry_price_mode") or position.premium_mode) or None,
+        "contract_multiplier": int(CONTRACT_MULTIPLIER) if option_legs else None,
+        "entry_premium_per_contract": finite_or_none(summary.get("initial_outlay")) if option_legs else None,
+        "bid_per_share": finite_or_none(quote_meta.get("bid")),
+        "ask_per_share": finite_or_none(quote_meta.get("ask")),
+        "mid_per_share": finite_or_none(quote_meta.get("mid")),
         "bid": finite_or_none(quote_meta.get("bid")),
         "ask": finite_or_none(quote_meta.get("ask")),
         "mid": finite_or_none(quote_meta.get("mid")),
@@ -4380,19 +4385,24 @@ def _single_option_adjusted_evaluation(
     )
     estimated_value = _single_option_num(raw.get("estimated_value"), 0.0)
     stock_profit_loss = _single_option_num(raw.get("stock_profit_loss"), 0.0)
-    mark_to_market_profit = estimated_value - float(premium_used)
     entry_anchor_applied = int(horizon_days) <= 0
+    return_basis_option_value = float(premium_used) if entry_anchor_applied else estimated_value
+    mark_to_market_profit = return_basis_option_value - float(premium_used)
     adjusted_profit = 0.0 if entry_anchor_applied else mark_to_market_profit
     adjusted_return = adjusted_profit / float(comparison_capital) if comparison_capital else None
     raw.update(
         {
+            "estimated_value": round(float(return_basis_option_value), 4),
+            "modeled_option_value": round(float(estimated_value), 4),
+            "return_basis_option_value": round(float(return_basis_option_value), 4),
             "premium_used": round(float(premium_used), 4),
             "profit_loss": round(float(adjusted_profit), 4),
             "return_on_comparison_capital": finite_or_none(adjusted_return),
             "difference_vs_stock": round(float(adjusted_profit - stock_profit_loss), 4),
             "comparison_profit_loss": round(float(adjusted_profit), 4),
             "modeled_profit_loss_before_entry_adjustment": raw.get("profit_loss"),
-            "mark_to_market_profit_loss_before_entry_anchor": round(float(mark_to_market_profit), 4),
+            "modeled_option_value_before_entry_anchor": round(float(estimated_value), 4),
+            "mark_to_market_profit_loss_before_entry_anchor": round(float(estimated_value - float(premium_used)), 4),
             "entry_premium_anchor_applied": bool(entry_anchor_applied),
         }
     )
@@ -6690,6 +6700,8 @@ def _build_required_path_tables_markdown(*, ticker: str) -> str:
             "",
             "- `1.5x / 2.0x` are relative to stock return, not absolute option return.",
             "- Required move tables show what each call needs before the option beats stock ownership.",
+            "- Bid/Ask/Mid are per-share option quotes.",
+            "- Entry premium is per-contract in required-path calculations.",
             "- Entry premium sensitivity shows fill-price risk.",
             "- IV sensitivity shows vol risk; use it after the stock-path requirement is understood.",
             "- Sell / hold pressure shows whether a modeled spike is better sold early or can be held.",
@@ -6730,7 +6742,10 @@ def _build_required_path_tables_html(
     sell_hold: pd.DataFrame,
     exit_ladder: pd.DataFrame,
 ) -> str:
-    note = "1.5x / 2.0x are relative to stock return, not absolute option return."
+    note = (
+        "1.5x / 2.0x are relative to stock return, not absolute option return. "
+        "Bid/Ask/Mid are per-share option quotes. Entry premium is per-contract in required-path calculations."
+    )
     css = """
 body { font-family: Arial, Helvetica, sans-serif; background: #ffffff; color: #1f2933; margin: 16px; }
 h1 { font-size: 20px; margin: 0 0 8px; }
@@ -6769,22 +6784,60 @@ tbody tr:nth-child(even) td.label { background: #FAFCFE; }
                 + _html_cell(row.get("strike"), kind="currency")
                 + _html_cell(row.get("expiry"), kind="date")
                 + _html_cell(row.get("dte"))
-                + _html_cell(row.get("entry_premium"), kind="currency")
+                + _html_cell(row.get("bid_per_share") if row.get("bid_per_share") is not None else row.get("bid"), kind="currency")
+                + _html_cell(row.get("ask_per_share") if row.get("ask_per_share") is not None else row.get("ask"), kind="currency")
+                + _html_cell(row.get("mid_per_share") if row.get("mid_per_share") is not None else row.get("mid"), kind="currency")
+                + _html_cell(row.get("entry_premium_per_contract") if row.get("entry_premium_per_contract") is not None else row.get("entry_premium"), kind="currency")
+                + _html_cell(row.get("contract_multiplier"))
                 + _html_cell(row.get("entry_iv"), kind="iv")
                 + _html_cell(row.get("entry_spot"), kind="currency")
                 + _html_cell(moneyness, kind="pct1")
-                + _html_cell(row.get("status"))
+                + _html_cell(
+                    " / ".join(
+                        part
+                        for part in [
+                            clean_string(row.get("option_data_source")),
+                            clean_string(row.get("option_data_trust")),
+                        ]
+                        if part
+                    )
+                    or "n/a"
+                )
                 + _html_cell(row.get("concise_explanation"), css_class="note")
                 + "</tr>"
             )
         table = (
             "<table><thead><tr>"
-            + "".join(_html_header(label) for label in ["Contract", "Strike", "Expiry", "DTE", "Entry premium", "Entry IV", "Spot", "Moneyness", "Source / trust", "Notes"])
+            + "".join(
+                _html_header(label)
+                for label in [
+                    "Contract",
+                    "Strike",
+                    "Expiry",
+                    "DTE",
+                    "Bid / share",
+                    "Ask / share",
+                    "Mid / share",
+                    "Entry premium / contract",
+                    "Multiplier",
+                    "Entry IV",
+                    "Spot",
+                    "Moneyness",
+                    "Source / trust",
+                    "Notes",
+                ]
+            )
             + "</tr></thead><tbody>"
             + "".join(rows)
             + "</tbody></table>"
         )
-        sections.append(_html_section("Contract inputs", "Shows what the model is pricing.", table))
+        sections.append(
+            _html_section(
+                "Contract inputs",
+                "Shows what the model is pricing. Bid/Ask/Mid are per-share option quotes; entry premium is per-contract in required-path calculations.",
+                table,
+            )
+        )
 
     if not summary.empty:
         pivot_rows = []
@@ -7220,6 +7273,8 @@ def _build_long_call_required_path_outputs(
                                 "is_peak_option_return": False,
                                 "stock_price": None,
                                 "option_value": None,
+                                "modeled_option_value": None,
+                                "return_basis_option_value": None,
                                 "option_return_pct": None,
                                 "stock_return_pct": None,
                                 "option_vs_stock_multiple": None,
@@ -7319,6 +7374,8 @@ def _build_long_call_required_path_outputs(
                         premium_used=float(premium_used),
                     )
                     option_value = finite_or_none(evaluation.get("estimated_value"))
+                    modeled_option_value = finite_or_none(evaluation.get("modeled_option_value"))
+                    return_basis_option_value = finite_or_none(evaluation.get("return_basis_option_value"))
                     profit = _single_option_num(evaluation.get("profit_loss"), 0.0)
                     stock_return = float(stock_price) / float(entry_spot) - 1.0 if entry_spot else None
                     option_return = profit / float(premium_used) if premium_used else None
@@ -7376,6 +7433,8 @@ def _build_long_call_required_path_outputs(
                         "is_peak_option_return": False,
                         "stock_price": round(float(stock_price), 4),
                         "option_value": option_value,
+                        "modeled_option_value": modeled_option_value,
+                        "return_basis_option_value": return_basis_option_value,
                         "option_return_pct": round(float(option_return), 6) if option_return is not None else None,
                         "stock_return_pct": round(float(stock_return), 6) if stock_return is not None else None,
                         "option_vs_stock_multiple": round(float(multiple), 4) if multiple is not None else None,
@@ -7658,10 +7717,15 @@ def _build_long_call_required_path_outputs(
                     "expiry": expiry_text,
                     "dte": int(dte) if dte is not None else None,
                     "entry_premium": round(float(premium_used), 4),
+                    "entry_premium_per_contract": round(float(premium_used), 4),
                     "entry_iv": round(float(entry_iv), 6) if entry_iv is not None else None,
                     "option_data_source": clean_string(candidate.get("option_data_source")) or clean_string(candidate.get("source_storage_location")) or None,
                     "option_data_trust": clean_string(candidate.get("option_data_trust")) or None,
                     "entry_price_mode": normalized_entry_mode,
+                    "contract_multiplier": int(CONTRACT_MULTIPLIER),
+                    "bid_per_share": finite_or_none(candidate.get("bid_per_share") or candidate.get("bid")),
+                    "ask_per_share": finite_or_none(candidate.get("ask_per_share") or candidate.get("ask")),
+                    "mid_per_share": finite_or_none(candidate.get("mid_per_share") or candidate.get("mid")),
                     "bid": finite_or_none(candidate.get("bid")),
                     "ask": finite_or_none(candidate.get("ask")),
                     "mid": finite_or_none(candidate.get("mid")),

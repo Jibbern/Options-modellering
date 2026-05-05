@@ -46,6 +46,19 @@ def _write_price_history_fixture(path: Path) -> None:
     )
 
 
+def _write_high_iv_options_fixture(path: Path) -> None:
+    path.write_text(
+        "\n".join(
+            [
+                'Symbol,Type,Price~,Latest,"Exp Date",DTE,Strike,Moneyness,Bid,Ask,Mid,Volume,"Open Int",IV,"IV Rank","IV Pctl",Delta,Gamma,Theta,Vega,Rho,"ITM Prob","OTM Prob","Profit Prob","BE (Bid)","BE (Ask)","BE (Mid)",Links',
+                'GPRE,Call,18.07,0.00,05/15/26,10,18,+0.39%,1.10,1.35,1.23,12,"7,403",100.46%,+0.39%,51.00%,0.51,0.05,-0.02,0.04,0.01,51.00%,49.00%,51.00%,19.10,19.35,19.23,https://example.test/high-iv',
+                '"Downloaded from Barchart.com as of 05-05-2026 07:59am CDT"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_barchart_options_import_normalizes_quotes_and_manifest(temp_data_root: Path, temp_workspace_root: Path):
     source = temp_workspace_root / "options-screener-GPRE_2026-05-05.csv"
     _write_options_screener_fixture(source)
@@ -78,6 +91,30 @@ def test_barchart_options_import_normalizes_quotes_and_manifest(temp_data_root: 
     assert normalized.loc[normalized["strike"].eq(15.0), "entry_premium_realistic"].iloc[0] == pytest.approx(3.50)
     assert "latest_zero" in normalized.loc[normalized["strike"].eq(15.0), "quality_flags"].iloc[0]
     assert "wide_spread" in normalized.loc[normalized["strike"].eq(20.0), "quality_flags"].iloc[0]
+
+
+def test_barchart_load_chain_preserves_normalized_decimal_units(temp_data_root: Path, temp_workspace_root: Path):
+    source = temp_workspace_root / "options-screener-GPRE_2026-05-05.csv"
+    _write_high_iv_options_fixture(source)
+
+    result = import_barchart_options_csv(
+        ticker="GPRE",
+        csv_path=source,
+        snapshot_date="2026-05-05",
+        data_root=temp_data_root,
+    )
+    normalized_path = Path(result.normalized_output_paths[0])
+    normalized = pd.read_csv(normalized_path)
+    chain = load_chain(normalized_path, prices_data_root=temp_data_root, research_data_root=temp_data_root)
+    row = chain.contracts.iloc[0]
+
+    assert normalized["implied_volatility"].iloc[0] == pytest.approx(1.0046)
+    assert row["iv"] == pytest.approx(1.0046)
+    assert row["implied_volatility"] == pytest.approx(1.0046)
+    assert row["moneyness"] == pytest.approx(0.0039)
+    assert row["moneyness_decimal"] == pytest.approx(0.0039)
+    assert row["itm_probability"] == pytest.approx(0.51)
+    assert row["profit_probability"] == pytest.approx(0.51)
 
 
 def test_barchart_options_import_can_include_puts(temp_data_root: Path, temp_workspace_root: Path):
@@ -180,3 +217,54 @@ def test_required_path_analysis_uses_barchart_source_fields(temp_data_root: Path
         "quality_flags",
     } <= set(result.required_path_core_summary.columns)
     assert result.required_path_core_summary["option_data_source"].eq("barchart_options_screener").any()
+
+
+def test_required_path_analysis_preserves_barchart_iv_and_entry_anchor(temp_data_root: Path, temp_workspace_root: Path):
+    options_source = temp_workspace_root / "options-screener-GPRE_2026-05-05.csv"
+    price_source = temp_workspace_root / "gpre_price-history-05-05-2026.csv"
+    _write_high_iv_options_fixture(options_source)
+    _write_price_history_fixture(price_source)
+    import_barchart_price_history_csv("GPRE", price_source, data_root=temp_data_root)
+    import_barchart_options_csv("GPRE", options_source, snapshot_date="2026-05-05", data_root=temp_data_root)
+
+    result = build_contract_selection_analysis(
+        ticker="GPRE",
+        snapshot_date="2026-05-05",
+        target_price=24.0,
+        target_date="2026-05-15",
+        data_root=temp_data_root,
+        strategy_families=["long_stock", "long_call"],
+        entry_price_mode="mid",
+    )
+
+    summary = result.required_path_core_summary.loc[
+        result.required_path_core_summary["contract_label"].astype(str).eq("18C May-26")
+    ]
+    assert not summary.empty
+    assert summary["entry_iv"].iloc[0] == pytest.approx(1.0046)
+    assert summary["implied_volatility"].iloc[0] == pytest.approx(1.0046)
+    assert summary["entry_premium"].iloc[0] == pytest.approx(123.0)
+    assert summary["entry_premium_per_contract"].iloc[0] == pytest.approx(123.0)
+    assert summary["mid_per_share"].iloc[0] == pytest.approx(1.23)
+    assert summary["contract_multiplier"].iloc[0] == 100
+
+    iv_sensitivity = result.required_path_iv_sensitivity.loc[
+        result.required_path_iv_sensitivity["contract_label"].astype(str).eq("18C May-26")
+        & result.required_path_iv_sensitivity["threshold_multiple"].eq(1.5)
+    ]
+    assert set(pd.to_numeric(iv_sensitivity["iv_shift_vol_points"], errors="coerce").round(2)) >= {-0.50, 0.0, 0.50}
+    assert iv_sensitivity.loc[iv_sensitivity["iv_shift_vol_points"].eq(-0.50), "base_iv"].iloc[0] == pytest.approx(1.0046)
+    assert iv_sensitivity.loc[iv_sensitivity["iv_shift_vol_points"].eq(-0.50), "adjusted_iv"].iloc[0] == pytest.approx(0.5046)
+    assert iv_sensitivity.loc[iv_sensitivity["iv_shift_vol_points"].eq(0.50), "adjusted_iv"].iloc[0] == pytest.approx(1.5046)
+
+    day_zero = result.required_paths_by_option.loc[
+        result.required_paths_by_option["contract_label"].astype(str).eq("18C May-26")
+        & result.required_paths_by_option["days_from_snapshot"].eq(0)
+    ]
+    assert not day_zero.empty
+    assert pd.to_numeric(day_zero["option_return_pct"], errors="coerce").eq(0.0).all()
+    assert pd.to_numeric(day_zero["return_basis_option_value"], errors="coerce").eq(123.0).all()
+    assert pd.to_numeric(day_zero["option_value"], errors="coerce").eq(123.0).all()
+    assert "modeled_option_value" in day_zero.columns
+    assert "Bid/Ask/Mid are per-share option quotes." in result.required_path_tables_html
+    assert "Entry premium is per-contract in required-path calculations." in result.required_path_tables_html
