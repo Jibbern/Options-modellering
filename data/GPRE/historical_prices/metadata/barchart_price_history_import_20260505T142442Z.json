@@ -1,0 +1,18 @@
+{
+  "generated_at": "2026-05-05T14:24:42Z",
+  "ticker": "GPRE",
+  "source": "barchart_price_history",
+  "raw_csv_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\historical_prices\\raw\\manual\\gpre_price-history-05-05-2026.csv",
+  "rows_raw": 520,
+  "rows_after_footer_cleanup": 519,
+  "rows_imported": 519,
+  "normalized_files": {
+    "csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\historical_prices\\normalized\\gpre_daily_prices.csv",
+    "parquet": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\historical_prices\\normalized\\gpre_daily_prices.parquet"
+  },
+  "merged_files": {
+    "csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\historical_prices\\merged\\gpre_daily_prices_merged.csv",
+    "parquet": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\historical_prices\\merged\\gpre_daily_prices_merged.parquet"
+  },
+  "source_notes": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\historical_prices\\metadata\\source_notes.json"
+}

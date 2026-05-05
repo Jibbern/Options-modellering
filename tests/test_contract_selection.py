@@ -1,8 +1,10 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
+from matplotlib.figure import Figure
 
 from options_lab.analysis import contract_selection as contract_selection_module
 from options_lab.analysis import (
@@ -13,12 +15,15 @@ from options_lab.analysis import (
 )
 from options_lab.analysis.contract_selection import (
     CHAIN_OVERVIEW_CARD_KEYS,
+    _build_long_call_required_path_outputs,
     _build_thesis_mode_outputs,
     _discover_candidates_for_chain,
+    _long_call_required_spot_for_threshold,
     _path_case_defaults,
     _path_case_iv_variants,
     _path_case_stock_variants,
     _path_view_filename,
+    _required_path_realism_bucket,
     _select_curated_single_option_decision_paths,
     _select_long_call_expiry_view_rows,
     _selector_cards,
@@ -30,7 +35,8 @@ from options_lab.analysis.simulation import (
     stock_path_family_metadata,
 )
 from options_lab.io import load_chain
-from options_lab.plots import plot_single_option_decision_view
+from options_lab import plots as plots_module
+from options_lab.plots import plot_option_required_paths, plot_single_option_decision_view
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -78,6 +84,595 @@ def test_path_case_variants_keep_custom_paths_separate_from_builtin_presets():
     assert iv_variants["custom_iv_path"]["30d"] == -0.05
     assert iv_variants["custom_iv_path"]["90d"] == -0.10
     assert iv_variants["flat"]["90d"] == 0.0
+
+
+def test_required_path_chart_renders_unavailable_stock_only_edge(temp_analysis_root: Path):
+    output_path = temp_analysis_root / "required_paths_unavailable.png"
+    frame = pd.DataFrame(
+        [
+            {
+                "contract_label": "15C Dec-26",
+                "threshold_multiple": 1.5,
+                "path_id": "contract__1_5x__fast_breakout",
+                "path_label": "Fast Breakout (1.5x)",
+                "path_family": "fast_breakout",
+                "family_display_order": 1,
+                "date": "2026-04-12",
+                "days_from_snapshot": 0,
+                "stock_price": None,
+                "option_value": None,
+                "option_return_pct": None,
+                "stock_return_pct": None,
+                "option_vs_stock_multiple": None,
+                "clears_threshold": False,
+                "realism_bucket": "unavailable",
+                "status": "needs_iv_or_entry_support",
+                "failure_driver": "entry_premium",
+            }
+        ]
+    )
+
+    result = plot_option_required_paths(
+        frame,
+        output_path=output_path,
+        title="Required Paths For 15C Dec-26 To Beat Stock By 1.5x / 2.0x",
+    )
+
+    assert result == output_path
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+
+
+def test_required_path_chart_caption_labels_holding_period_and_expiry(monkeypatch, temp_analysis_root: Path):
+    output_path = temp_analysis_root / "required_paths_holding_period.png"
+    figure_text: list[str] = []
+
+    original_figure_text = Figure.text
+
+    def capture_figure_text(self, x, y, s, *args, **kwargs):
+        figure_text.append(str(s))
+        return original_figure_text(self, x, y, s, *args, **kwargs)
+
+    monkeypatch.setattr(Figure, "text", capture_figure_text)
+    frame = pd.DataFrame(
+        [
+            {
+                "contract_label": "15C Dec-26",
+                "threshold_multiple": 1.5,
+                "strike": 15.0,
+                "entry_spot": 15.23,
+                "snapshot_date": "2026-04-12",
+                "analysis_horizon_date": "2026-07-15",
+                "chart_horizon_date": "2026-12-18",
+                "path_terminal_date": "2026-12-18",
+                "option_expiry": "2026-12-18",
+                "option_expiry_date": "2026-12-18",
+                "terminal_basis": "option_expiry",
+                "chart_horizon_basis": "option_expiry",
+                "path_id": "contract__1_5x__slow_grind",
+                "path_label": "Slow Grind (1.5x)",
+                "path_family": "slow_grind",
+                "family_display_order": 1,
+                "date": "2026-04-12",
+                "days_from_snapshot": 0,
+                "stock_price": 15.23,
+                "option_value": 341.96,
+                "option_return_pct": 0.0,
+                "stock_return_pct": 0.0,
+                "option_vs_stock_multiple": None,
+                "is_checkpoint_marker": True,
+                "is_peak_option_return": False,
+                "clears_threshold": False,
+                "realism_bucket": "plausible",
+                "status": "solved_normal_range",
+                "failure_driver": "timing",
+            },
+            {
+                "contract_label": "15C Dec-26",
+                "threshold_multiple": 2.0,
+                "strike": 15.0,
+                "entry_spot": 15.23,
+                "snapshot_date": "2026-04-12",
+                "analysis_horizon_date": "2026-07-15",
+                "chart_horizon_date": "2026-12-18",
+                "path_terminal_date": "2026-12-18",
+                "option_expiry": "2026-12-18",
+                "option_expiry_date": "2026-12-18",
+                "terminal_basis": "option_expiry",
+                "chart_horizon_basis": "option_expiry",
+                "path_id": "contract__2_0x__slow_grind",
+                "path_label": "Slow Grind (2.0x)",
+                "path_family": "slow_grind",
+                "family_display_order": 1,
+                "date": "2026-12-18",
+                "days_from_snapshot": 250,
+                "stock_price": 17.31,
+                "option_value": 435.0,
+                "option_return_pct": 0.2721,
+                "stock_return_pct": 0.1366,
+                "option_vs_stock_multiple": 1.99,
+                "is_checkpoint_marker": True,
+                "is_peak_option_return": True,
+                "clears_threshold": False,
+                "realism_bucket": "plausible",
+                "status": "solved_normal_range",
+                "failure_driver": "timing",
+            },
+        ]
+    )
+
+    result = plot_option_required_paths(
+        frame,
+        output_path=output_path,
+        title="Required Paths For 15C Dec-26 To Beat Stock By 1.5x / 2.0x",
+    )
+
+    assert result == output_path
+    assert output_path.exists()
+    combined_text = " ".join(figure_text)
+    assert "Snapshot: 2026-04-12" in combined_text
+    assert "Option expiry: 2026-12-18" in combined_text
+    assert "Chart horizon: option expiry" in combined_text
+    assert "Threshold rule: option return must be at least 1.5x / 2.0x stock return" in combined_text
+    assert "Path terminal: 2026-07-15" not in combined_text
+
+
+def test_required_path_date_ticks_use_month_day_and_two_week_spacing():
+    tick_map = pd.DataFrame(
+        {
+            "requested_days": list(range(0, 251)),
+            "date": [(pd.Timestamp("2026-04-12") + pd.Timedelta(days=day)).date().isoformat() for day in range(0, 251)],
+        }
+    )
+
+    ticks = plots_module._required_path_date_tick_rows(tick_map)
+    labels = [row["label"] for row in ticks]
+    positions = [int(row["requested_days"]) for row in ticks]
+
+    assert labels[:3] == ["Apr 12", "Apr 26", "May 10"]
+    intervals = [positions[index] - positions[index - 1] for index in range(1, len(positions))]
+    assert intervals
+    assert min(intervals) >= 14
+    assert max(intervals) <= 28
+
+
+def test_required_path_reference_label_offsets_keep_spot_and_strike_separate():
+    spot_offset, strike_offset = plots_module._required_path_reference_label_offsets(15.00, 15.03)
+
+    assert spot_offset[1] > 0
+    assert strike_offset[1] < 0
+    assert abs(spot_offset[1] - strike_offset[1]) >= 24
+
+
+def test_required_path_realism_bucket_uses_decimal_return_units():
+    assert _required_path_realism_bucket(0.40, "solved_normal_range") == "plausible"
+    assert _required_path_realism_bucket(0.75, "solved_aggressive_range") == "aggressive"
+    assert _required_path_realism_bucket(2.50, "solved_extreme_range") == "extreme"
+    assert _required_path_realism_bucket(3.00, "solved_absurd_range") == "absurd"
+
+
+def _fake_long_call_spec(*, candidate_slug: str, strike: float, premium: float, expiry: str = "2026-04-17") -> dict:
+    position = SimpleNamespace(
+        initial_outlay=float(premium),
+        expiry_date=pd.Timestamp(expiry).date(),
+        option_legs=[SimpleNamespace(strike=float(strike), base_iv=0.55)],
+    )
+    return {
+        "candidate_slug": candidate_slug,
+        "candidate_label": f"Long Call {expiry} {strike:.2f}",
+        "strategy_family": "long_call",
+        "position": position,
+        "stock_baseline": SimpleNamespace(),
+    }
+
+
+def _patch_intrinsic_required_path_eval(monkeypatch):
+    def fake_adjusted_evaluation(spec, *, spot_price: float, horizon_days: int, comparison_capital: float, premium_used: float, **_kwargs):
+        strike = float(spec["position"].option_legs[0].strike)
+        estimated_value = max(float(spot_price) - strike, 0.0) * 100.0
+        profit = 0.0 if int(horizon_days) <= 0 else estimated_value - float(premium_used)
+        stock_profit = (float(spot_price) - 10.0) * 100.0
+        return {
+            "estimated_value": round(estimated_value, 4),
+            "profit_loss": round(profit, 4),
+            "stock_profit_loss": round(stock_profit, 4),
+            "difference_vs_stock": round(profit - stock_profit, 4),
+            "requested_days": int(horizon_days),
+            "effective_days": int(horizon_days),
+        }
+
+    monkeypatch.setattr(contract_selection_module, "_single_option_adjusted_evaluation", fake_adjusted_evaluation)
+
+
+def test_long_call_required_path_engine_uses_contract_strike_and_numeric_paths(monkeypatch):
+    _patch_intrinsic_required_path_eval(monkeypatch)
+    candidate_slug = "long-call-2026-04-17-14-00-exact-snapshot"
+    outputs = _build_long_call_required_path_outputs(
+        ticker="GPRE",
+        specs=[_fake_long_call_spec(candidate_slug=candidate_slug, strike=14.0, premium=300.0)],
+        candidate_rows=pd.DataFrame(
+            [
+                {
+                    "candidate_slug": candidate_slug,
+                    "candidate_label": "Long Call 2026-04-17 14.00",
+                    "candidate_short_label": "14C Apr-26",
+                    "strategy_family": "long_call",
+                    "primary_strike": 14.0,
+                    "strike_label": "14.00",
+                    "expiry_date": "2026-04-17",
+                    "active_candidate_rank": 1,
+                    "objective_score": 50.0,
+                }
+            ]
+        ),
+        snapshot_date=pd.Timestamp("2026-04-12").date(),
+        target_date=pd.Timestamp("2026-04-17").date(),
+        target_horizon_label="5d",
+        entry_spot=10.0,
+        target_price=20.0,
+        active_iv_path_points={"entry": 0.0, "5d": 0.0},
+        comparison_capital=1000.0,
+        minimum_outperformance_multiple=1.5,
+        strong_outperformance_multiple=2.0,
+        minimum_edge_stock_return_pct=0.05,
+        entry_price_mode="mid",
+    )
+
+    summary = outputs["required_path_core_summary"]
+    paths = outputs["required_paths_by_option"]
+    summary_14c = summary.loc[summary["contract_label"].eq("14C Apr-26")]
+    solved_paths = paths.loc[paths["status"].astype(str).str.startswith("solved")]
+    day_zero = paths.loc[paths["days_from_snapshot"].eq(0)]
+
+    assert not summary_14c.empty
+    assert set(summary_14c["strike"]) == {14.0}
+    assert summary_14c["required_move_pct"].notna().all()
+    assert summary_14c["status"].astype(str).str.startswith("solved").all()
+    assert solved_paths["stock_price"].notna().any()
+    assert solved_paths["option_value"].notna().any()
+    assert solved_paths["option_return_pct"].notna().any()
+    assert day_zero["option_return_pct"].fillna(999).eq(0.0).all()
+    assert not day_zero["clears_threshold"].fillna(True).any()
+
+
+def test_long_call_required_path_engine_writes_absurd_numeric_moves(monkeypatch):
+    _patch_intrinsic_required_path_eval(monkeypatch)
+    candidate_slug = "long-call-2026-04-17-20-00-exact-snapshot"
+    outputs = _build_long_call_required_path_outputs(
+        ticker="GPRE",
+        specs=[_fake_long_call_spec(candidate_slug=candidate_slug, strike=20.0, premium=300.0)],
+        candidate_rows=pd.DataFrame(
+            [
+                {
+                    "candidate_slug": candidate_slug,
+                    "candidate_label": "Long Call 2026-04-17 20.00",
+                    "candidate_short_label": "20C Apr-26",
+                    "strategy_family": "long_call",
+                    "primary_strike": 20.0,
+                    "strike_label": "20.00",
+                    "expiry_date": "2026-04-17",
+                    "active_candidate_rank": 1,
+                    "objective_score": 50.0,
+                }
+            ]
+        ),
+        snapshot_date=pd.Timestamp("2026-04-12").date(),
+        target_date=pd.Timestamp("2026-04-17").date(),
+        target_horizon_label="5d",
+        entry_spot=10.0,
+        target_price=20.0,
+        active_iv_path_points={"entry": 0.0, "5d": 0.0},
+        comparison_capital=1000.0,
+        minimum_outperformance_multiple=1.5,
+        strong_outperformance_multiple=2.0,
+        minimum_edge_stock_return_pct=0.05,
+        entry_price_mode="mid",
+    )
+
+    summary = outputs["required_path_core_summary"]
+    strong = summary.loc[summary["threshold_multiple"].eq(2.0)].iloc[0]
+    strong_paths = outputs["required_paths_by_option"].loc[
+        outputs["required_paths_by_option"]["threshold_multiple"].eq(2.0)
+    ]
+
+    assert strong["status"] == "solved_absurd_range"
+    assert strong["realism_bucket"] == "absurd"
+    assert float(strong["required_move_pct"]) > 2.5
+    assert pd.to_numeric(strong_paths["stock_price"], errors="coerce").notna().any()
+    assert pd.to_numeric(strong_paths["option_value"], errors="coerce").notna().any()
+
+
+def test_long_call_required_path_engine_clamps_path_dates_to_option_expiry(monkeypatch):
+    _patch_intrinsic_required_path_eval(monkeypatch)
+    candidate_slug = "long-call-2026-04-17-14-00-exact-snapshot"
+    outputs = _build_long_call_required_path_outputs(
+        ticker="GPRE",
+        specs=[_fake_long_call_spec(candidate_slug=candidate_slug, strike=14.0, premium=300.0)],
+        candidate_rows=pd.DataFrame(
+            [
+                {
+                    "candidate_slug": candidate_slug,
+                    "candidate_label": "Long Call 2026-04-17 14.00",
+                    "candidate_short_label": "14C Apr-26",
+                    "strategy_family": "long_call",
+                    "primary_strike": 14.0,
+                    "strike_label": "14.00",
+                    "expiry_date": "2026-04-17",
+                    "active_candidate_rank": 1,
+                    "objective_score": 50.0,
+                }
+            ]
+        ),
+        snapshot_date=pd.Timestamp("2026-04-12").date(),
+        target_date=pd.Timestamp("2026-07-15").date(),
+        target_horizon_label="94d",
+        entry_spot=10.0,
+        target_price=20.0,
+        active_iv_path_points={"entry": 0.0, "94d": 0.0},
+        comparison_capital=1000.0,
+        minimum_outperformance_multiple=1.5,
+        strong_outperformance_multiple=2.0,
+        minimum_edge_stock_return_pct=0.05,
+        entry_price_mode="mid",
+    )
+
+    paths = outputs["required_paths_by_option"]
+    summary = outputs["required_path_core_summary"]
+    assert pd.to_numeric(paths["days_from_snapshot"], errors="coerce").max() == 5
+    assert pd.to_datetime(paths["date"]).max().date() == pd.Timestamp("2026-04-17").date()
+    assert set(summary["latest_valid_date"]) <= {"2026-04-17"}
+
+
+def test_long_call_required_path_engine_writes_smooth_marker_rows_and_peak_summary(monkeypatch):
+    _patch_intrinsic_required_path_eval(monkeypatch)
+    candidate_slug = "long-call-2026-12-18-15-00-exact-snapshot"
+    outputs = _build_long_call_required_path_outputs(
+        ticker="GPRE",
+        specs=[_fake_long_call_spec(candidate_slug=candidate_slug, strike=15.0, premium=300.0, expiry="2026-12-18")],
+        candidate_rows=pd.DataFrame(
+            [
+                {
+                    "candidate_slug": candidate_slug,
+                    "candidate_label": "Long Call 2026-12-18 15.00",
+                    "candidate_short_label": "15C Dec-26",
+                    "strategy_family": "long_call",
+                    "primary_strike": 15.0,
+                    "strike_label": "15.00",
+                    "expiry_date": "2026-12-18",
+                    "active_candidate_rank": 1,
+                    "objective_score": 50.0,
+                }
+            ]
+        ),
+        snapshot_date=pd.Timestamp("2026-04-12").date(),
+        target_date=pd.Timestamp("2026-07-15").date(),
+        target_horizon_label="94d",
+        entry_spot=10.0,
+        target_price=20.0,
+        active_iv_path_points={"entry": 0.0, "94d": 0.0},
+        comparison_capital=1000.0,
+        minimum_outperformance_multiple=1.5,
+        strong_outperformance_multiple=2.0,
+        minimum_edge_stock_return_pct=0.05,
+        entry_price_mode="mid",
+    )
+
+    paths = outputs["required_paths_by_option"]
+    peaks = outputs["required_path_peak_summary"]
+    exit_ladder = outputs["required_path_exit_ladder"]
+    entry_sensitivity = outputs["required_path_entry_sensitivity"]
+    iv_sensitivity = outputs["required_path_iv_sensitivity"]
+    entry_iv_matrix = outputs["required_path_entry_iv_matrix"]
+    sell_hold = outputs["required_path_sell_hold_summary"]
+    tables_html = outputs["required_path_tables_html"]
+    tables_md = outputs["required_path_tables_markdown"]
+    sample_path = paths.loc[
+        (paths["threshold_multiple"].eq(1.5))
+        & (paths["path_family"].eq("slow_grind"))
+    ].copy()
+
+    assert len(sample_path) > 80
+    assert sample_path["days_from_snapshot"].max() == 250
+    assert {
+        "is_checkpoint_marker",
+        "display_marker",
+        "checkpoint_label",
+        "snapshot_date",
+        "analysis_horizon_date",
+        "chart_horizon_date",
+        "path_terminal_date",
+        "option_expiry",
+        "option_expiry_date",
+        "terminal_basis",
+        "chart_horizon_basis",
+        "valuation_date",
+        "effective_days",
+        "time_to_expiry_days",
+        "intrinsic_value",
+        "time_value",
+        "shape_template",
+        "shape_source_path",
+    } <= set(paths.columns)
+    assert sample_path["snapshot_date"].eq("2026-04-12").all()
+    assert sample_path["analysis_horizon_date"].eq("2026-07-15").all()
+    assert sample_path["chart_horizon_date"].eq("2026-12-18").all()
+    assert sample_path["path_terminal_date"].eq("2026-12-18").all()
+    assert sample_path["option_expiry"].eq("2026-12-18").all()
+    assert sample_path["option_expiry_date"].eq("2026-12-18").all()
+    assert sample_path["terminal_basis"].eq("option_expiry").all()
+    assert sample_path["chart_horizon_basis"].eq("option_expiry").all()
+    assert sample_path["shape_template"].eq("slow_grind").all()
+    marker_days = set(pd.to_numeric(sample_path.loc[sample_path["is_checkpoint_marker"], "days_from_snapshot"], errors="coerce"))
+    assert {0, 7, 14, 30, 250} <= marker_days
+    assert any(124 <= day <= 126 for day in marker_days)
+    assert any(187 <= day <= 188 for day in marker_days)
+    time_to_expiry = pd.to_numeric(sample_path.sort_values("days_from_snapshot")["time_to_expiry_days"], errors="coerce")
+    assert time_to_expiry.iloc[0] == 250
+    assert time_to_expiry.iloc[-1] == 0
+    assert time_to_expiry.is_monotonic_decreasing
+    expiry_row = sample_path.sort_values("days_from_snapshot").iloc[-1]
+    assert float(expiry_row["option_value"]) == pytest.approx(float(expiry_row["intrinsic_value"]), abs=0.01)
+    assert float(expiry_row["time_value"]) == pytest.approx(0.0, abs=0.01)
+    family_names = set(paths["path_family"].astype(str))
+    assert {
+        "fast_breakout",
+        "slow_grind",
+        "late_acceleration",
+        "down_first_recovery",
+        "rally_retrace_finish",
+        "violent_absurd",
+        "expiry_only",
+    } <= family_names
+    shape_signatures = {}
+    for family, family_frame in paths.loc[paths["threshold_multiple"].eq(1.5)].groupby("path_family"):
+        ordered = family_frame.sort_values("days_from_snapshot")
+        prices = pd.to_numeric(ordered["stock_price"], errors="coerce").dropna()
+        if len(prices) < 3:
+            continue
+        start = float(prices.iloc[0])
+        end = float(prices.iloc[-1])
+        span = end - start if abs(end - start) > 1e-9 else 1.0
+        normalized = tuple(round(float((value - start) / span), 3) for value in prices.iloc[[0, len(prices) // 4, len(prices) // 2, -1]])
+        shape_signatures[str(family)] = normalized
+    assert len(set(shape_signatures.values())) >= 5
+    down_recovery = paths.loc[(paths["threshold_multiple"].eq(1.5)) & (paths["path_family"].eq("down_first_recovery"))]
+    rally_retrace = paths.loc[(paths["threshold_multiple"].eq(1.5)) & (paths["path_family"].eq("rally_retrace_finish"))].sort_values("days_from_snapshot")
+    assert pd.to_numeric(down_recovery["stock_price"], errors="coerce").min() < 10.0
+    assert pd.to_numeric(rally_retrace["stock_price"], errors="coerce").diff().min() < 0
+    assert not peaks.empty
+    assert {
+        "peak_option_return_pct",
+        "peak_option_value",
+        "peak_date",
+        "peak_days_from_snapshot",
+        "stock_price_at_peak",
+        "option_vs_stock_multiple_at_peak",
+        "terminal_option_return_pct",
+        "terminal_option_vs_stock_multiple",
+    } <= set(peaks.columns)
+    solved_peaks = peaks.loc[peaks["status"].astype(str).str.startswith("solved")]
+    assert pd.to_numeric(solved_peaks["peak_option_return_pct"], errors="coerce").notna().all()
+    assert pd.to_numeric(solved_peaks["stock_price_at_peak"], errors="coerce").notna().all()
+    assert (
+        pd.to_numeric(solved_peaks["peak_option_return_pct"], errors="coerce")
+        >= pd.to_numeric(solved_peaks["terminal_option_return_pct"], errors="coerce")
+    ).all()
+    assert not exit_ladder.empty
+    assert {
+        "ticker",
+        "strike",
+        "expiry",
+        "target_absolute_option_return_pct",
+        "first_hit_date",
+        "stock_price_at_first_hit",
+        "option_return_pct_at_first_hit",
+        "option_value_at_first_hit",
+        "hit_status",
+        "exit_return_label",
+        "exit_return_pct",
+        "first_exit_date",
+        "first_exit_days_from_snapshot",
+        "stock_price_at_exit",
+        "option_return_pct_at_exit",
+    } <= set(exit_ladder.columns)
+    solved_ladder = exit_ladder.loc[
+        exit_ladder["status"].astype(str).str.startswith("solved")
+        & exit_ladder["first_exit_date"].notna()
+    ]
+    assert not solved_ladder.empty
+    assert pd.to_numeric(solved_ladder["stock_price_at_exit"], errors="coerce").notna().all()
+    assert 3.0 in set(pd.to_numeric(exit_ladder["target_absolute_option_return_pct"], errors="coerce"))
+
+    assert not entry_sensitivity.empty
+    assert set(pd.to_numeric(entry_sensitivity["entry_shift_pct"], errors="coerce").round(2)) == {-0.50, -0.25, 0.0, 0.25, 0.50, 1.0}
+    assert {
+        "ticker",
+        "contract_label",
+        "strike",
+        "expiry",
+        "threshold_multiple",
+        "path_family",
+        "entry_shift_pct",
+        "adjusted_entry_premium",
+        "required_terminal_stock_price",
+        "required_move_pct",
+        "realism_bucket",
+        "verdict",
+    } <= set(entry_sensitivity.columns)
+    assert not iv_sensitivity.empty
+    assert set(pd.to_numeric(iv_sensitivity["iv_shift_vol_points"], errors="coerce").round(2)) == {-0.50, -0.25, -0.10, 0.0, 0.10, 0.25, 0.50}
+    assert {
+        "ticker",
+        "contract_label",
+        "strike",
+        "expiry",
+        "threshold_multiple",
+        "path_family",
+        "iv_shift_vol_points",
+        "adjusted_iv",
+        "required_terminal_stock_price",
+        "required_move_pct",
+        "realism_bucket",
+        "verdict",
+    } <= set(iv_sensitivity.columns)
+    assert not entry_iv_matrix.empty
+    assert {"entry_shift_pct", "iv_shift_vol_points", "adjusted_entry_premium", "adjusted_iv"} <= set(entry_iv_matrix.columns)
+    assert not sell_hold.empty
+    assert {
+        "ticker",
+        "contract_label",
+        "strike",
+        "expiry",
+        "threshold_multiple",
+        "path_family",
+        "peak_option_return_pct",
+        "option_return_2w_after_peak",
+        "option_return_1m_after_peak",
+        "expiry_option_return_pct",
+        "decay_from_peak_to_expiry_pct",
+        "interpretation",
+    } <= set(sell_hold.columns)
+    assert set(sell_hold["interpretation"].astype(str)) - {""}
+
+    for section in [
+        "Contract inputs",
+        "Required move summary",
+        "Path family comparison",
+        "Entry premium sensitivity",
+        "IV sensitivity",
+        "Entry premium x IV matrix",
+        "Sell / hold pressure",
+        "Absolute option-return exit ladder",
+    ]:
+        assert section in tables_html
+    assert "1.5x / 2.0x are relative to stock return, not absolute option return." in tables_html
+    assert "NaN" not in tables_html
+    assert "How to read the tables" in tables_md
+    assert "relative to stock return" in tables_md
+
+
+def test_long_call_required_path_solver_marks_unsolved_only_after_extreme_search(monkeypatch):
+    _patch_intrinsic_required_path_eval(monkeypatch)
+    spec = _fake_long_call_spec(
+        candidate_slug="long-call-2026-04-17-20-00-exact-snapshot",
+        strike=20.0,
+        premium=1000.0,
+    )
+
+    required_spot, evaluation, status = _long_call_required_spot_for_threshold(
+        spec,
+        horizon_days=5,
+        iv_shift_points=0.0,
+        comparison_capital=1000.0,
+        premium_used=1000.0,
+        edge_multiple=1.5,
+        entry_spot=10.0,
+        minimum_stock_return_floor_pct=0.05,
+    )
+
+    assert required_spot is None
+    assert status == "unsolved_after_extreme_search"
+    assert evaluation["last_extreme_search_stock_price"] > 100.0
 
 
 def test_path_case_defaults_respect_active_goal_and_iv_variant():
@@ -635,6 +1230,12 @@ def test_contract_selection_analysis_builds_candidates_path_cases_and_selector_o
     assert not hasattr(result, "selection_slice_rows")
     assert not result.required_path_rows.empty
     assert not result.required_path_summary.empty
+    assert not result.required_path_core_summary.empty
+    assert not result.required_paths_by_option.empty
+    assert not result.required_path_family_summary.empty
+    assert not result.required_path_peak_summary.empty
+    assert "What each call needs" in result.required_path_summary_markdown
+    assert "Top Required-Path Candidates" in result.top_required_path_candidates_markdown
     assert not result.assumed_path_trace_rows.empty
     assert not result.iv_path_trace_rows.empty
     assert not result.compare_vs_stock_path_rows.empty
@@ -880,6 +1481,161 @@ def test_contract_selection_analysis_builds_candidates_path_cases_and_selector_o
         "required_path_note",
     } <= set(result.required_path_rows.columns)
     assert {"required_path_difficulty", "path_gap_at_target", "first_cleared_horizon"} <= set(result.required_path_summary.columns)
+    assert {
+        "ticker",
+        "contract_label",
+        "option_type",
+        "strike",
+        "expiry",
+        "dte",
+        "entry_premium",
+        "entry_iv",
+        "snapshot_date",
+        "analysis_horizon_date",
+        "chart_horizon_date",
+        "path_terminal_date",
+        "option_expiry_date",
+        "terminal_basis",
+        "chart_horizon_basis",
+        "threshold_multiple",
+        "required_terminal_stock_price",
+        "required_terminal_stock_return_pct",
+        "required_move_pct",
+        "earliest_valid_date",
+        "latest_valid_date",
+        "minimum_required_move_by_expiry",
+        "path_count_generated",
+        "plausible_path_count",
+        "extreme_path_count",
+        "status",
+        "verdict",
+        "concise_explanation",
+    } <= set(result.required_path_core_summary.columns)
+    assert {
+        "contract_label",
+        "threshold_multiple",
+        "path_id",
+        "path_label",
+        "path_family",
+        "date",
+        "days_from_snapshot",
+        "snapshot_date",
+        "analysis_horizon_date",
+        "chart_horizon_date",
+        "path_terminal_date",
+        "option_expiry",
+        "option_expiry_date",
+        "terminal_basis",
+        "chart_horizon_basis",
+        "valuation_date",
+        "effective_days",
+        "time_to_expiry_days",
+        "intrinsic_value",
+        "time_value",
+        "shape_template",
+        "shape_source_path",
+        "stock_price",
+        "option_value",
+        "option_return_pct",
+        "stock_return_pct",
+        "option_vs_stock_multiple",
+        "clears_threshold",
+        "is_checkpoint_marker",
+        "display_marker",
+        "checkpoint_label",
+        "is_peak_option_return",
+        "realism_bucket",
+    } <= set(result.required_paths_by_option.columns)
+    assert {
+        "contract_label",
+        "threshold_multiple",
+        "path_family",
+        "min_required_move_pct",
+        "median_required_move_pct",
+        "earliest_clear_date",
+        "latest_clear_date",
+        "clears_count",
+        "realism_bucket",
+        "failure_driver",
+        "peak_option_return_pct",
+        "peak_date",
+    } <= set(result.required_path_family_summary.columns)
+    assert {
+        "contract_label",
+        "threshold_multiple",
+        "path_family",
+        "peak_date",
+        "peak_option_return_pct",
+        "stock_price_at_peak",
+        "terminal_option_return_pct",
+    } <= set(result.required_path_peak_summary.columns)
+    assert not result.required_path_entry_sensitivity.empty
+    assert not result.required_path_iv_sensitivity.empty
+    assert not result.required_path_entry_iv_matrix.empty
+    assert not result.required_path_sell_hold_summary.empty
+    assert {
+        "entry_shift_pct",
+        "adjusted_entry_premium",
+        "required_terminal_stock_price",
+        "required_move_pct",
+        "realism_bucket",
+        "verdict",
+    } <= set(result.required_path_entry_sensitivity.columns)
+    assert {
+        "iv_shift_vol_points",
+        "adjusted_iv",
+        "required_terminal_stock_price",
+        "required_move_pct",
+        "realism_bucket",
+        "verdict",
+    } <= set(result.required_path_iv_sensitivity.columns)
+    assert {
+        "entry_shift_pct",
+        "iv_shift_vol_points",
+        "adjusted_entry_premium",
+        "adjusted_iv",
+        "required_move_pct",
+    } <= set(result.required_path_entry_iv_matrix.columns)
+    assert {
+        "option_return_2w_after_peak",
+        "option_return_1m_after_peak",
+        "expiry_option_return_pct",
+        "decay_from_peak_to_expiry_pct",
+        "interpretation",
+    } <= set(result.required_path_sell_hold_summary.columns)
+    assert "Contract inputs" in result.required_path_tables_html
+    assert "Required move summary" in result.required_path_tables_html
+    assert "1.5x / 2.0x are relative to stock return, not absolute option return." in result.required_path_tables_html
+    assert "NaN" not in result.required_path_tables_html
+    assert "How to read the tables" in result.required_path_tables_markdown
+    assert set(result.required_path_core_summary["threshold_multiple"]) == {1.5, 2.0}
+    assert set(result.required_paths_by_option["path_family"]).issuperset(
+        {
+            "fast_breakout",
+            "slow_grind",
+            "late_acceleration",
+            "down_first_recovery",
+            "rally_retrace_finish",
+            "violent_absurd",
+            "expiry_only",
+        }
+    )
+    parsed_contract_strikes = pd.to_numeric(
+        result.required_path_core_summary["contract_label"].astype(str).str.extract(r"^(\d+(?:\.\d+)?)C")[0],
+        errors="coerce",
+    )
+    actual_contract_strikes = pd.to_numeric(result.required_path_core_summary["strike"], errors="coerce")
+    assert actual_contract_strikes[parsed_contract_strikes.notna()].eq(parsed_contract_strikes[parsed_contract_strikes.notna()]).all()
+    solved_required = result.required_path_core_summary.loc[
+        result.required_path_core_summary["status"].astype(str).str.startswith("solved")
+    ]
+    assert not solved_required.empty
+    assert pd.to_numeric(solved_required["required_move_pct"], errors="coerce").notna().all()
+    solved_required_paths = result.required_paths_by_option.loc[
+        result.required_paths_by_option["status"].astype(str).str.startswith("solved")
+    ]
+    assert pd.to_numeric(solved_required_paths["stock_price"], errors="coerce").notna().any()
+    assert pd.to_numeric(solved_required_paths["option_value"], errors="coerce").notna().any()
     assert {
         "current_objective_card_status",
         "best_under_current_objective",

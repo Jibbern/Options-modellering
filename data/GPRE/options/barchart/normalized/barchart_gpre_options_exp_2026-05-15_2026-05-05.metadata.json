@@ -1,0 +1,20 @@
+{
+  "ticker": "GPRE",
+  "snapshot_date": "2026-05-05",
+  "expiry_date": "2026-05-15",
+  "spot_price": 18.07,
+  "spot_price_source": "barchart_options_screener",
+  "source": "barchart_options_screener",
+  "trust": "manually_downloaded_barchart",
+  "extra": {
+    "trust": "manually_downloaded_barchart",
+    "entry_price_mode": "mid"
+  },
+  "snapshot_scope": "barchart_options_screener",
+  "storage_location": "barchart_options_screener",
+  "quote_count": 12,
+  "strike_count": 12,
+  "entry_price_mode": "mid",
+  "raw_csv_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\options\\barchart\\raw\\options-screener-GPRE_2026-05-05.csv",
+  "downloaded_at": "2026-05-05T07:59:00 CDT"
+}

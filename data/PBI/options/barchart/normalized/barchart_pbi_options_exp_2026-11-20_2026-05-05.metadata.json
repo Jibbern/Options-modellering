@@ -1,0 +1,20 @@
+{
+  "ticker": "PBI",
+  "snapshot_date": "2026-05-05",
+  "expiry_date": "2026-11-20",
+  "spot_price": 15.26,
+  "spot_price_source": "barchart_options_screener",
+  "source": "barchart_options_screener",
+  "trust": "manually_downloaded_barchart",
+  "extra": {
+    "trust": "manually_downloaded_barchart",
+    "entry_price_mode": "mid"
+  },
+  "snapshot_scope": "barchart_options_screener",
+  "storage_location": "barchart_options_screener",
+  "quote_count": 26,
+  "strike_count": 26,
+  "entry_price_mode": "mid",
+  "raw_csv_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\options\\barchart\\raw\\options-screener-PBI_2026-05-05.csv",
+  "downloaded_at": "2026-05-05T08:01:00 CDT"
+}

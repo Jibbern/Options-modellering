@@ -137,98 +137,28 @@ model_outputs/
       model_output_manifest.json
       summary.md
       summary.csv
-      00_overview/
-        entry_justification.md
-        thesis_mode.md
-        bullish_action_board.md
-        other_structures.md
-        action_board.md
-        highlights.md
-        tables/
-          bullish_long_call_action_board.csv
-          bullish_long_call_watchlist.csv
-          bullish_long_call_avoid.csv
-          bullish_long_call_triggers.csv
-          bullish_long_call_score_breakdown.csv
-          other_structures_summary.csv
-          stock_preference_summary.csv
-          action_board_candidates.csv
-          buy_now_candidates.csv
-          watchlist_candidates.csv
-          avoid_for_now_candidates.csv
-          prefer_stock_instead.csv
-          decision_triggers.csv
-          action_board_score_breakdown.csv
-          action_board_explanations.csv
-          entry_justification_candidates.csv
-          required_stock_path_to_buy.csv
-          required_move_summary.csv
-          required_move_vs_stock.csv
-          required_iv_support_summary.csv
-          entry_barrier_summary.csv
-          thesis_mode_candidates.csv
-          thesis_path_family_summary.csv
-          thesis_iv_family_summary.csv
-          thesis_candidate_ranking.csv
-          max_justified_premium.csv
-          current_vs_justified_premium.csv
-          thesis_required_move_summary.csv
-          thesis_stock_vs_option_summary.csv
-        decision_highlights.csv
-        candidate_robustness_summary.csv
-        candidate_tradeoff_matrix.csv
-        stock_vs_option_takeaways.csv
-        charts/
-          required_stock_path_to_buy.png
-          required_move_speed_vs_magnitude.png
-          required_move_vs_stock_chart.png
-          strike_expiry_entry_barrier_map.png
-          iv_support_requirement_chart.png
-          thesis_path_gallery.png
-          thesis_iv_gallery.png
-          thesis_candidate_overview.png
-          current_vs_justified_premium.png
-          thesis_path_vs_value.png
-          thesis_iv_vs_value.png
-          thesis_stock_vs_option.png
-          bullish_action_board_overview.png
-          bullish_conviction_vs_robustness.png
-          bullish_buy_watch_avoid_matrix.png
-          bullish_trigger_map.png
-          action_board_overview.png
-          conviction_vs_robustness.png
-          buy_watch_avoid_matrix.png
-          trigger_map.png
-          stock_vs_option_preference_chart.png
-          highlights_overview.png
-          candidate_robustness_vs_upside.png
-          path_survival_scorecard.png
-          iv_robustness_scorecard.png
-          strike_expiry_tradeoff_overview.png
-          stock_vs_option_decision_chart.png
-      01_path_packs/
-        <path_alias>/
-          README.md
-          compare_vs_stock_delta.png
-          long_call_strike_value.png
-          long_call_strike_delta.png
-          long_call_expiry_value.png
-          long_call_expiry_delta.png
-          long_call_best_of_value.png
-          long_call_best_of_delta.png
-          iv_path_value.png
-          iv_path_delta.png
-          long_call_strike_iv_value.png
-          long_call_strike_iv_delta.png
-          long_call_expiry_iv_value.png
-          long_call_expiry_iv_delta.png
-          long_call_best_of_iv_value.png
-          long_call_best_of_iv_delta.png
-          iv_robustness_summary.csv
-          checkpoints.csv
-          iv_checkpoints.csv
-      02_tables/
-      03_secondary/
+      00_core_view/
+        START_HERE.md
+        required_paths_overview.png
+        required_path_summary.csv
+        required_path_summary.md
+        required_path_tables.html
+        required_path_tables.md
+        top_required_path_candidates.md
+      01_option_required_paths/
+        required_paths_<contract_slug>.png
+        required_paths_by_option.csv
+        required_path_family_summary.csv
+        required_path_peak_summary.csv
+        required_path_exit_ladder.csv
+        required_path_entry_sensitivity.csv
+        required_path_iv_sensitivity.csv
+        required_path_entry_iv_matrix.csv
+        required_path_sell_hold_summary.csv
+        required_path_exit_ladder.md
+      99_secondary_or_debug/
+        # supporting Markdown and CSV diagnostics only; old fixed-target,
+        # single-option, gallery, and path-pack charts are intentionally omitted
     snapshot_<YYYY-MM-DD>/
       <analysis_kind>/
         <run_slug>/
@@ -236,10 +166,9 @@ model_outputs/
           model_output_manifest.json
           summary.md
           summary.csv
-          00_overview/
-          01_path_packs/
-          02_tables/
-          03_secondary/
+          00_core_view/
+          01_option_required_paths/
+          99_secondary_or_debug/
     archive/
       promoted_runs.json
 ```
@@ -260,9 +189,16 @@ The canonical analysis layer owns:
 - replay / case-study computation
 - bundle writing
 
-`analyze-contract-selection` is the main Python-first workflow for path-thesis work. Its bundle is expected to answer:
+`analyze-contract-selection` is the main Python-first workflow for long-call required-path work. Its core product question is: what must the stock do, and by when, for this call to beat owning stock by 1.5x and 2.0x? Those hurdles are relative to stock return: 1.5x means the option return is at least 1.5 times the stock return over the same holding period, not an absolute +50% option return.
 
-- what stock path is required for each candidate or family to work
+The fixed `--target-price` / `--target-date` thesis artifacts still exist as secondary examples. They no longer define the core buy case for long calls; the required-path engine solves backwards from option-over-stock outperformance.
+
+Per-option required-path charts use option expiry as the default chart horizon. A shorter analysis horizon can still appear as a reference marker, but the main stock path and option-return path continue through the option's life.
+
+Its bundle is expected to answer:
+
+- what stock path is required for each long call to beat owning stock by the configured outperformance hurdles
+- where each required-path family reaches peak modeled option return, so the user can compare holding versus selling after an early move
 - how the active assumed stock and IV paths evolve over time
 - how different IV paths change required paths and terminal outcomes
 - how different IV paths change the same long call when the stock path is held fixed
@@ -495,33 +431,17 @@ Long-call strike, expiry, and best-of charts are now split into two deliberate c
 
 The analyst-facing reading order is now:
 
-1. `00_overview/action_board.md`
-2. `00_overview/entry_justification.md`
-3. `00_overview/thesis_mode.md`
-4. `00_overview/charts/thesis_candidate_overview.png`
-5. `00_overview/charts/current_vs_justified_premium.png`
-6. `00_overview/charts/thesis_path_gallery.png`
-7. `00_overview/charts/thesis_stock_vs_option.png`
-8. `00_overview/charts/action_board_overview.png`
-9. `00_overview/charts/required_stock_path_to_buy.png`
-10. `00_overview/charts/required_move_speed_vs_magnitude.png`
-11. `00_overview/charts/stock_vs_option_decision_chart.png`
-12. `00_overview/bullish_action_board.md`
-13. `00_overview/charts/bullish_action_board_overview.png`
-14. `00_overview/charts/bullish_buy_watch_avoid_matrix.png`
-15. `00_overview/charts/stock_vs_option_preference_chart.png`
-16. `00_overview/tables/bullish_long_call_watchlist.csv` and `00_overview/tables/bullish_long_call_avoid.csv`
-17. market context / trust
-18. `00_overview/charts/single_option_decision_view.png` and `00_overview/tables/single_option_decision_path_selections.csv`
-19. `00_overview/highlights.md` for broader robustness context
-20. stock path gallery and IV path gallery
-21. choose a named stock path and open its compare-vs-stock path pack chart
-22. inspect that path's long-call strike ladder, expiry ladder, and best-of value charts
-23. inspect that path's single-anchor IV-path value and delta-vs-stock charts
-24. inspect the IV-expanded strike, expiry, and best-of value charts
-25. review `iv_robustness_summary.csv`, checkpoint tables, and IV-checkpoint tables
-25. `00_overview/other_structures.md` for secondary structures only after the bullish-first read
-26. representative paths as secondary context
+1. `00_core_view/required_paths_overview.png`
+2. `00_core_view/required_path_summary.md`
+3. `00_core_view/required_path_summary.csv`
+4. `00_core_view/required_path_tables.html`
+5. `00_core_view/required_path_tables.md`
+6. `00_core_view/top_required_path_candidates.md`
+7. `01_option_required_paths/required_paths_by_option.csv`
+8. `01_option_required_paths/required_path_family_summary.csv`
+9. `01_option_required_paths/required_path_peak_summary.csv`
+10. per-option charts in `01_option_required_paths/`
+11. `99_secondary_or_debug/` only for supporting Markdown and CSV diagnostics
 
 ## Publishing
 
@@ -563,12 +483,11 @@ Each promoted model-output folder includes:
 
 - `START_HERE.md`: compact guide for what to open first
 - `model_output_manifest.json`: machine-readable link back to the source bundle
-- `00_overview/`: action board first, entry justification, thesis mode, bullish long-call board, highlights, stock/IV galleries, trust, and secondary structures
-- `01_path_packs/<path_alias>/`: one folder per scenario path with value charts, delta-vs-stock charts, and checkpoints
-- `02_tables/`: trust/source and decision tables
-- `03_secondary/`: representative-path and broad support artifacts
+- `00_core_view/`: required-path overview, summary, spreadsheet-style required-path workbook, and top required-path candidates
+- `01_option_required_paths/`: per-option required-path charts plus path, family, peak/best-exit, entry sensitivity, IV sensitivity, entry x IV matrix, and sell/hold tables
+- `99_secondary_or_debug/`: supporting Markdown and CSV diagnostics only
 
-The intended reading path is: start with `00_overview/action_board.md`, then `entry_justification.md`, then `thesis_mode.md`, then `thesis_candidate_overview.png`, then `current_vs_justified_premium.png`, then `thesis_path_gallery.png`, then `thesis_stock_vs_option.png`, then the bullish long-call board and path packs. Read value charts first and delta-vs-stock charts second.
+The intended reading path is: start with `00_core_view/required_paths_overview.png`, then `required_path_summary.md`, then `required_path_tables.html` for the analyst-workbook table view, then the per-option charts in `01_option_required_paths/`. Entry-premium and IV sensitivity are secondary checks after the required stock path is understood. Old fixed-target, single-option, gallery, and path-pack charts are not promoted into `model_outputs`.
 
 `build-model-outputs` never recomputes analysis. It only reads an existing canonical bundle and promotes the current primary files into a clearer workspace.
 
@@ -595,6 +514,34 @@ IBKR ingestion remains standalone and delayed-only:
   - sidecars and manifests with `snapshot_scope`, expiry coverage, strike counts, attempted-contract counts, and missing-field summaries
 
 For same-date analysis precedence, full quoted IBKR slices only outrank manual `option_chains/` slices when they are quote-usable. The current canonical gate is 20% usable-quote coverage for that same-day expiry slice. Sparse same-day IBKR slices stay visible in provenance, but analysis falls back cleanly to the best local quoted slice.
+
+## Barchart CSV import
+
+Manually downloaded Barchart Options Screener CSVs are a first-class local chain source. This is a local-file workflow only: no Barchart API, no scraping, and no Barchart for Excel. The importer copies the loose export into the project data store and leaves the original file untouched.
+
+```powershell
+..\.venv\Scripts\python.exe -m options_lab.cli import-barchart-options `
+  --ticker GPRE `
+  --csv ".\options-screener-GPRE_2026-05-05.csv" `
+  --snapshot-date 2026-05-05 `
+  --entry-mode mid
+```
+
+```powershell
+..\.venv\Scripts\python.exe -m options_lab.cli import-barchart-price-history `
+  --ticker GPRE `
+  --csv ".\gpre_price-history-05-05-2026.csv"
+```
+
+Use the same commands for `PBI` with `options-screener-PBI_2026-05-05.csv` and `pbi_price-history-05-05-2026.csv`.
+
+Barchart option imports are stored under `data/<TICKER>/options/barchart/`:
+
+- `raw/`: copied original CSV exports
+- `normalized/`: per-expiry model-ready chain slices plus sidecar metadata
+- `manifests/`: import summaries with row counts, expiries, warnings, and provenance
+
+The normalized chain preserves bid, ask, mid, spread, IV, Greeks, probabilities, volume, open interest, liquidity bucket, quality flags, model eligibility, and source/trust metadata. Required-path analysis can then show `option_data_source = barchart_options_screener` and carry the quote fields into candidate and required-path tables. Same-day quote-usable IBKR still has top precedence; same-day Barchart Options Screener data is preferred over older manual `option_chains/` and legacy sparse fallbacks.
 
 Risk-free remains local-first:
 

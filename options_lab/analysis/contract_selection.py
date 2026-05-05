@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from html import escape
 from pathlib import Path
 from typing import Any, Iterable
 import zlib
@@ -60,7 +61,7 @@ from .simulation import (
 from ..io import OptionChain, OptionContract, load_chain
 from ..snapshots import list_snapshot_slices, snapshot_slices_for_date
 from ..strategies import StrategyPosition, build_strategy
-from ..utils import build_stock_grid, clean_string, finite_or_none, horizon_to_days, parse_date, slugify
+from ..utils import CONTRACT_MULTIPLIER, build_stock_grid, clean_string, finite_or_none, horizon_to_days, parse_date, slugify
 from .scenario import _budget_fields, _dedupe
 from .market_context import resolve_market_context
 
@@ -152,6 +153,51 @@ SINGLE_OPTION_ENTRY_PRICE_MODES = [
 ]
 SINGLE_OPTION_DEFAULT_IV_MODES = ("low", "base", "high")
 DEFAULT_SINGLE_OPTION_MIN_EDGE_STOCK_RETURN_PCT = 0.05
+REQUIRED_PATH_FAMILIES = (
+    "fast_breakout",
+    "slow_grind",
+    "late_acceleration",
+    "down_first_recovery",
+    "rally_retrace_finish",
+    "violent_absurd",
+    "expiry_only",
+)
+REQUIRED_PATH_FAMILY_LABELS = {
+    "fast_breakout": "Fast Breakout Required Path",
+    "slow_grind": "Slow Grind Required Path",
+    "late_acceleration": "Late Breakout Required Path",
+    "down_first_recovery": "Down Then Recover Required Path",
+    "rally_retrace_finish": "Rally, Retrace, Finish Required Path",
+    "violent_absurd": "Violent / Absurd Required Path",
+    "expiry_only": "Expiry-Only Required Path",
+}
+REQUIRED_PATH_FAMILY_SOURCE_PATHS = {
+    "fast_breakout": "rally_early_then_fade_then_rally_again",
+    "slow_grind": "slow_grind_up",
+    "late_acceleration": "late_breakout",
+    "down_first_recovery": "down_first_then_recovery",
+    "rally_retrace_finish": "rally_early_then_fade_then_rally_again",
+    "violent_absurd": "violent_two_sided_quarter",
+    "expiry_only": "reaches_target_late_near_expiry",
+}
+REQUIRED_PATH_SEARCH_TIERS = (
+    ("normal", 0.40),
+    ("aggressive", 1.00),
+    ("extreme", 2.50),
+    ("absurd", 10.00),
+)
+REQUIRED_PATH_ENTRY_SHOCKS = (-0.50, -0.25, 0.00, 0.25, 0.50, 1.00)
+REQUIRED_PATH_IV_SHOCKS = (-0.50, -0.25, -0.10, 0.00, 0.10, 0.25, 0.50)
+REQUIRED_PATH_MATRIX_IV_SHOCKS = (-0.50, -0.25, 0.00, 0.25, 0.50)
+REQUIRED_PATH_EXIT_RETURN_LEVELS = (
+    (0.50, "+50%"),
+    (1.00, "+100%"),
+    (1.50, "+150%"),
+    (2.00, "+200%"),
+    (3.00, "+300%"),
+    (5.00, "+500%"),
+)
+REQUIRED_PATH_CHART_CONTRACT_LIMIT = 6
 SINGLE_OPTION_REPRESENTATIVE_PATH_ROLES = [
     (
         "early_rally_path",
@@ -272,6 +318,20 @@ class ContractSelectionComputation:
     compare_vs_stock: pd.DataFrame
     required_path_rows: pd.DataFrame
     required_path_summary: pd.DataFrame
+    required_path_core_summary: pd.DataFrame
+    required_paths_by_option: pd.DataFrame
+    required_path_family_summary: pd.DataFrame
+    required_path_peak_summary: pd.DataFrame
+    required_path_exit_ladder: pd.DataFrame
+    required_path_entry_sensitivity: pd.DataFrame
+    required_path_iv_sensitivity: pd.DataFrame
+    required_path_entry_iv_matrix: pd.DataFrame
+    required_path_sell_hold_summary: pd.DataFrame
+    required_path_summary_markdown: str
+    required_path_exit_ladder_markdown: str
+    required_path_tables_markdown: str
+    required_path_tables_html: str
+    top_required_path_candidates_markdown: str
     assumed_path_trace_rows: pd.DataFrame
     iv_path_trace_rows: pd.DataFrame
     compare_vs_stock_path_rows: pd.DataFrame
@@ -749,6 +809,8 @@ def _build_candidate_row(
         source_trust_label=source_trust_label,
     )
     option_legs = position.option_legs
+    quote_meta = dict(option_legs[0].quote_metadata) if option_legs else {}
+    metadata_extra = dict(chain.metadata.extra or {})
     primary_strike = option_legs[0].strike if option_legs else None
     secondary_strike = option_legs[1].strike if len(option_legs) > 1 else None
     strike_label = (
@@ -786,6 +848,19 @@ def _build_candidate_row(
         "source_quality": clean_string(source_quality).lower() or None,
         "source_trust_label": clean_string(source_trust_label).lower() or None,
         "source_quality_note": clean_string(source_quality_note) or None,
+        "option_data_source": clean_string(quote_meta.get("source") or chain.metadata.source or source_storage_location) or None,
+        "option_data_trust": clean_string(quote_meta.get("trust") or metadata_extra.get("trust")) or None,
+        "entry_price_mode": clean_string(quote_meta.get("entry_price_mode") or position.premium_mode) or None,
+        "bid": finite_or_none(quote_meta.get("bid")),
+        "ask": finite_or_none(quote_meta.get("ask")),
+        "mid": finite_or_none(quote_meta.get("mid")),
+        "spread_pct_of_mid": finite_or_none(quote_meta.get("spread_pct_of_mid")),
+        "implied_volatility": finite_or_none(quote_meta.get("implied_volatility") or (option_legs[0].base_iv if option_legs else None)),
+        "open_interest": quote_meta.get("open_interest"),
+        "volume": quote_meta.get("volume"),
+        "quality_flags": clean_string(quote_meta.get("quality_flags")) or None,
+        "liquidity_bucket": clean_string(quote_meta.get("liquidity_bucket")) or None,
+        "model_eligible": quote_meta.get("model_eligible"),
         "expiry_date": source_expiry_date,
         "target_price": round(float(target_price), 4),
         "target_date": target_date.isoformat(),
@@ -1325,8 +1400,8 @@ def _required_path_rows(
                             "target_beyond_expiry": bool(winning_eval.get("target_beyond_expiry")),
                             "valuation_date": winning_eval.get("valuation_date"),
                             "iv_shift_points": iv_shift,
-                        }
-                    )
+                            }
+                        )
     return pd.DataFrame(rows)
 
 
@@ -1454,11 +1529,16 @@ def _sort_candidate_priority(frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
         return frame.copy()
     working = frame.copy()
+    def numeric_column(name: str, default: float) -> pd.Series:
+        if name not in working.columns:
+            return pd.Series(default, index=working.index, dtype=float)
+        return pd.to_numeric(working[name], errors="coerce").fillna(default)
+
     working["_preferred_quote_context"] = working.apply(_preferred_quote_context, axis=1)
-    working["_rank"] = pd.to_numeric(working.get("active_candidate_rank"), errors="coerce").fillna(999999)
-    working["_objective"] = pd.to_numeric(working.get("objective_score"), errors="coerce").fillna(-999999.0)
-    working["_coverage"] = pd.to_numeric(working.get("source_quote_coverage_pct"), errors="coerce").fillna(-1.0)
-    working["_primary_strike"] = pd.to_numeric(working.get("primary_strike"), errors="coerce")
+    working["_rank"] = numeric_column("active_candidate_rank", 999999)
+    working["_objective"] = numeric_column("objective_score", -999999.0)
+    working["_coverage"] = numeric_column("source_quote_coverage_pct", -1.0)
+    working["_primary_strike"] = numeric_column("primary_strike", float("inf"))
     return working.sort_values(
         ["_preferred_quote_context", "_rank", "_objective", "_coverage", "expiry_date", "_primary_strike"],
         ascending=[False, True, False, False, True, True],
@@ -5842,6 +5922,1833 @@ def _build_single_option_decision_outputs(
     }
 
 
+def _required_path_threshold_slug(threshold: float) -> str:
+    return f"{str(float(threshold)).replace('.', '_')}x"
+
+
+def _required_path_short_contract_label(candidate: dict[str, Any]) -> str:
+    label = clean_string(candidate.get("candidate_short_label"))
+    if label:
+        return label
+    return _single_option_candidate_short_label(candidate)
+
+
+def _required_path_contract_strike(candidate: dict[str, Any], spec: dict[str, Any], *, default: float | None = None) -> float | None:
+    position = spec.get("position")
+    option_legs = getattr(position, "option_legs", None) if position is not None else None
+    for value in [
+        candidate.get("primary_strike"),
+        spec.get("primary_strike"),
+        option_legs[0].strike if option_legs else None,
+    ]:
+        parsed = finite_or_none(value)
+        if parsed is not None:
+            return float(parsed)
+    strike_label = clean_string(candidate.get("strike_label") or spec.get("strike_label"))
+    if strike_label and "/" not in strike_label:
+        try:
+            return float(strike_label)
+        except ValueError:
+            pass
+    parsed_default = finite_or_none(default)
+    return float(parsed_default) if parsed_default is not None else None
+
+
+def _required_path_realism_bucket(required_move_pct: float | None, status: str = "solved") -> str:
+    if not clean_string(status).startswith("solved") or required_move_pct is None:
+        return "unavailable"
+    move = float(required_move_pct)
+    if move <= 0.40:
+        return "plausible"
+    if move <= 1.00:
+        return "aggressive"
+    if move <= 2.50:
+        return "extreme"
+    return "absurd"
+
+
+def _required_path_status_for_move(required_move_pct: float | None) -> str:
+    if required_move_pct is None:
+        return "unsolved_after_extreme_search"
+    move = float(required_move_pct)
+    if move <= 0.40:
+        return "solved_normal_range"
+    if move <= 1.00:
+        return "solved_aggressive_range"
+    if move <= 2.50:
+        return "solved_extreme_range"
+    return "solved_absurd_range"
+
+
+def _required_path_is_solved_status(status: str) -> bool:
+    return clean_string(status).startswith("solved")
+
+
+def _required_path_bucket_sort_value(bucket: str) -> int:
+    return {"plausible": 0, "aggressive": 1, "extreme": 2, "absurd": 3, "unavailable": 4}.get(clean_string(bucket), 9)
+
+
+def _required_path_checkpoint_labels(terminal_days: int) -> dict[int, str]:
+    terminal = max(int(terminal_days), 0)
+    labels: dict[int, str] = {0: "Entry"}
+    for day, label in [
+        (7, "+1w"),
+        (14, "+2w"),
+        (30, "+1m"),
+        (int(round(terminal * 0.50)), "Midpoint"),
+        (int(round(terminal * 0.75)), "75%"),
+        (terminal, "Terminal"),
+    ]:
+        bounded = max(0, min(int(day), terminal))
+        labels[bounded] = label
+    return dict(sorted(labels.items()))
+
+
+def _required_path_row_days(terminal_days: int) -> list[int]:
+    terminal = max(int(terminal_days), 0)
+    if terminal <= 0:
+        return [0]
+    step = 1 if terminal <= 180 else (2 if terminal <= 365 else 3)
+    days = set(range(0, terminal + 1, step))
+    days.update(_required_path_checkpoint_labels(terminal).keys())
+    days.add(terminal)
+    return sorted(day for day in days if 0 <= day <= terminal)
+
+
+def _required_path_day_label(day: int, terminal_days: int) -> str:
+    if int(day) <= 0:
+        return "entry"
+    if int(day) >= int(terminal_days):
+        return f"{int(terminal_days)}d"
+    return f"{int(day)}d"
+
+
+def _required_path_shape_progress(*, family: str, time_fraction: float) -> float:
+    """Return stock-gallery-inspired progress for a required path family."""
+
+    family_key = clean_string(family)
+    fraction = max(0.0, min(float(time_fraction), 1.0))
+    templates: dict[str, tuple[tuple[float, float], ...]] = {
+        "fast_breakout": ((0.00, 0.00), (0.10, 0.55), (0.22, 1.00), (0.62, 1.04), (1.00, 1.00)),
+        "slow_grind": ((0.00, 0.00), (0.20, 0.14), (0.50, 0.46), (0.78, 0.78), (1.00, 1.00)),
+        "late_acceleration": ((0.00, 0.00), (0.45, 0.05), (0.68, 0.20), (0.88, 0.70), (1.00, 1.00)),
+        "down_first_recovery": ((0.00, 0.00), (0.18, -0.32), (0.38, -0.12), (0.68, 0.35), (1.00, 1.00)),
+        "rally_retrace_finish": ((0.00, 0.00), (0.16, 0.78), (0.34, 0.42), (0.62, 0.58), (1.00, 1.00)),
+        "violent_absurd": ((0.00, 0.00), (0.18, 1.40), (0.42, -0.18), (0.72, 1.18), (1.00, 1.00)),
+        "expiry_only": ((0.00, 0.00), (0.55, 0.03), (0.82, 0.10), (0.94, 0.58), (1.00, 1.00)),
+    }
+    anchors = templates.get(family_key, templates["slow_grind"])
+    if fraction <= anchors[0][0]:
+        return float(anchors[0][1])
+    for (left_x, left_y), (right_x, right_y) in zip(anchors, anchors[1:]):
+        if fraction <= right_x:
+            span = max(float(right_x) - float(left_x), 1e-9)
+            local = max(0.0, min((fraction - float(left_x)) / span, 1.0))
+            eased = 0.5 - 0.5 * float(np.cos(np.pi * local))
+            return float(left_y) + (float(right_y) - float(left_y)) * eased
+    return float(anchors[-1][1])
+
+
+def _required_path_intrinsic_value(spec: dict[str, Any], *, stock_price: float) -> float | None:
+    position = spec.get("position")
+    option_legs = getattr(position, "option_legs", None) if position is not None else None
+    if not option_legs:
+        return None
+    total = 0.0
+    for leg in option_legs:
+        strike = finite_or_none(getattr(leg, "strike", None))
+        if strike is None:
+            continue
+        option_type = clean_string(getattr(leg, "option_type", None) or "call").lower()
+        quantity = finite_or_none(getattr(leg, "quantity", 1))
+        quantity = 1.0 if quantity is None else float(quantity)
+        if option_type == "put":
+            intrinsic = max(float(strike) - float(stock_price), 0.0)
+        else:
+            intrinsic = max(float(stock_price) - float(strike), 0.0)
+        total += quantity * float(CONTRACT_MULTIPLIER) * intrinsic
+    return round(float(total), 4)
+
+
+def _required_path_row_time_fields(
+    spec: dict[str, Any],
+    *,
+    row_date: date,
+    snapshot_date: date,
+    expiry_date: date | None,
+    requested_days: int,
+    stock_price: float | None,
+    option_value: float | None,
+    evaluation: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    valuation_date = clean_string((evaluation or {}).get("valuation_date")) or row_date.isoformat()
+    effective_days = finite_or_none((evaluation or {}).get("effective_days"))
+    if effective_days is None:
+        parsed_valuation = parse_date(valuation_date)
+        effective_days = max((parsed_valuation - snapshot_date).days, 0) if parsed_valuation else int(requested_days)
+    time_to_expiry_days = max((expiry_date - row_date).days, 0) if expiry_date else None
+    intrinsic = _required_path_intrinsic_value(spec, stock_price=float(stock_price)) if stock_price is not None else None
+    time_value = (
+        round(float(option_value) - float(intrinsic), 4)
+        if option_value is not None and intrinsic is not None
+        else None
+    )
+    return {
+        "valuation_date": valuation_date,
+        "effective_days": int(effective_days) if effective_days is not None else None,
+        "time_to_expiry_days": int(time_to_expiry_days) if time_to_expiry_days is not None else None,
+        "intrinsic_value": intrinsic,
+        "time_value": time_value,
+    }
+
+
+def _required_path_verdict(*, required_move_pct: float | None, earliest_clear_fraction: float | None, status: str) -> tuple[str, str]:
+    normalized_status = clean_string(status)
+    if not _required_path_is_solved_status(normalized_status) or required_move_pct is None:
+        return (
+            "cannot_clear_under_model_assumptions",
+            "Cannot clear the hurdle by stock move alone inside the explicit extreme-search range.",
+        )
+    move = float(required_move_pct)
+    timing = float(earliest_clear_fraction) if earliest_clear_fraction is not None else 1.0
+    if move <= 0.40 and timing <= 0.65:
+        return "plausible_but_timing_sensitive", "Needs a plausible move, but the option still benefits from the move arriving early enough."
+    if move <= 0.40:
+        return "only_works_with_early_breakout", "Terminal move is plausible, but the option mostly needs earlier timing to beat stock cleanly."
+    if move <= 1.00:
+        return "requires_aggressive_move", "Requires an aggressive stock move before the option clearly beats owning stock."
+    if move <= 2.50:
+        return "requires_extreme_move", "Requires an extreme stock move; stock may be the cleaner trade unless conviction is unusually high."
+    return "stock_cleaner", "Requires an absurd stock move under current premium and IV assumptions, so stock is probably cleaner."
+
+
+def _required_path_return_gap_value(
+    spec: dict[str, Any],
+    *,
+    spot_price: float,
+    horizon_days: int,
+    iv_shift_points: float,
+    comparison_capital: float,
+    premium_used: float,
+    edge_multiple: float,
+    entry_spot: float,
+    minimum_stock_return_floor_pct: float,
+) -> tuple[float, dict[str, Any], bool]:
+    evaluation = _single_option_adjusted_evaluation(
+        spec,
+        spot_price=float(spot_price),
+        horizon_days=int(horizon_days),
+        iv_shift_points=float(iv_shift_points),
+        comparison_capital=float(comparison_capital),
+        premium_used=float(premium_used),
+    )
+    profit = _single_option_num(evaluation.get("profit_loss"), 0.0)
+    stock_return = (float(spot_price) / float(entry_spot) - 1.0) if entry_spot else 0.0
+    option_return = profit / float(premium_used) if premium_used and premium_used > 0 else None
+    meaningful_stock_return = stock_return > float(minimum_stock_return_floor_pct)
+    profitable_option = option_return is not None and option_return > 0
+    required_option_return = float(edge_multiple) * stock_return
+    clears_edge = bool(
+        meaningful_stock_return
+        and profitable_option
+        and option_return is not None
+        and option_return >= required_option_return
+    )
+    if not meaningful_stock_return:
+        gap = (option_return if option_return is not None else -float("inf")) - (
+            float(edge_multiple) * float(minimum_stock_return_floor_pct)
+        )
+    else:
+        gap = (option_return if option_return is not None else -float("inf")) - required_option_return
+    multiple = (
+        float(option_return) / float(stock_return)
+        if option_return is not None and stock_return > 0
+        else None
+    )
+    evaluation.update(
+        {
+            "minimum_stock_return_floor_pct": round(float(minimum_stock_return_floor_pct), 6),
+            "meaningful_stock_return_for_edge": bool(meaningful_stock_return),
+            "option_profitable_for_edge": bool(profitable_option),
+            "option_return_on_entry_premium": finite_or_none(option_return),
+            "stock_return_pct": finite_or_none(stock_return),
+            "required_edge_option_return": round(float(required_option_return), 6),
+            "option_vs_stock_multiple": round(float(multiple), 6) if multiple is not None else None,
+            "edge_gap_to_threshold_return": round(float(gap), 6) if np.isfinite(gap) else None,
+            "clears_required_edge": clears_edge,
+        }
+    )
+    return (float(gap) if np.isfinite(gap) else -1e12), evaluation, clears_edge
+
+
+def _long_call_required_spot_for_threshold(
+    spec: dict[str, Any],
+    *,
+    horizon_days: int,
+    iv_shift_points: float,
+    comparison_capital: float,
+    premium_used: float,
+    edge_multiple: float,
+    entry_spot: float,
+    minimum_stock_return_floor_pct: float,
+) -> tuple[float | None, dict[str, Any] | None, str]:
+    if int(horizon_days) <= 0:
+        _gap, evaluation, _clears = _required_path_return_gap_value(
+            spec,
+            spot_price=float(entry_spot),
+            horizon_days=int(horizon_days),
+            iv_shift_points=float(iv_shift_points),
+            comparison_capital=float(comparison_capital),
+            premium_used=float(premium_used),
+            edge_multiple=float(edge_multiple),
+            entry_spot=float(entry_spot),
+            minimum_stock_return_floor_pct=float(minimum_stock_return_floor_pct),
+        )
+        return None, evaluation, "no_meaningful_edge_at_this_horizon"
+    if not premium_used or float(premium_used) <= 0 or not entry_spot or float(entry_spot) <= 0:
+        return None, None, "invalid_contract_data"
+
+    start_move = max(float(minimum_stock_return_floor_pct) + 1e-5, 1e-5)
+    lo_spot = float(entry_spot) * (1.0 + start_move)
+    lo_gap, lo_eval, lo_clears = _required_path_return_gap_value(
+        spec,
+        spot_price=lo_spot,
+        horizon_days=int(horizon_days),
+        iv_shift_points=float(iv_shift_points),
+        comparison_capital=float(comparison_capital),
+        premium_used=float(premium_used),
+        edge_multiple=float(edge_multiple),
+        entry_spot=float(entry_spot),
+        minimum_stock_return_floor_pct=float(minimum_stock_return_floor_pct),
+    )
+    if lo_clears:
+        return lo_spot, lo_eval, _required_path_status_for_move(lo_spot / float(entry_spot) - 1.0)
+
+    previous_spot = lo_spot
+    previous_gap = lo_gap
+    previous_eval = lo_eval
+    for _tier_name, tier_move in REQUIRED_PATH_SEARCH_TIERS:
+        upper_spot = float(entry_spot) * (1.0 + float(tier_move))
+        if upper_spot <= previous_spot:
+            continue
+        scan_points = np.geomspace(max(previous_spot, 0.01), max(upper_spot, previous_spot + 0.01), num=96)
+        for spot in scan_points[1:]:
+            gap, evaluation, clears = _required_path_return_gap_value(
+                spec,
+                spot_price=float(spot),
+                horizon_days=int(horizon_days),
+                iv_shift_points=float(iv_shift_points),
+                comparison_capital=float(comparison_capital),
+                premium_used=float(premium_used),
+                edge_multiple=float(edge_multiple),
+                entry_spot=float(entry_spot),
+                minimum_stock_return_floor_pct=float(minimum_stock_return_floor_pct),
+            )
+            if clears:
+                lower = previous_spot
+                upper = float(spot)
+                best_eval = evaluation
+                for _ in range(52):
+                    mid = (lower + upper) / 2.0
+                    _mid_gap, mid_eval, mid_clears = _required_path_return_gap_value(
+                        spec,
+                        spot_price=mid,
+                        horizon_days=int(horizon_days),
+                        iv_shift_points=float(iv_shift_points),
+                        comparison_capital=float(comparison_capital),
+                        premium_used=float(premium_used),
+                        edge_multiple=float(edge_multiple),
+                        entry_spot=float(entry_spot),
+                        minimum_stock_return_floor_pct=float(minimum_stock_return_floor_pct),
+                    )
+                    if mid_clears:
+                        upper = mid
+                        best_eval = mid_eval
+                    else:
+                        lower = mid
+                return upper, best_eval, _required_path_status_for_move(upper / float(entry_spot) - 1.0)
+            previous_spot = float(spot)
+            previous_gap = gap
+            previous_eval = evaluation
+    if previous_eval is not None:
+        previous_eval["last_extreme_search_gap_to_threshold_return"] = round(float(previous_gap), 6)
+        previous_eval["last_extreme_search_stock_price"] = round(float(previous_spot), 4)
+    return None, previous_eval, "unsolved_after_extreme_search"
+
+
+def _required_path_family_price(
+    *,
+    family: str,
+    entry_spot: float,
+    terminal_required: float,
+    time_fraction: float,
+) -> float:
+    family_key = clean_string(family)
+    fraction = max(0.0, min(float(time_fraction), 1.0))
+    entry = float(entry_spot)
+    terminal = float(terminal_required)
+    move = terminal - entry
+    if fraction <= 0:
+        return max(0.01, entry)
+    progress = _required_path_shape_progress(family=family_key, time_fraction=fraction)
+    level = entry + move * progress
+    return max(0.01, float(level))
+
+
+def _required_path_failure_driver(
+    *,
+    status: str,
+    clears_count: int,
+    required_move_pct: float | None,
+    terminal_profit: float | None,
+    terminal_stock_profit: float | None,
+) -> str:
+    if int(clears_count) > 0:
+        return "none"
+    normalized = clean_string(status)
+    if normalized in {"invalid_contract_data", "missing_pricing_inputs"}:
+        return "invalid_input"
+    if normalized == "unsolved_after_extreme_search":
+        return "stock_move" if (terminal_profit is not None and terminal_profit > 0) else "model_assumptions"
+    if normalized in {"needs_iv_or_entry_support", "unreached_in_search_range"}:
+        return "iv_or_entry" if (terminal_profit is not None and terminal_profit <= 0) else "stock_move"
+    if terminal_stock_profit is not None and terminal_stock_profit <= 0:
+        return "stock_move"
+    if required_move_pct is not None and float(required_move_pct) > 1.0:
+        return "stock_move"
+    return "timing"
+
+
+def _build_required_path_markdowns(
+    *,
+    ticker: str,
+    summary: pd.DataFrame,
+    family_summary: pd.DataFrame,
+) -> tuple[str, str]:
+    if summary.empty:
+        return "", ""
+    display = summary.copy()
+    display["required_move_sort"] = pd.to_numeric(display.get("required_move_pct"), errors="coerce")
+    display["bucket_sort"] = display.get("realism_bucket", pd.Series(dtype=str)).astype(str).map(_required_path_bucket_sort_value).fillna(9)
+    display = display.sort_values(["threshold_multiple", "bucket_sort", "required_move_sort", "dte"], na_position="last")
+    lines = [
+        f"# {ticker} Required Paths",
+        "",
+        "## What each call needs",
+        "",
+        "The core read is option outperformance versus owning stock over the same period. Thresholds are relative to stock return: `1.5x` means option return is at least 1.5 times stock return, not an absolute +50% option return.",
+        "",
+        "## How to read this",
+        "",
+        "1. If the required path looks realistic, the option may be worth deeper review.",
+        "2. If it requires extreme or absurd stock movement, stock is likely cleaner.",
+        "3. Peak markers in the per-option charts show where selling early would have produced the best modeled return.",
+        "",
+        "Use IV and entry-premium sensitivity after the path requirement is understood; they are secondary checks, not the core thesis.",
+        "",
+    ]
+    for row in display.head(12).to_dict("records"):
+        move = finite_or_none(row.get("required_move_pct"))
+        move_text = f"{move * 100:.1f}%" if move is not None else "n/a"
+        lines.append(
+            f"- `{clean_string(row.get('contract_label'))}` at `{float(row.get('threshold_multiple') or 0):.1f}x`: "
+            f"{move_text} required move by `{clean_string(row.get('latest_valid_date') or row.get('expiry') or 'target')}`; "
+            f"bucket `{clean_string(row.get('realism_bucket'))}`; verdict `{clean_string(row.get('verdict'))}`."
+        )
+    plausible = display.loc[display.get("realism_bucket", pd.Series(dtype=str)).astype(str).isin({"plausible", "aggressive"})].copy()
+    extreme = display.loc[display.get("realism_bucket", pd.Series(dtype=str)).astype(str).isin({"extreme", "absurd"})].copy()
+    lines.extend(["", "## Calls that require plausible moves", ""])
+    if plausible.empty:
+        lines.append("- None under current premium and IV assumptions.")
+    else:
+        for row in plausible.head(8).to_dict("records"):
+            lines.append(f"- `{clean_string(row.get('contract_label'))}`: {clean_string(row.get('concise_explanation'))}")
+    lines.extend(["", "## Calls that require extreme/unrealistic moves", ""])
+    if extreme.empty:
+        lines.append("- No extreme or absurd required-path rows in the top set.")
+    else:
+        for row in extreme.head(8).to_dict("records"):
+            lines.append(f"- `{clean_string(row.get('contract_label'))}`: {clean_string(row.get('concise_explanation'))}")
+    lines.extend(
+        [
+            "",
+            "## Stock is cleaner when...",
+            "",
+            "- The required move is extreme or absurd, or the path only clears in a narrow late-expiry window.",
+            "- The family summary points to `iv_or_entry` or `timing` as the failure driver after the stock move is already large.",
+            "- The same stock thesis gives a cleaner risk/reward without paying option premium.",
+        ]
+    )
+
+    top = display.loc[display.get("status", pd.Series(dtype=str)).astype(str).map(_required_path_is_solved_status)].copy()
+    top = top.sort_values(["bucket_sort", "required_move_sort", "earliest_valid_date"], na_position="last")
+    top_lines = [
+        f"# {ticker} Top Required-Path Candidates",
+        "",
+        "Ranked by the smallest required move among solved long-call required paths. The `1.5x` / `2.0x` hurdles are relative to stock return, not absolute option-return targets; path-family and peak-exit checks stay in the canonical tables.",
+        "",
+    ]
+    if top.empty:
+        top_lines.append("- No solved required-path candidates were available.")
+    else:
+        for rank, row in enumerate(top.head(10).to_dict("records"), start=1):
+            move = finite_or_none(row.get("required_move_pct"))
+            move_text = f"{move * 100:.1f}%" if move is not None else "n/a"
+            families = family_summary.loc[
+                (family_summary.get("contract_label", pd.Series(dtype=str)).astype(str) == clean_string(row.get("contract_label")))
+                & (pd.to_numeric(family_summary.get("threshold_multiple"), errors="coerce") == float(row.get("threshold_multiple") or 0))
+            ] if not family_summary.empty else pd.DataFrame()
+            family_note = ""
+            if not families.empty:
+                lead_family = families.sort_values(["clears_count", "min_required_move_pct"], ascending=[False, True], na_position="last").iloc[0]
+                family_note = f"; best family `{clean_string(lead_family.get('path_family'))}`"
+            top_lines.append(
+                f"{rank}. `{clean_string(row.get('contract_label'))}` `{float(row.get('threshold_multiple') or 0):.1f}x`: "
+                f"{move_text} required move, `{clean_string(row.get('verdict'))}`{family_note}."
+            )
+    return "\n".join(lines), "\n".join(top_lines)
+
+
+def _build_required_path_exit_ladder_markdown(
+    *,
+    ticker: str,
+    exit_ladder: pd.DataFrame,
+) -> str:
+    if exit_ladder.empty:
+        return ""
+    reached = exit_ladder.loc[exit_ladder.get("first_exit_date", pd.Series(dtype=str)).notna()].copy()
+    lines = [
+        f"# {ticker} Required Path Exit Ladder",
+        "",
+        "These checkpoints are absolute option returns from entry premium. They are separate from the core `1.5x` / `2.0x` option-versus-stock hurdle.",
+        "",
+        "Use this as a secondary best-exit read after the required stock path itself is understood.",
+        "",
+    ]
+    if reached.empty:
+        lines.append("- No modeled required paths reached the tracked absolute option-return checkpoints.")
+        return "\n".join(lines)
+    reached["exit_return_pct_numeric"] = pd.to_numeric(reached.get("exit_return_pct"), errors="coerce")
+    reached["first_exit_days_numeric"] = pd.to_numeric(reached.get("first_exit_days_from_snapshot"), errors="coerce")
+    reached = reached.sort_values(
+        ["exit_return_pct_numeric", "first_exit_days_numeric", "contract_label", "threshold_multiple", "path_family"],
+        na_position="last",
+    )
+    lines.extend(["## First modeled exits", ""])
+    for row in reached.head(12).to_dict("records"):
+        lines.append(
+            f"- `{clean_string(row.get('contract_label'))}` `{float(row.get('threshold_multiple') or 0):.1f}x` "
+            f"`{clean_string(row.get('path_family'))}` reaches `{clean_string(row.get('exit_return_label'))}` on "
+            f"`{clean_string(row.get('first_exit_date'))}` near stock `${float(row.get('stock_price_at_exit') or 0):.2f}`."
+        )
+    return "\n".join(lines)
+
+
+def _required_path_family_short_label(family: str) -> str:
+    return {
+        "fast_breakout": "Fast BO",
+        "slow_grind": "Slow Grind",
+        "late_acceleration": "Late BO",
+        "down_first_recovery": "Down/Recover",
+        "rally_retrace_finish": "Rally/Retrace",
+        "violent_absurd": "Violent",
+        "expiry_only": "Expiry",
+        "best_family": "Best family",
+    }.get(clean_string(family), clean_string(family).replace("_", " ").title() or "n/a")
+
+
+def _required_path_display_value(value: Any, *, kind: str = "text") -> str:
+    if value is None:
+        return "n/a"
+    if isinstance(value, float) and not np.isfinite(value):
+        return "n/a"
+    cleaned = clean_string(value)
+    if cleaned.lower() in {"", "nan", "none", "nat", "<na>"}:
+        return "n/a"
+    if kind == "currency":
+        numeric = finite_or_none(value)
+        return f"${numeric:,.2f}" if numeric is not None else "n/a"
+    if kind == "pct":
+        numeric = finite_or_none(value)
+        return f"{numeric * 100:+.0f}%" if numeric is not None else "n/a"
+    if kind == "pct1":
+        numeric = finite_or_none(value)
+        return f"{numeric * 100:+.1f}%" if numeric is not None else "n/a"
+    if kind == "iv":
+        numeric = finite_or_none(value)
+        return f"{numeric * 100:.1f}%" if numeric is not None else "n/a"
+    if kind == "vol_points":
+        numeric = finite_or_none(value)
+        return f"{numeric * 100:+.0f} vol pts" if numeric is not None else "n/a"
+    if kind == "multiple":
+        numeric = finite_or_none(value)
+        return f"{numeric:.1f}x" if numeric is not None else "n/a"
+    if kind == "date":
+        parsed = parse_date(value)
+        return parsed.isoformat() if parsed else "n/a"
+    return cleaned or "n/a"
+
+
+def _required_path_bucket_class(bucket: Any) -> str:
+    normalized = clean_string(bucket).lower()
+    return {
+        "plausible": "bucket-plausible",
+        "aggressive": "bucket-aggressive",
+        "extreme": "bucket-extreme",
+        "absurd": "bucket-absurd",
+        "unavailable": "bucket-muted",
+        "invalid": "bucket-muted",
+    }.get(normalized, "bucket-neutral")
+
+
+def _required_path_solve_row(
+    *,
+    ticker: str,
+    candidate_slug: str,
+    contract_slug: str,
+    contract_label: str,
+    strike_value: float | None,
+    expiry_text: str,
+    threshold: float,
+    path_family: str,
+    spec: dict[str, Any],
+    terminal_days: int,
+    iv_shift_points: float,
+    comparison_capital: float,
+    premium_used: float,
+    entry_spot: float,
+    minimum_stock_return_floor_pct: float,
+    extra_fields: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    required_spot, _evaluation, status = _long_call_required_spot_for_threshold(
+        spec,
+        horizon_days=int(terminal_days),
+        iv_shift_points=float(iv_shift_points),
+        comparison_capital=float(comparison_capital),
+        premium_used=float(premium_used),
+        edge_multiple=float(threshold),
+        entry_spot=float(entry_spot),
+        minimum_stock_return_floor_pct=float(minimum_stock_return_floor_pct),
+    )
+    required_move_pct = (
+        float(required_spot) / float(entry_spot) - 1.0
+        if required_spot is not None and entry_spot
+        else None
+    )
+    bucket = _required_path_realism_bucket(required_move_pct, status)
+    verdict, _explanation = _required_path_verdict(
+        required_move_pct=required_move_pct,
+        earliest_clear_fraction=1.0,
+        status=status,
+    )
+    row = {
+        "ticker": clean_string(ticker).upper(),
+        "contract_label": contract_label,
+        "candidate_slug": candidate_slug,
+        "contract_slug": contract_slug,
+        "strike": float(strike_value) if strike_value is not None else None,
+        "expiry": expiry_text,
+        "threshold_multiple": float(threshold),
+        "path_family": path_family,
+        "required_terminal_stock_price": round(float(required_spot), 4) if required_spot is not None else None,
+        "required_move_pct": round(float(required_move_pct), 6) if required_move_pct is not None else None,
+        "realism_bucket": bucket,
+        "verdict": verdict,
+        "status": status,
+    }
+    if extra_fields:
+        row.update(extra_fields)
+    return row
+
+
+def _nearest_required_path_return(frame: pd.DataFrame, target_days: int) -> float | None:
+    if frame.empty:
+        return None
+    working = frame.copy()
+    working["days_numeric"] = pd.to_numeric(working.get("days_from_snapshot"), errors="coerce")
+    working["return_numeric"] = pd.to_numeric(working.get("option_return_pct"), errors="coerce")
+    working = working.loc[working["days_numeric"].notna() & working["return_numeric"].notna()].copy()
+    if working.empty:
+        return None
+    after = working.loc[working["days_numeric"] >= int(target_days)].sort_values("days_numeric")
+    selected = after.iloc[0] if not after.empty else working.sort_values("days_numeric").iloc[-1]
+    return finite_or_none(selected.get("return_numeric"))
+
+
+def _required_path_sell_hold_interpretation(
+    *,
+    peak_return: float | None,
+    terminal_return: float | None,
+    return_2w: float | None,
+    return_1m: float | None,
+) -> str:
+    if peak_return is None or terminal_return is None:
+        return "Stock cleaner"
+    decay = float(peak_return) - float(terminal_return)
+    if decay >= max(0.50, abs(float(peak_return)) * 0.35):
+        return "Sell early path"
+    if terminal_return >= float(peak_return) - 0.10:
+        return "Hold acceptable"
+    if return_2w is not None and return_1m is not None and float(return_1m) < float(return_2w) - 0.20:
+        return "Theta/IV risk after spike"
+    return "Needs continued stock drift"
+
+
+def _build_required_path_sell_hold_summary(
+    *,
+    ticker: str,
+    paths: pd.DataFrame,
+    peaks: pd.DataFrame,
+) -> pd.DataFrame:
+    if paths.empty or peaks.empty:
+        return pd.DataFrame()
+    rows: list[dict[str, Any]] = []
+    for _, peak in peaks.iterrows():
+        candidate_slug = clean_string(peak.get("candidate_slug"))
+        path_family = clean_string(peak.get("path_family"))
+        threshold = finite_or_none(peak.get("threshold_multiple"))
+        if threshold is None:
+            continue
+        subset = paths.loc[
+            paths.get("candidate_slug", pd.Series(dtype=str)).astype(str).eq(candidate_slug)
+            & paths.get("path_family", pd.Series(dtype=str)).astype(str).eq(path_family)
+            & (pd.to_numeric(paths.get("threshold_multiple"), errors="coerce") == float(threshold))
+        ].copy()
+        if subset.empty:
+            continue
+        subset["days_numeric"] = pd.to_numeric(subset.get("days_from_snapshot"), errors="coerce")
+        subset = subset.sort_values("days_numeric")
+        terminal = subset.iloc[-1]
+        peak_days = finite_or_none(peak.get("peak_days_from_snapshot"))
+        peak_days_int = int(peak_days) if peak_days is not None else int(finite_or_none(terminal.get("days_from_snapshot")) or 0)
+        peak_return = finite_or_none(peak.get("peak_option_return_pct"))
+        terminal_return = finite_or_none(peak.get("terminal_option_return_pct"))
+        if terminal_return is None:
+            terminal_return = finite_or_none(terminal.get("option_return_pct"))
+        return_2w = _nearest_required_path_return(subset, peak_days_int + 14)
+        return_1m = _nearest_required_path_return(subset, peak_days_int + 30)
+        decay = (
+            round(float(peak_return) - float(terminal_return), 6)
+            if peak_return is not None and terminal_return is not None
+            else None
+        )
+        first = subset.iloc[0]
+        rows.append(
+            {
+                "ticker": clean_string(ticker).upper(),
+                "contract_label": clean_string(peak.get("contract_label")),
+                "candidate_slug": candidate_slug,
+                "strike": finite_or_none(first.get("strike")),
+                "expiry": clean_string(first.get("option_expiry_date") or first.get("option_expiry")),
+                "threshold_multiple": float(threshold),
+                "path_family": path_family,
+                "peak_option_return_pct": peak_return,
+                "peak_date": clean_string(peak.get("peak_date")) or None,
+                "stock_price_at_peak": finite_or_none(peak.get("stock_price_at_peak")),
+                "option_return_2w_after_peak": return_2w,
+                "option_return_1m_after_peak": return_1m,
+                "terminal_option_return_pct": terminal_return,
+                "expiry_option_return_pct": terminal_return,
+                "decay_from_peak_to_expiry_pct": decay,
+                "interpretation": _required_path_sell_hold_interpretation(
+                    peak_return=peak_return,
+                    terminal_return=terminal_return,
+                    return_2w=return_2w,
+                    return_1m=return_1m,
+                ),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _required_path_best_family_map(family_summary: pd.DataFrame) -> dict[tuple[str, float], str]:
+    if family_summary.empty:
+        return {}
+    working = family_summary.copy()
+    working["threshold_numeric"] = pd.to_numeric(working.get("threshold_multiple"), errors="coerce")
+    working["clears_numeric"] = pd.to_numeric(working.get("clears_count"), errors="coerce").fillna(0)
+    working["move_numeric"] = pd.to_numeric(working.get("min_required_move_pct"), errors="coerce")
+    mapping: dict[tuple[str, float], str] = {}
+    for (candidate_slug, threshold), group in working.groupby([working.get("candidate_slug").astype(str), "threshold_numeric"]):
+        if pd.isna(threshold):
+            continue
+        selected = group.sort_values(["clears_numeric", "move_numeric"], ascending=[False, True], na_position="last").iloc[0]
+        mapping[(clean_string(candidate_slug), float(threshold))] = clean_string(selected.get("path_family")) or "slow_grind"
+    return mapping
+
+
+def _build_required_path_tables_markdown(*, ticker: str) -> str:
+    return "\n".join(
+        [
+            f"# {ticker} Required Path Tables",
+            "",
+            "## What to open first",
+            "",
+            "Open `required_path_tables.html` after the overview chart and summary. It is the spreadsheet-style companion for comparing calls, required moves, entry risk, IV risk, and sell/hold pressure.",
+            "",
+            "## How to read the tables",
+            "",
+            "- `1.5x / 2.0x` are relative to stock return, not absolute option return.",
+            "- Required move tables show what each call needs before the option beats stock ownership.",
+            "- Entry premium sensitivity shows fill-price risk.",
+            "- IV sensitivity shows vol risk; use it after the stock-path requirement is understood.",
+            "- Sell / hold pressure shows whether a modeled spike is better sold early or can be held.",
+        ]
+    )
+
+
+def _html_cell(value: Any, *, kind: str = "text", css_class: str = "") -> str:
+    text = _required_path_display_value(value, kind=kind)
+    class_attr = f' class="{escape(css_class)}"' if css_class else ""
+    return f"<td{class_attr}>{escape(text)}</td>"
+
+
+def _html_header(label: str, *, colspan: int = 1) -> str:
+    span = f' colspan="{int(colspan)}"' if int(colspan) > 1 else ""
+    return f"<th{span}>{escape(label)}</th>"
+
+
+def _html_section(title: str, note: str, table_html: str) -> str:
+    return (
+        '<section class="workbook-section">'
+        f'<div class="section-title">{escape(title)}</div>'
+        f'<div class="subnote">{escape(note)}</div>'
+        f'<div class="table-scroll">{table_html}</div>'
+        "</section>"
+    )
+
+
+def _build_required_path_tables_html(
+    *,
+    ticker: str,
+    summary: pd.DataFrame,
+    paths: pd.DataFrame,
+    family_summary: pd.DataFrame,
+    entry_sensitivity: pd.DataFrame,
+    iv_sensitivity: pd.DataFrame,
+    entry_iv_matrix: pd.DataFrame,
+    sell_hold: pd.DataFrame,
+    exit_ladder: pd.DataFrame,
+) -> str:
+    note = "1.5x / 2.0x are relative to stock return, not absolute option return."
+    css = """
+body { font-family: Arial, Helvetica, sans-serif; background: #ffffff; color: #1f2933; margin: 16px; }
+h1 { font-size: 20px; margin: 0 0 8px; }
+.intro { font-size: 12px; margin: 0 0 14px; color: #111827; }
+.section-title { background: #5FA5DA; color: white; font-weight: 700; text-align: center; font-size: 15px; padding: 6px 8px; border: 1px solid #8BAFCC; }
+.subnote { background: #F3F8FC; color: #111827; font-size: 12px; padding: 5px 7px; border-left: 1px solid #8BAFCC; border-right: 1px solid #8BAFCC; }
+.table-scroll { overflow-x: auto; margin-bottom: 18px; border-left: 1px solid #B8C7D5; border-right: 1px solid #B8C7D5; }
+table { border-collapse: collapse; width: 100%; table-layout: auto; font-size: 12px; }
+th { background: #E8F3FB; border: 1px solid #AEBFD1; padding: 5px 6px; text-align: center; font-weight: 700; white-space: nowrap; position: sticky; top: 0; z-index: 2; }
+td { border: 1px solid #B8C7D5; padding: 4px 6px; text-align: right; white-space: nowrap; }
+td.label { text-align: left; font-weight: 600; position: sticky; left: 0; background: #ffffff; z-index: 1; }
+td.note { text-align: left; font-size: 11px; color: #374151; white-space: normal; min-width: 240px; }
+tbody tr:nth-child(even) td { background: #FAFCFE; }
+tbody tr:nth-child(even) td.label { background: #FAFCFE; }
+.bucket-plausible { background: #DCEEFF; font-weight: 700; }
+.bucket-aggressive { background: #FFF3D6; font-weight: 700; }
+.bucket-extreme { background: #F6E2F0; font-weight: 700; }
+.bucket-absurd { background: #E5E7EB; font-weight: 800; }
+.bucket-muted { background: #EEF2F6; color: #4B5563; font-weight: 700; }
+.bucket-neutral { background: #FFFFFF; }
+""".strip()
+
+    sections: list[str] = []
+    if not summary.empty:
+        base = summary.sort_values(["dte", "strike", "threshold_multiple"], na_position="last").drop_duplicates("contract_label")
+        rows = []
+        for row in base.to_dict("records"):
+            moneyness = None
+            spot = finite_or_none(row.get("entry_spot")) or finite_or_none(row.get("spot"))
+            strike = finite_or_none(row.get("strike"))
+            if spot and strike:
+                moneyness = float(spot) / float(strike) - 1.0
+            rows.append(
+                "<tr>"
+                + _html_cell(row.get("contract_label"), css_class="label")
+                + _html_cell(row.get("strike"), kind="currency")
+                + _html_cell(row.get("expiry"), kind="date")
+                + _html_cell(row.get("dte"))
+                + _html_cell(row.get("entry_premium"), kind="currency")
+                + _html_cell(row.get("entry_iv"), kind="iv")
+                + _html_cell(row.get("entry_spot"), kind="currency")
+                + _html_cell(moneyness, kind="pct1")
+                + _html_cell(row.get("status"))
+                + _html_cell(row.get("concise_explanation"), css_class="note")
+                + "</tr>"
+            )
+        table = (
+            "<table><thead><tr>"
+            + "".join(_html_header(label) for label in ["Contract", "Strike", "Expiry", "DTE", "Entry premium", "Entry IV", "Spot", "Moneyness", "Source / trust", "Notes"])
+            + "</tr></thead><tbody>"
+            + "".join(rows)
+            + "</tbody></table>"
+        )
+        sections.append(_html_section("Contract inputs", "Shows what the model is pricing.", table))
+
+    if not summary.empty:
+        pivot_rows = []
+        for contract, group in summary.groupby(summary.get("contract_label").astype(str)):
+            row_15 = group.loc[pd.to_numeric(group.get("threshold_multiple"), errors="coerce").eq(1.5)]
+            row_20 = group.loc[pd.to_numeric(group.get("threshold_multiple"), errors="coerce").eq(2.0)]
+            r15 = row_15.iloc[0].to_dict() if not row_15.empty else {}
+            r20 = row_20.iloc[0].to_dict() if not row_20.empty else {}
+            cleaner = "Yes" if clean_string(r15.get("realism_bucket")) in {"extreme", "absurd"} and clean_string(r20.get("realism_bucket")) in {"extreme", "absurd"} else "Review"
+            pivot_rows.append(
+                "<tr>"
+                + _html_cell(contract, css_class="label")
+                + _html_cell(r15.get("required_terminal_stock_price"), kind="currency")
+                + _html_cell(r15.get("required_move_pct"), kind="pct1")
+                + _html_cell(r15.get("earliest_valid_date"), kind="date")
+                + _html_cell(_required_path_family_short_label(_best_family_for_display(family_summary, contract, 1.5)))
+                + _html_cell(r15.get("realism_bucket"), css_class=_required_path_bucket_class(r15.get("realism_bucket")))
+                + _html_cell(r15.get("verdict"))
+                + _html_cell(r20.get("required_terminal_stock_price"), kind="currency")
+                + _html_cell(r20.get("required_move_pct"), kind="pct1")
+                + _html_cell(r20.get("earliest_valid_date"), kind="date")
+                + _html_cell(_required_path_family_short_label(_best_family_for_display(family_summary, contract, 2.0)))
+                + _html_cell(r20.get("realism_bucket"), css_class=_required_path_bucket_class(r20.get("realism_bucket")))
+                + _html_cell(r20.get("verdict"))
+                + _html_cell(cleaner)
+                + _html_cell(_main_failure_driver_for_display(family_summary, contract))
+                + _html_cell(r15.get("concise_explanation") or r20.get("concise_explanation"), css_class="note")
+                + "</tr>"
+            )
+        table = (
+            "<table><thead><tr>"
+            + _html_header("Contract", colspan=1)
+            + _html_header("1.5x hurdle", colspan=6)
+            + _html_header("2.0x hurdle", colspan=6)
+            + _html_header("Interpretation", colspan=3)
+            + "</tr><tr>"
+            + "".join(
+                _html_header(label)
+                for label in [
+                    "Contract",
+                    "Required terminal stock price",
+                    "Required stock move %",
+                    "Earliest clear date",
+                    "Best path family",
+                    "Realism bucket",
+                    "Verdict",
+                    "Required terminal stock price",
+                    "Required stock move %",
+                    "Earliest clear date",
+                    "Best path family",
+                    "Realism bucket",
+                    "Verdict",
+                    "Stock cleaner?",
+                    "Main failure driver",
+                    "Concise explanation",
+                ]
+            )
+            + "</tr></thead><tbody>"
+            + "".join(pivot_rows)
+            + "</tbody></table>"
+        )
+        sections.append(_html_section("Required move summary", "What each call needs to beat stock by the configured relative hurdle.", table))
+
+    sections.append(_html_section("Path family comparison", "Shows whether the option works across path forms or only one narrow timing shape.", _required_path_family_comparison_html(family_summary)))
+    sections.append(_html_section("Entry premium sensitivity", "Lower entry premium can dramatically reduce the required stock move. Expensive fills can turn a plausible call into an extreme one.", _required_path_sensitivity_html(entry_sensitivity, shock_column="entry_shift_pct", shock_kind="pct1", title_prefix="Entry")))
+    sections.append(_html_section("IV sensitivity", "IV is secondary to stock path, but can materially affect longer-dated or near-the-money calls.", _required_path_sensitivity_html(iv_sensitivity, shock_column="iv_shift_vol_points", shock_kind="vol_points", title_prefix="IV")))
+    sections.append(_html_section("Entry premium x IV matrix", "Stress test fill price and IV together. Cells show required move for the 1.5x / 2.0x hurdles.", _required_path_matrix_html(entry_iv_matrix)))
+    sections.append(_html_section("Sell / hold pressure", "Compares peak modeled return versus later/expiry returns to show whether the path should likely be sold early.", _required_path_sell_hold_html(sell_hold)))
+    sections.append(_html_section("Absolute option-return exit ladder", "This table is absolute option return from entry premium. It is not the same as the 1.5x / 2.0x stock-relative hurdle.", _required_path_exit_ladder_html(exit_ladder)))
+
+    return (
+        "<!doctype html><html><head><meta charset=\"utf-8\"><title>"
+        + escape(f"{ticker} Required Path Tables")
+        + "</title><style>"
+        + css
+        + "</style></head><body><h1>"
+        + escape(f"{ticker} Required Path Tables")
+        + '</h1><p class="intro">'
+        + escape(note)
+        + "</p>"
+        + "".join(sections)
+        + "</body></html>"
+    )
+
+
+def _best_family_for_display(family_summary: pd.DataFrame, contract_label: str, threshold: float) -> str:
+    if family_summary.empty:
+        return "best_family"
+    group = family_summary.loc[
+        family_summary.get("contract_label", pd.Series(dtype=str)).astype(str).eq(clean_string(contract_label))
+        & pd.to_numeric(family_summary.get("threshold_multiple"), errors="coerce").eq(float(threshold))
+    ].copy()
+    if group.empty:
+        return "best_family"
+    group["clears_numeric"] = pd.to_numeric(group.get("clears_count"), errors="coerce").fillna(0)
+    group["move_numeric"] = pd.to_numeric(group.get("min_required_move_pct"), errors="coerce")
+    return clean_string(group.sort_values(["clears_numeric", "move_numeric"], ascending=[False, True], na_position="last").iloc[0].get("path_family")) or "best_family"
+
+
+def _main_failure_driver_for_display(family_summary: pd.DataFrame, contract_label: str) -> str:
+    if family_summary.empty:
+        return "n/a"
+    group = family_summary.loc[family_summary.get("contract_label", pd.Series(dtype=str)).astype(str).eq(clean_string(contract_label))]
+    if group.empty:
+        return "n/a"
+    drivers = group.get("failure_driver", pd.Series(dtype=str)).astype(str)
+    drivers = drivers.loc[drivers.astype(str).ne("none")]
+    if drivers.empty:
+        return "none"
+    return clean_string(drivers.mode().iloc[0])
+
+
+def _required_path_family_comparison_html(family_summary: pd.DataFrame) -> str:
+    if family_summary.empty:
+        return "<table><tbody><tr><td>n/a</td></tr></tbody></table>"
+    rows = []
+    family_order = list(REQUIRED_PATH_FAMILIES)
+    working = family_summary.copy()
+    for (contract, threshold), group in working.groupby([working.get("contract_label").astype(str), pd.to_numeric(working.get("threshold_multiple"), errors="coerce")]):
+        if pd.isna(threshold):
+            continue
+        moves = {
+            clean_string(row.get("path_family")): finite_or_none(row.get("min_required_move_pct"))
+            for row in group.to_dict("records")
+        }
+        numeric_moves = {family: move for family, move in moves.items() if move is not None}
+        best = min(numeric_moves, key=numeric_moves.get) if numeric_moves else "n/a"
+        worst = max(numeric_moves, key=numeric_moves.get) if numeric_moves else "n/a"
+        row = "<tr>" + _html_cell(contract, css_class="label") + _html_cell(threshold, kind="multiple")
+        for family in family_order:
+            row += _html_cell(moves.get(family), kind="pct1")
+        row += _html_cell(_required_path_family_short_label(best)) + _html_cell(_required_path_family_short_label(worst)) + _html_cell("Path shape sensitivity read.", css_class="note") + "</tr>"
+        rows.append(row)
+    headers = ["Contract", "Threshold"] + [f"{_required_path_family_short_label(family)} required move %" for family in family_order] + ["Best family", "Worst family", "Notes"]
+    return "<table><thead><tr>" + "".join(_html_header(label) for label in headers) + "</tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
+
+
+def _required_path_sensitivity_html(frame: pd.DataFrame, *, shock_column: str, shock_kind: str, title_prefix: str) -> str:
+    if frame.empty:
+        return "<table><tbody><tr><td>n/a</td></tr></tbody></table>"
+    working = frame.copy()
+    working["threshold_numeric"] = pd.to_numeric(working.get("threshold_multiple"), errors="coerce")
+    working["shock_numeric"] = pd.to_numeric(working.get(shock_column), errors="coerce")
+    shocks = sorted(value for value in working["shock_numeric"].dropna().unique())
+    rows = []
+    for (contract, threshold, family), group in working.groupby([working.get("contract_label").astype(str), "threshold_numeric", working.get("path_family").astype(str)]):
+        if pd.isna(threshold):
+            continue
+        by_shock = {float(row["shock_numeric"]): row for row in group.to_dict("records") if finite_or_none(row.get("shock_numeric")) is not None}
+        row = "<tr>" + _html_cell(contract, css_class="label") + _html_cell(threshold, kind="multiple") + _html_cell(_required_path_family_short_label(family))
+        for shock in shocks:
+            item = by_shock.get(float(shock), {})
+            move = _required_path_display_value(item.get("required_move_pct"), kind="pct1")
+            price = _required_path_display_value(item.get("required_terminal_stock_price"), kind="currency")
+            row += f"<td>{escape(move)} ({escape(price)})</td>"
+        row += "</tr>"
+        rows.append(row)
+    headers = ["Contract", "Threshold", "Path family"] + [f"{title_prefix} {_required_path_display_value(shock, kind=shock_kind)}" for shock in shocks]
+    return "<table><thead><tr>" + "".join(_html_header(label) for label in headers) + "</tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
+
+
+def _required_path_matrix_html(frame: pd.DataFrame) -> str:
+    if frame.empty:
+        return "<table><tbody><tr><td>n/a</td></tr></tbody></table>"
+    working = frame.copy()
+    working["entry_numeric"] = pd.to_numeric(working.get("entry_shift_pct"), errors="coerce")
+    working["iv_numeric"] = pd.to_numeric(working.get("iv_shift_vol_points"), errors="coerce")
+    working["threshold_numeric"] = pd.to_numeric(working.get("threshold_multiple"), errors="coerce")
+    tables = []
+    for contract, contract_group in working.groupby(working.get("contract_label").astype(str)):
+        iv_shocks = sorted(value for value in contract_group["iv_numeric"].dropna().unique())
+        entry_shocks = sorted(value for value in contract_group["entry_numeric"].dropna().unique())
+        rows = []
+        for entry_shift in entry_shocks:
+            entry_group = contract_group.loc[contract_group["entry_numeric"].eq(entry_shift)]
+            row = "<tr>" + _html_cell(_required_path_display_value(entry_shift, kind="pct1"), css_class="label")
+            for iv_shift in iv_shocks:
+                cell_group = entry_group.loc[entry_group["iv_numeric"].eq(iv_shift)]
+                parts = []
+                for threshold in [1.5, 2.0]:
+                    threshold_row = cell_group.loc[cell_group["threshold_numeric"].eq(threshold)]
+                    if threshold_row.empty:
+                        parts.append(f"{threshold:.1f}x: n/a")
+                    else:
+                        parts.append(f"{threshold:.1f}x: {_required_path_display_value(threshold_row.iloc[0].get('required_move_pct'), kind='pct1')}")
+                row += f"<td>{escape(' / '.join(parts))}</td>"
+            row += "</tr>"
+            rows.append(row)
+        headers = ["Entry premium"] + [_required_path_display_value(shock, kind="vol_points") for shock in iv_shocks]
+        tables.append(
+            f'<div class="subnote">{escape(contract)}</div><table><thead><tr>'
+            + "".join(_html_header(label) for label in headers)
+            + "</tr></thead><tbody>"
+            + "".join(rows)
+            + "</tbody></table>"
+        )
+    return "".join(tables)
+
+
+def _required_path_sell_hold_html(frame: pd.DataFrame) -> str:
+    if frame.empty:
+        return "<table><tbody><tr><td>n/a</td></tr></tbody></table>"
+    rows = []
+    for row in frame.sort_values(["contract_label", "threshold_multiple", "path_family"], na_position="last").to_dict("records"):
+        rows.append(
+            "<tr>"
+            + _html_cell(row.get("contract_label"), css_class="label")
+            + _html_cell(row.get("threshold_multiple"), kind="multiple")
+            + _html_cell(_required_path_family_short_label(row.get("path_family")))
+            + _html_cell(row.get("peak_option_return_pct"), kind="pct1")
+            + _html_cell(row.get("peak_date"), kind="date")
+            + _html_cell(row.get("stock_price_at_peak"), kind="currency")
+            + _html_cell(row.get("option_return_2w_after_peak"), kind="pct1")
+            + _html_cell(row.get("option_return_1m_after_peak"), kind="pct1")
+            + _html_cell(row.get("expiry_option_return_pct"), kind="pct1")
+            + _html_cell(row.get("decay_from_peak_to_expiry_pct"), kind="pct1")
+            + _html_cell(row.get("interpretation"))
+            + "</tr>"
+        )
+    headers = ["Contract", "Threshold", "Path family", "Peak option return", "Peak date", "Stock price at peak", "Return 2 weeks after peak", "Return 1 month after peak", "Return at expiry", "Decay from peak to expiry", "Interpretation"]
+    return "<table><thead><tr>" + "".join(_html_header(label) for label in headers) + "</tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
+
+
+def _required_path_exit_ladder_html(frame: pd.DataFrame) -> str:
+    if frame.empty:
+        return "<table><tbody><tr><td>n/a</td></tr></tbody></table>"
+    working = frame.copy()
+    working["target_numeric"] = pd.to_numeric(working.get("target_absolute_option_return_pct", working.get("exit_return_pct")), errors="coerce")
+    levels = [0.50, 1.00, 1.50, 2.00, 3.00, 5.00]
+    rows = []
+    for (contract, family, threshold), group in working.groupby([working.get("contract_label").astype(str), working.get("path_family").astype(str), pd.to_numeric(working.get("threshold_multiple"), errors="coerce")]):
+        if pd.isna(threshold):
+            continue
+        by_level = {float(row["target_numeric"]): row for row in group.to_dict("records") if finite_or_none(row.get("target_numeric")) is not None}
+        row_html = "<tr>" + _html_cell(contract, css_class="label") + _html_cell(_required_path_family_short_label(family)) + _html_cell(threshold, kind="multiple")
+        for level in levels:
+            item = by_level.get(level, {})
+            date_text = _required_path_display_value(item.get("first_hit_date") or item.get("first_exit_date"), kind="date")
+            stock_text = _required_path_display_value(item.get("stock_price_at_first_hit") or item.get("stock_price_at_exit"), kind="currency")
+            row_html += f"<td>{escape(date_text)} / {escape(stock_text)}</td>"
+        row_html += "</tr>"
+        rows.append(row_html)
+    headers = ["Contract", "Path family", "Threshold context", "First +50%", "First +100%", "First +150%", "First +200%", "First +300%", "First +500%"]
+    return "<table><thead><tr>" + "".join(_html_header(label) for label in headers) + "</tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
+
+
+def _build_long_call_required_path_outputs(
+    *,
+    ticker: str,
+    specs: list[dict[str, Any]],
+    candidate_rows: pd.DataFrame,
+    snapshot_date: date,
+    target_date: date,
+    target_horizon_label: str,
+    entry_spot: float,
+    target_price: float,
+    active_iv_path_points: dict[str, float],
+    comparison_capital: float,
+    minimum_outperformance_multiple: float,
+    strong_outperformance_multiple: float,
+    minimum_edge_stock_return_pct: float,
+    entry_price_mode: str,
+) -> dict[str, Any]:
+    thresholds = [float(minimum_outperformance_multiple), float(strong_outperformance_multiple)]
+    normalized_entry_mode = clean_string(entry_price_mode).lower() or "conservative_mid_plus_slippage"
+    target_days = max((target_date - snapshot_date).days, 0)
+    spec_lookup = {
+        clean_string(spec.get("candidate_slug")): spec
+        for spec in specs
+        if clean_string(spec.get("strategy_family")) == "long_call"
+    }
+    if candidate_rows.empty or not spec_lookup:
+        return {
+            "required_path_core_summary": pd.DataFrame(),
+            "required_paths_by_option": pd.DataFrame(),
+            "required_path_family_summary": pd.DataFrame(),
+            "required_path_peak_summary": pd.DataFrame(),
+            "required_path_exit_ladder": pd.DataFrame(),
+            "required_path_entry_sensitivity": pd.DataFrame(),
+            "required_path_iv_sensitivity": pd.DataFrame(),
+            "required_path_entry_iv_matrix": pd.DataFrame(),
+            "required_path_sell_hold_summary": pd.DataFrame(),
+            "required_path_summary_markdown": "",
+            "required_path_exit_ladder_markdown": "",
+            "required_path_tables_markdown": "",
+            "required_path_tables_html": "",
+            "top_required_path_candidates_markdown": "",
+        }
+    long_calls = candidate_rows.loc[
+        candidate_rows.get("strategy_family", pd.Series(dtype=str)).astype(str).eq("long_call")
+        & candidate_rows.get("candidate_slug", pd.Series(dtype=str)).astype(str).isin(spec_lookup.keys())
+    ].copy()
+    if long_calls.empty:
+        return {
+            "required_path_core_summary": pd.DataFrame(),
+            "required_paths_by_option": pd.DataFrame(),
+            "required_path_family_summary": pd.DataFrame(),
+            "required_path_peak_summary": pd.DataFrame(),
+            "required_path_exit_ladder": pd.DataFrame(),
+            "required_path_entry_sensitivity": pd.DataFrame(),
+            "required_path_iv_sensitivity": pd.DataFrame(),
+            "required_path_entry_iv_matrix": pd.DataFrame(),
+            "required_path_sell_hold_summary": pd.DataFrame(),
+            "required_path_summary_markdown": "",
+            "required_path_exit_ladder_markdown": "",
+            "required_path_tables_markdown": "",
+            "required_path_tables_html": "",
+            "top_required_path_candidates_markdown": "",
+        }
+    long_calls = _sort_candidate_priority(long_calls).reset_index(drop=True)
+    minimum_stock_return_floor_pct = float(minimum_edge_stock_return_pct)
+    summary_rows: list[dict[str, Any]] = []
+    path_rows: list[dict[str, Any]] = []
+    family_rows: list[dict[str, Any]] = []
+    peak_rows: list[dict[str, Any]] = []
+    exit_ladder_rows: list[dict[str, Any]] = []
+    entry_sensitivity_rows: list[dict[str, Any]] = []
+    iv_sensitivity_rows: list[dict[str, Any]] = []
+    entry_iv_matrix_rows: list[dict[str, Any]] = []
+
+    for candidate_order, candidate in enumerate(long_calls.to_dict("records"), start=1):
+        candidate_slug = clean_string(candidate.get("candidate_slug"))
+        spec = spec_lookup.get(candidate_slug)
+        if spec is None:
+            continue
+        position: StrategyPosition = spec["position"]
+        premium_used, _premium_source = _single_option_entry_premium(position, mode=normalized_entry_mode)
+        expiry_dt = parse_date(candidate.get("expiry_date")) or position.expiry_date
+        dte = max((expiry_dt - snapshot_date).days, 0) if expiry_dt else None
+        candidate_terminal_days = int(dte) if dte is not None else int(target_days)
+        candidate_terminal_days = max(int(candidate_terminal_days), 0)
+        path_terminal_date = snapshot_date + timedelta(days=candidate_terminal_days)
+        chart_horizon_date = path_terminal_date
+        terminal_basis = "option_expiry" if expiry_dt else "analysis_horizon"
+        chart_horizon_basis = terminal_basis
+        candidate_horizon_label = (
+            f"{candidate_terminal_days}d"
+            if candidate_terminal_days != int(target_days)
+            else (clean_string(target_horizon_label) or f"{target_days}d")
+        )
+        checkpoint_labels = _required_path_checkpoint_labels(candidate_terminal_days)
+        horizon_specs = [
+            {"label": _required_path_day_label(day, candidate_terminal_days), "requested_days": day}
+            for day in _required_path_row_days(candidate_terminal_days)
+        ]
+        active_iv_path = _interpolated_path(active_iv_path_points, horizon_specs, default_value=0.0)
+        terminal_days = max(int(candidate_terminal_days), 1)
+        strike_value = _required_path_contract_strike(candidate, spec, default=None)
+        entry_iv = finite_or_none(position.option_legs[0].base_iv if position.option_legs else None)
+        contract_label = _required_path_short_contract_label(candidate)
+        contract_slug = candidate_slug
+        option_type = clean_string(candidate.get("option_type")) or "call"
+        expiry_text = clean_string(candidate.get("expiry_date")) or (expiry_dt.isoformat() if expiry_dt else "")
+        for threshold in thresholds:
+            terminal_iv = float(
+                active_iv_path.get(
+                    clean_string(candidate_horizon_label).lower(),
+                    active_iv_path.get(f"{candidate_terminal_days}d", 0.0),
+                )
+            )
+            terminal_required_spot, terminal_eval, terminal_status = _long_call_required_spot_for_threshold(
+                spec,
+                horizon_days=candidate_terminal_days,
+                iv_shift_points=terminal_iv,
+                comparison_capital=float(comparison_capital),
+                premium_used=float(premium_used),
+                edge_multiple=float(threshold),
+                entry_spot=float(entry_spot),
+                minimum_stock_return_floor_pct=float(minimum_stock_return_floor_pct),
+            )
+            if terminal_required_spot is None:
+                terminal_required_spot = None
+            required_move_pct = (
+                float(terminal_required_spot) / float(entry_spot) - 1.0
+                if terminal_required_spot is not None and entry_spot
+                else None
+            )
+            threshold_slug = _required_path_threshold_slug(threshold)
+            threshold_label = f"{float(threshold):.1f}x"
+            generated_path_ids: set[str] = set()
+            family_terminals: list[float] = []
+            all_family_clears: list[dict[str, Any]] = []
+
+            for family_order, family in enumerate(REQUIRED_PATH_FAMILIES, start=1):
+                path_id = f"{contract_slug}__{threshold_slug}__{family}"
+                generated_path_ids.add(path_id)
+                terminal_for_family = terminal_required_spot
+                if terminal_for_family is not None and family == "violent_absurd":
+                    terminal_for_family = max(float(terminal_for_family), float(entry_spot) * 1.01)
+                family_path_rows: list[dict[str, Any]] = []
+                if terminal_for_family is None:
+                    for step_index, horizon in enumerate(horizon_specs):
+                        requested_days = int(horizon.get("requested_days") or 0)
+                        row_date = snapshot_date + timedelta(days=requested_days)
+                        checkpoint_label = checkpoint_labels.get(requested_days, "")
+                        time_fields = _required_path_row_time_fields(
+                            spec,
+                            row_date=row_date,
+                            snapshot_date=snapshot_date,
+                            expiry_date=expiry_dt,
+                            requested_days=requested_days,
+                            stock_price=None,
+                            option_value=None,
+                            evaluation=None,
+                        )
+                        family_path_rows.append(
+                            {
+                                "contract_label": contract_label,
+                                "candidate_slug": candidate_slug,
+                                "threshold_multiple": float(threshold),
+                                "strike": float(strike_value) if strike_value is not None else None,
+                                "entry_spot": round(float(entry_spot), 4),
+                                "snapshot_date": snapshot_date.isoformat(),
+                                "analysis_horizon_date": target_date.isoformat(),
+                                "chart_horizon_date": chart_horizon_date.isoformat(),
+                                "path_terminal_date": path_terminal_date.isoformat(),
+                                "option_expiry": expiry_text,
+                                "option_expiry_date": expiry_text,
+                                "terminal_basis": terminal_basis,
+                                "chart_horizon_basis": chart_horizon_basis,
+                                "path_id": path_id,
+                                "path_label": f"{REQUIRED_PATH_FAMILY_LABELS[family]} ({threshold_label})",
+                                "path_family": family,
+                                "shape_template": family,
+                                "shape_source_path": REQUIRED_PATH_FAMILY_SOURCE_PATHS.get(family, family),
+                                "family_display_order": family_order,
+                                "date": row_date.isoformat(),
+                                "days_from_snapshot": requested_days,
+                                **time_fields,
+                                "is_checkpoint_marker": bool(checkpoint_label),
+                                "display_marker": checkpoint_label or "",
+                                "checkpoint_label": checkpoint_label,
+                                "is_peak_option_return": False,
+                                "stock_price": None,
+                                "option_value": None,
+                                "option_return_pct": None,
+                                "stock_return_pct": None,
+                                "option_vs_stock_multiple": None,
+                                "clears_threshold": False,
+                                "realism_bucket": "unavailable",
+                                "status": terminal_status,
+                                "failure_driver": _required_path_failure_driver(
+                                    status=terminal_status,
+                                    clears_count=0,
+                                    required_move_pct=required_move_pct,
+                                    terminal_profit=finite_or_none((terminal_eval or {}).get("profit_loss")),
+                                    terminal_stock_profit=finite_or_none((terminal_eval or {}).get("stock_return_pct")),
+                                ),
+                        }
+                    )
+                    for exit_return, exit_label in REQUIRED_PATH_EXIT_RETURN_LEVELS:
+                        exit_ladder_rows.append(
+                            {
+                                "contract_label": contract_label,
+                                "candidate_slug": candidate_slug,
+                                "threshold_multiple": float(threshold),
+                                "path_id": path_id,
+                                "path_label": f"{REQUIRED_PATH_FAMILY_LABELS[family]} ({threshold_label})",
+                                "path_family": family,
+                                "exit_return_label": exit_label,
+                                "exit_return_pct": float(exit_return),
+                                "first_exit_date": None,
+                                "first_exit_days_from_snapshot": None,
+                                "stock_price_at_exit": None,
+                                "option_value_at_exit": None,
+                                "option_return_pct_at_exit": None,
+                                "stock_return_pct_at_exit": None,
+                                "option_vs_stock_multiple_at_exit": None,
+                                "snapshot_date": snapshot_date.isoformat(),
+                                "analysis_horizon_date": target_date.isoformat(),
+                                "chart_horizon_date": chart_horizon_date.isoformat(),
+                                "path_terminal_date": path_terminal_date.isoformat(),
+                                "option_expiry": expiry_text,
+                                "option_expiry_date": expiry_text,
+                                "terminal_basis": terminal_basis,
+                                "chart_horizon_basis": chart_horizon_basis,
+                                "status": terminal_status,
+                                "realism_bucket": "unavailable",
+                            }
+                        )
+                    path_rows.extend(family_path_rows)
+                    family_rows.append(
+                        {
+                            "contract_label": contract_label,
+                            "candidate_slug": candidate_slug,
+                            "threshold_multiple": float(threshold),
+                            "path_family": family,
+                            "min_required_move_pct": None,
+                            "median_required_move_pct": None,
+                            "earliest_clear_date": None,
+                            "latest_clear_date": None,
+                            "clears_count": 0,
+                            "realism_bucket": "unavailable",
+                            "failure_driver": _required_path_failure_driver(
+                                status=terminal_status,
+                                clears_count=0,
+                                required_move_pct=required_move_pct,
+                                terminal_profit=finite_or_none((terminal_eval or {}).get("profit_loss")),
+                                terminal_stock_profit=finite_or_none((terminal_eval or {}).get("stock_return_pct")),
+                            ),
+                            "peak_option_return_pct": None,
+                            "peak_option_value": None,
+                            "peak_date": None,
+                            "peak_days_from_snapshot": None,
+                            "stock_price_at_peak": None,
+                            "option_vs_stock_multiple_at_peak": None,
+                            "terminal_option_return_pct": None,
+                            "terminal_option_vs_stock_multiple": None,
+                        }
+                    )
+                    continue
+
+                family_move_pct = float(terminal_for_family) / float(entry_spot) - 1.0 if entry_spot else None
+                family_bucket = _required_path_realism_bucket(family_move_pct, terminal_status)
+                for step_index, horizon in enumerate(horizon_specs):
+                    requested_days = int(horizon.get("requested_days") or 0)
+                    time_fraction = max(0.0, min(float(requested_days) / float(terminal_days), 1.0))
+                    stock_price = _required_path_family_price(
+                        family=family,
+                        entry_spot=float(entry_spot),
+                        terminal_required=float(terminal_for_family),
+                        time_fraction=time_fraction,
+                    )
+                    iv_key = clean_string(horizon.get("label")).lower()
+                    iv_shift = float(active_iv_path.get(iv_key, 0.0))
+                    evaluation = _single_option_adjusted_evaluation(
+                        spec,
+                        spot_price=float(stock_price),
+                        horizon_days=requested_days,
+                        iv_shift_points=iv_shift,
+                        comparison_capital=float(comparison_capital),
+                        premium_used=float(premium_used),
+                    )
+                    option_value = finite_or_none(evaluation.get("estimated_value"))
+                    profit = _single_option_num(evaluation.get("profit_loss"), 0.0)
+                    stock_return = float(stock_price) / float(entry_spot) - 1.0 if entry_spot else None
+                    option_return = profit / float(premium_used) if premium_used else None
+                    multiple = (
+                        float(option_return) / float(stock_return)
+                        if option_return is not None and stock_return is not None and stock_return > 0
+                        else None
+                    )
+                    clears = bool(
+                        stock_return is not None
+                        and stock_return > float(minimum_stock_return_floor_pct)
+                        and option_return is not None
+                        and option_return > 0
+                        and multiple is not None
+                        and float(multiple) >= float(threshold)
+                    )
+                    row_date = snapshot_date + timedelta(days=requested_days)
+                    checkpoint_label = checkpoint_labels.get(requested_days, "")
+                    time_fields = _required_path_row_time_fields(
+                        spec,
+                        row_date=row_date,
+                        snapshot_date=snapshot_date,
+                        expiry_date=expiry_dt,
+                        requested_days=requested_days,
+                        stock_price=float(stock_price),
+                        option_value=option_value,
+                        evaluation=evaluation,
+                    )
+                    row_payload = {
+                        "contract_label": contract_label,
+                        "candidate_slug": candidate_slug,
+                        "threshold_multiple": float(threshold),
+                        "strike": float(strike_value) if strike_value is not None else None,
+                        "entry_spot": round(float(entry_spot), 4),
+                        "snapshot_date": snapshot_date.isoformat(),
+                        "analysis_horizon_date": target_date.isoformat(),
+                        "chart_horizon_date": chart_horizon_date.isoformat(),
+                        "path_terminal_date": path_terminal_date.isoformat(),
+                        "option_expiry": expiry_text,
+                        "option_expiry_date": expiry_text,
+                        "terminal_basis": terminal_basis,
+                        "chart_horizon_basis": chart_horizon_basis,
+                        "path_id": path_id,
+                        "path_label": f"{REQUIRED_PATH_FAMILY_LABELS[family]} ({threshold_label})",
+                        "path_family": family,
+                        "shape_template": family,
+                        "shape_source_path": REQUIRED_PATH_FAMILY_SOURCE_PATHS.get(family, family),
+                        "family_display_order": family_order,
+                        "date": row_date.isoformat(),
+                        "days_from_snapshot": requested_days,
+                        **time_fields,
+                        "is_checkpoint_marker": bool(checkpoint_label),
+                        "display_marker": checkpoint_label or "",
+                        "checkpoint_label": checkpoint_label,
+                        "is_peak_option_return": False,
+                        "stock_price": round(float(stock_price), 4),
+                        "option_value": option_value,
+                        "option_return_pct": round(float(option_return), 6) if option_return is not None else None,
+                        "stock_return_pct": round(float(stock_return), 6) if stock_return is not None else None,
+                        "option_vs_stock_multiple": round(float(multiple), 4) if multiple is not None else None,
+                        "clears_threshold": clears,
+                        "realism_bucket": family_bucket,
+                        "status": terminal_status,
+                        "failure_driver": "none" if clears else "timing",
+                    }
+                    family_path_rows.append(row_payload)
+                for exit_return, exit_label in REQUIRED_PATH_EXIT_RETURN_LEVELS:
+                    reached_rows = [
+                        row
+                        for row in family_path_rows
+                        if finite_or_none(row.get("option_return_pct")) is not None
+                        and float(finite_or_none(row.get("option_return_pct")) or 0.0) >= float(exit_return)
+                    ]
+                    first_exit = reached_rows[0] if reached_rows else {}
+                    exit_ladder_rows.append(
+                        {
+                            "ticker": clean_string(ticker).upper(),
+                            "contract_label": contract_label,
+                            "candidate_slug": candidate_slug,
+                            "strike": float(strike_value) if strike_value is not None else None,
+                            "expiry": expiry_text,
+                            "threshold_multiple": float(threshold),
+                            "path_id": path_id,
+                            "path_label": f"{REQUIRED_PATH_FAMILY_LABELS[family]} ({threshold_label})",
+                            "path_family": family,
+                            "target_absolute_option_return_pct": float(exit_return),
+                            "first_hit_date": clean_string(first_exit.get("date")) or None,
+                            "stock_price_at_first_hit": finite_or_none(first_exit.get("stock_price")) if first_exit else None,
+                            "option_return_pct_at_first_hit": finite_or_none(first_exit.get("option_return_pct")) if first_exit else None,
+                            "option_value_at_first_hit": finite_or_none(first_exit.get("option_value")) if first_exit else None,
+                            "hit_status": "hit" if first_exit else "not_hit",
+                            "exit_return_label": exit_label,
+                            "exit_return_pct": float(exit_return),
+                            "first_exit_date": clean_string(first_exit.get("date")) or None,
+                            "first_exit_days_from_snapshot": first_exit.get("days_from_snapshot") if first_exit else None,
+                            "stock_price_at_exit": finite_or_none(first_exit.get("stock_price")) if first_exit else None,
+                            "option_value_at_exit": finite_or_none(first_exit.get("option_value")) if first_exit else None,
+                            "option_return_pct_at_exit": finite_or_none(first_exit.get("option_return_pct")) if first_exit else None,
+                            "stock_return_pct_at_exit": finite_or_none(first_exit.get("stock_return_pct")) if first_exit else None,
+                            "option_vs_stock_multiple_at_exit": finite_or_none(first_exit.get("option_vs_stock_multiple")) if first_exit else None,
+                            "snapshot_date": snapshot_date.isoformat(),
+                            "analysis_horizon_date": target_date.isoformat(),
+                            "chart_horizon_date": chart_horizon_date.isoformat(),
+                            "path_terminal_date": path_terminal_date.isoformat(),
+                            "option_expiry": expiry_text,
+                            "option_expiry_date": expiry_text,
+                            "terminal_basis": terminal_basis,
+                            "chart_horizon_basis": chart_horizon_basis,
+                            "status": terminal_status,
+                            "realism_bucket": family_bucket,
+                        }
+                    )
+                peak_payload: dict[str, Any] = {
+                    "contract_label": contract_label,
+                    "candidate_slug": candidate_slug,
+                    "threshold_multiple": float(threshold),
+                    "path_id": path_id,
+                    "path_label": f"{REQUIRED_PATH_FAMILY_LABELS[family]} ({threshold_label})",
+                    "path_family": family,
+                    "family_display_order": family_order,
+                    "status": terminal_status,
+                    "realism_bucket": family_bucket,
+                }
+                peak_candidates = [
+                    (index, finite_or_none(row.get("option_return_pct")))
+                    for index, row in enumerate(family_path_rows)
+                    if finite_or_none(row.get("option_return_pct")) is not None
+                ]
+                terminal_row = family_path_rows[-1] if family_path_rows else {}
+                if peak_candidates:
+                    peak_index, _peak_value = max(peak_candidates, key=lambda item: float(item[1]))
+                    family_path_rows[peak_index]["is_peak_option_return"] = True
+                    peak_row = family_path_rows[peak_index]
+                    peak_payload.update(
+                        {
+                            "peak_option_return_pct": finite_or_none(peak_row.get("option_return_pct")),
+                            "peak_option_value": finite_or_none(peak_row.get("option_value")),
+                            "peak_date": clean_string(peak_row.get("date")),
+                            "peak_days_from_snapshot": int(peak_row.get("days_from_snapshot") or 0),
+                            "stock_price_at_peak": finite_or_none(peak_row.get("stock_price")),
+                            "option_vs_stock_multiple_at_peak": finite_or_none(peak_row.get("option_vs_stock_multiple")),
+                            "terminal_option_return_pct": finite_or_none(terminal_row.get("option_return_pct")),
+                            "terminal_option_vs_stock_multiple": finite_or_none(terminal_row.get("option_vs_stock_multiple")),
+                        }
+                    )
+                else:
+                    peak_payload.update(
+                        {
+                            "peak_option_return_pct": None,
+                            "peak_option_value": None,
+                            "peak_date": None,
+                            "peak_days_from_snapshot": None,
+                            "stock_price_at_peak": None,
+                            "option_vs_stock_multiple_at_peak": None,
+                            "terminal_option_return_pct": finite_or_none(terminal_row.get("option_return_pct")),
+                            "terminal_option_vs_stock_multiple": finite_or_none(terminal_row.get("option_vs_stock_multiple")),
+                        }
+                    )
+                peak_rows.append(peak_payload)
+                path_rows.extend(family_path_rows)
+                clear_rows = [row for row in family_path_rows if bool(row.get("clears_threshold"))]
+                all_family_clears.extend(clear_rows)
+                move_values = [
+                    finite_or_none(row.get("stock_price")) / float(entry_spot) - 1.0
+                    for row in family_path_rows
+                    if finite_or_none(row.get("stock_price")) is not None and entry_spot
+                ]
+                clear_move_values = [
+                    finite_or_none(row.get("stock_price")) / float(entry_spot) - 1.0
+                    for row in clear_rows
+                    if finite_or_none(row.get("stock_price")) is not None and entry_spot
+                ]
+                clears_count = len(clear_rows)
+                driver = _required_path_failure_driver(
+                    status=terminal_status,
+                    clears_count=clears_count,
+                    required_move_pct=family_move_pct,
+                    terminal_profit=finite_or_none((terminal_eval or {}).get("profit_loss")),
+                    terminal_stock_profit=finite_or_none((terminal_eval or {}).get("stock_return_pct")),
+                )
+                family_rows.append(
+                    {
+                        "contract_label": contract_label,
+                        "candidate_slug": candidate_slug,
+                        "threshold_multiple": float(threshold),
+                        "path_family": family,
+                        "min_required_move_pct": round(min(clear_move_values or move_values), 6) if (clear_move_values or move_values) else None,
+                        "median_required_move_pct": round(float(np.median(clear_move_values or move_values)), 6) if (clear_move_values or move_values) else None,
+                        "earliest_clear_date": clear_rows[0]["date"] if clear_rows else None,
+                        "latest_clear_date": clear_rows[-1]["date"] if clear_rows else None,
+                        "clears_count": clears_count,
+                        "realism_bucket": family_bucket,
+                        "failure_driver": driver,
+                        "peak_option_return_pct": peak_payload.get("peak_option_return_pct"),
+                        "peak_option_value": peak_payload.get("peak_option_value"),
+                        "peak_date": peak_payload.get("peak_date"),
+                        "peak_days_from_snapshot": peak_payload.get("peak_days_from_snapshot"),
+                        "stock_price_at_peak": peak_payload.get("stock_price_at_peak"),
+                        "option_vs_stock_multiple_at_peak": peak_payload.get("option_vs_stock_multiple_at_peak"),
+                        "terminal_option_return_pct": peak_payload.get("terminal_option_return_pct"),
+                        "terminal_option_vs_stock_multiple": peak_payload.get("terminal_option_vs_stock_multiple"),
+                    }
+                )
+                if family_move_pct is not None:
+                    family_terminals.append(float(family_move_pct))
+
+            threshold_family_rows = [
+                row
+                for row in family_rows
+                if clean_string(row.get("candidate_slug")) == candidate_slug
+                and finite_or_none(row.get("threshold_multiple")) == float(threshold)
+            ]
+            if threshold_family_rows:
+                best_family_row = sorted(
+                    threshold_family_rows,
+                    key=lambda row: (
+                        -int(finite_or_none(row.get("clears_count")) or 0),
+                        float(finite_or_none(row.get("min_required_move_pct")) or 999.0),
+                    ),
+                )[0]
+                best_family = clean_string(best_family_row.get("path_family")) or "slow_grind"
+            else:
+                best_family = "slow_grind"
+            for entry_shift in REQUIRED_PATH_ENTRY_SHOCKS:
+                adjusted_premium = max(float(premium_used) * (1.0 + float(entry_shift)), 0.01)
+                solved_row = _required_path_solve_row(
+                    ticker=ticker,
+                    candidate_slug=candidate_slug,
+                    contract_slug=contract_slug,
+                    contract_label=contract_label,
+                    strike_value=strike_value,
+                    expiry_text=expiry_text,
+                    threshold=float(threshold),
+                    path_family=best_family,
+                    spec=spec,
+                    terminal_days=candidate_terminal_days,
+                    iv_shift_points=terminal_iv,
+                    comparison_capital=float(comparison_capital),
+                    premium_used=adjusted_premium,
+                    entry_spot=float(entry_spot),
+                    minimum_stock_return_floor_pct=float(minimum_stock_return_floor_pct),
+                    extra_fields={
+                        "entry_shift_pct": float(entry_shift),
+                        "adjusted_entry_premium": round(float(adjusted_premium), 4),
+                        "base_entry_premium": round(float(premium_used), 4),
+                    },
+                )
+                for family in REQUIRED_PATH_FAMILIES:
+                    family_row = dict(solved_row)
+                    family_row["path_family"] = family
+                    entry_sensitivity_rows.append(family_row)
+            for iv_shift in REQUIRED_PATH_IV_SHOCKS:
+                combined_iv_shift = float(terminal_iv) + float(iv_shift)
+                adjusted_iv = (float(entry_iv) if entry_iv is not None else 0.0) + combined_iv_shift
+                solved_row = _required_path_solve_row(
+                    ticker=ticker,
+                    candidate_slug=candidate_slug,
+                    contract_slug=contract_slug,
+                    contract_label=contract_label,
+                    strike_value=strike_value,
+                    expiry_text=expiry_text,
+                    threshold=float(threshold),
+                    path_family=best_family,
+                    spec=spec,
+                    terminal_days=candidate_terminal_days,
+                    iv_shift_points=combined_iv_shift,
+                    comparison_capital=float(comparison_capital),
+                    premium_used=float(premium_used),
+                    entry_spot=float(entry_spot),
+                    minimum_stock_return_floor_pct=float(minimum_stock_return_floor_pct),
+                    extra_fields={
+                        "iv_shift_vol_points": float(iv_shift),
+                        "adjusted_iv": round(max(float(adjusted_iv), 0.0001), 6),
+                        "base_iv": round(float(entry_iv), 6) if entry_iv is not None else None,
+                    },
+                )
+                for family in REQUIRED_PATH_FAMILIES:
+                    family_row = dict(solved_row)
+                    family_row["path_family"] = family
+                    iv_sensitivity_rows.append(family_row)
+            for entry_shift in REQUIRED_PATH_ENTRY_SHOCKS:
+                adjusted_premium = max(float(premium_used) * (1.0 + float(entry_shift)), 0.01)
+                for iv_shift in REQUIRED_PATH_MATRIX_IV_SHOCKS:
+                    combined_iv_shift = float(terminal_iv) + float(iv_shift)
+                    adjusted_iv = (float(entry_iv) if entry_iv is not None else 0.0) + combined_iv_shift
+                    entry_iv_matrix_rows.append(
+                        _required_path_solve_row(
+                            ticker=ticker,
+                            candidate_slug=candidate_slug,
+                            contract_slug=contract_slug,
+                            contract_label=contract_label,
+                            strike_value=strike_value,
+                            expiry_text=expiry_text,
+                            threshold=float(threshold),
+                            path_family=best_family,
+                            spec=spec,
+                            terminal_days=candidate_terminal_days,
+                            iv_shift_points=combined_iv_shift,
+                            comparison_capital=float(comparison_capital),
+                            premium_used=adjusted_premium,
+                            entry_spot=float(entry_spot),
+                            minimum_stock_return_floor_pct=float(minimum_stock_return_floor_pct),
+                            extra_fields={
+                                "entry_shift_pct": float(entry_shift),
+                                "iv_shift_vol_points": float(iv_shift),
+                                "adjusted_entry_premium": round(float(adjusted_premium), 4),
+                                "adjusted_iv": round(max(float(adjusted_iv), 0.0001), 6),
+                                "base_entry_premium": round(float(premium_used), 4),
+                                "base_iv": round(float(entry_iv), 6) if entry_iv is not None else None,
+                            },
+                        )
+                    )
+
+            clear_dates = [clean_string(row.get("date")) for row in all_family_clears if clean_string(row.get("date"))]
+            earliest_valid_date = min(clear_dates) if clear_dates else None
+            latest_valid_date = max(clear_dates) if clear_dates else None
+            earliest_fraction = None
+            if earliest_valid_date:
+                parsed_earliest = parse_date(earliest_valid_date)
+                if parsed_earliest:
+                    earliest_fraction = max((parsed_earliest - snapshot_date).days, 0) / float(terminal_days)
+            status = clean_string(terminal_status)
+            verdict, explanation = _required_path_verdict(
+                required_move_pct=required_move_pct,
+                earliest_clear_fraction=earliest_fraction,
+                status=status,
+            )
+            realism_bucket = _required_path_realism_bucket(required_move_pct, status)
+            summary_rows.append(
+                {
+                    "ticker": clean_string(ticker).upper(),
+                    "contract_label": contract_label,
+                    "candidate_slug": candidate_slug,
+                    "contract_slug": contract_slug,
+                    "option_type": option_type or "call",
+                    "strike": float(strike_value) if strike_value is not None else None,
+                    "expiry": expiry_text,
+                    "dte": int(dte) if dte is not None else None,
+                    "entry_premium": round(float(premium_used), 4),
+                    "entry_iv": round(float(entry_iv), 6) if entry_iv is not None else None,
+                    "option_data_source": clean_string(candidate.get("option_data_source")) or clean_string(candidate.get("source_storage_location")) or None,
+                    "option_data_trust": clean_string(candidate.get("option_data_trust")) or None,
+                    "entry_price_mode": normalized_entry_mode,
+                    "bid": finite_or_none(candidate.get("bid")),
+                    "ask": finite_or_none(candidate.get("ask")),
+                    "mid": finite_or_none(candidate.get("mid")),
+                    "spread_pct_of_mid": finite_or_none(candidate.get("spread_pct_of_mid")),
+                    "implied_volatility": finite_or_none(candidate.get("implied_volatility") or entry_iv),
+                    "open_interest": candidate.get("open_interest"),
+                    "volume": candidate.get("volume"),
+                    "quality_flags": clean_string(candidate.get("quality_flags")) or None,
+                    "entry_spot": round(float(entry_spot), 4),
+                    "snapshot_date": snapshot_date.isoformat(),
+                    "analysis_horizon_date": target_date.isoformat(),
+                    "chart_horizon_date": chart_horizon_date.isoformat(),
+                    "path_terminal_date": path_terminal_date.isoformat(),
+                    "option_expiry_date": expiry_text,
+                    "terminal_basis": terminal_basis,
+                    "chart_horizon_basis": chart_horizon_basis,
+                    "threshold_multiple": float(threshold),
+                    "required_terminal_stock_price": round(float(terminal_required_spot), 4) if terminal_required_spot is not None else None,
+                    "required_terminal_stock_return_pct": round(float(required_move_pct), 6) if required_move_pct is not None else None,
+                    "required_move_pct": round(float(required_move_pct), 6) if required_move_pct is not None else None,
+                    "earliest_valid_date": earliest_valid_date,
+                    "latest_valid_date": latest_valid_date,
+                    "minimum_required_move_by_expiry": round(float(required_move_pct), 6) if required_move_pct is not None else None,
+                    "path_count_generated": len(generated_path_ids),
+                    "plausible_path_count": int(sum(1 for value in family_terminals if value <= 0.40)),
+                    "extreme_path_count": int(sum(1 for value in family_terminals if value > 1.00)),
+                    "status": status,
+                    "verdict": verdict,
+                    "concise_explanation": explanation,
+                    "realism_bucket": realism_bucket,
+                    "selection_rank": candidate_order,
+                    "minimum_positive_stock_return_floor_pct": round(float(minimum_stock_return_floor_pct), 6),
+                    "max_search_move_pct": float(REQUIRED_PATH_SEARCH_TIERS[-1][1]),
+                }
+            )
+    summary = pd.DataFrame(summary_rows)
+    by_option = pd.DataFrame(path_rows)
+    family_summary = pd.DataFrame(family_rows)
+    peak_summary = pd.DataFrame(peak_rows)
+    exit_ladder = pd.DataFrame(exit_ladder_rows)
+    entry_sensitivity = pd.DataFrame(entry_sensitivity_rows)
+    iv_sensitivity = pd.DataFrame(iv_sensitivity_rows)
+    entry_iv_matrix = pd.DataFrame(entry_iv_matrix_rows)
+    sell_hold_summary = _build_required_path_sell_hold_summary(
+        ticker=ticker,
+        paths=by_option,
+        peaks=peak_summary,
+    )
+    summary_md, top_md = _build_required_path_markdowns(
+        ticker=ticker,
+        summary=summary,
+        family_summary=family_summary,
+    )
+    exit_ladder_md = _build_required_path_exit_ladder_markdown(
+        ticker=ticker,
+        exit_ladder=exit_ladder,
+    )
+    tables_md = _build_required_path_tables_markdown(ticker=ticker)
+    tables_html = _build_required_path_tables_html(
+        ticker=ticker,
+        summary=summary,
+        paths=by_option,
+        family_summary=family_summary,
+        entry_sensitivity=entry_sensitivity,
+        iv_sensitivity=iv_sensitivity,
+        entry_iv_matrix=entry_iv_matrix,
+        sell_hold=sell_hold_summary,
+        exit_ladder=exit_ladder,
+    )
+    return {
+        "required_path_core_summary": summary,
+        "required_paths_by_option": by_option,
+        "required_path_family_summary": family_summary,
+        "required_path_peak_summary": peak_summary,
+        "required_path_exit_ladder": exit_ladder,
+        "required_path_entry_sensitivity": entry_sensitivity,
+        "required_path_iv_sensitivity": iv_sensitivity,
+        "required_path_entry_iv_matrix": entry_iv_matrix,
+        "required_path_sell_hold_summary": sell_hold_summary,
+        "required_path_summary_markdown": summary_md,
+        "required_path_exit_ladder_markdown": exit_ladder_md,
+        "required_path_tables_markdown": tables_md,
+        "required_path_tables_html": tables_html,
+        "top_required_path_candidates_markdown": top_md,
+    }
+
+
 def _chain_overview_empty_outputs() -> dict[str, Any]:
     return {
         "chain_overview_summary": pd.DataFrame(),
@@ -9306,6 +11213,22 @@ def _build_contract_selection_core(
         strong_outperformance_multiple=float(strong_outperformance_multiple),
         required_winning_path_families=int(required_winning_path_families),
     )
+    required_path_engine_outputs = _build_long_call_required_path_outputs(
+        ticker=ticker_label,
+        specs=ordered_specs,
+        candidate_rows=candidates,
+        snapshot_date=snapshot,
+        target_date=resolved_target_date,
+        target_horizon_label=target_horizon_label,
+        entry_spot=float(spot_price or target_price),
+        target_price=float(target_price),
+        active_iv_path_points=iv_points,
+        comparison_capital=float(comparison_capital),
+        minimum_outperformance_multiple=float(minimum_outperformance_multiple),
+        strong_outperformance_multiple=float(strong_outperformance_multiple),
+        minimum_edge_stock_return_pct=float(minimum_edge_stock_return_pct),
+        entry_price_mode=clean_string(entry_price_mode).lower(),
+    )
     compare_vs_stock = candidates[
         [
             "candidate_slug",
@@ -9524,6 +11447,13 @@ def _build_contract_selection_core(
             "candidate_scope": "bullish_long_calls_only",
             "stock_benchmark": "long_stock_baseline",
         },
+        "required_path_engine": {
+            "scope": "long_calls_only",
+            "benchmark": "long_stock_baseline_same_comparison_capital",
+            "thresholds": [float(minimum_outperformance_multiple), float(strong_outperformance_multiple)],
+            "minimum_edge_stock_return_pct": float(minimum_edge_stock_return_pct),
+            "path_families": list(REQUIRED_PATH_FAMILIES),
+        },
         "trusted_expiry_count": int(selection_scope.get("trusted_expiry_count") or 0),
         "fallback_only_expiry_count": int(selection_scope.get("fallback_only_expiry_count") or 0),
         "default_strategy_family": default_strategy_family,
@@ -9583,6 +11513,20 @@ def _build_contract_selection_core(
         compare_vs_stock=compare_vs_stock,
         required_path_rows=required_path,
         required_path_summary=required_path_summary,
+        required_path_core_summary=required_path_engine_outputs["required_path_core_summary"],
+        required_paths_by_option=required_path_engine_outputs["required_paths_by_option"],
+        required_path_family_summary=required_path_engine_outputs["required_path_family_summary"],
+        required_path_peak_summary=required_path_engine_outputs["required_path_peak_summary"],
+        required_path_exit_ladder=required_path_engine_outputs["required_path_exit_ladder"],
+        required_path_entry_sensitivity=required_path_engine_outputs["required_path_entry_sensitivity"],
+        required_path_iv_sensitivity=required_path_engine_outputs["required_path_iv_sensitivity"],
+        required_path_entry_iv_matrix=required_path_engine_outputs["required_path_entry_iv_matrix"],
+        required_path_sell_hold_summary=required_path_engine_outputs["required_path_sell_hold_summary"],
+        required_path_summary_markdown=required_path_engine_outputs["required_path_summary_markdown"],
+        required_path_exit_ladder_markdown=required_path_engine_outputs["required_path_exit_ladder_markdown"],
+        required_path_tables_markdown=required_path_engine_outputs["required_path_tables_markdown"],
+        required_path_tables_html=required_path_engine_outputs["required_path_tables_html"],
+        top_required_path_candidates_markdown=required_path_engine_outputs["top_required_path_candidates_markdown"],
         assumed_path_trace_rows=assumed_path_trace_rows,
         iv_path_trace_rows=iv_path_trace_rows,
         compare_vs_stock_path_rows=compare_vs_stock_path_rows,

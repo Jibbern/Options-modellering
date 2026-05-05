@@ -30,6 +30,7 @@ COLUMN_ALIASES = {
     "iv": "iv",
     "delta": "delta",
     "type": "option_type",
+    "expiration": "expiry_date",
     "last_trade": "last_trade",
 }
 
@@ -143,6 +144,8 @@ class OptionChain:
 
     def to_contract(self, row: pd.Series | dict[str, Any]) -> OptionContract:
         payload = dict(row)
+        raw_payload = dict(payload.get("raw_row", {}) or {})
+        raw_payload.update({key: value for key, value in payload.items() if key != "raw_row"})
         return OptionContract(
             ticker=payload["ticker"],
             snapshot_date=payload["snapshot_date"],
@@ -159,7 +162,7 @@ class OptionChain:
             open_interest=payload.get("open_interest"),
             moneyness=payload.get("moneyness"),
             last_trade=payload.get("last_trade"),
-            raw_row=payload.get("raw_row", {}),
+            raw_row=raw_payload,
         )
 
 
@@ -185,7 +188,10 @@ def _normalize_contracts(raw_df: pd.DataFrame, metadata: SnapshotMetadata) -> pd
     # practical without hardcoding one exact vendor layout.
     contract_mask = renamed["option_type"].str.lower().isin({"call", "put"})
     contract_mask &= renamed["strike"].apply(lambda value: parse_number(value) is not None)
-    contracts = renamed.loc[contract_mask, EXPECTED_COLUMNS + ["raw_row"]].copy()
+    extra_columns = [
+        column for column in renamed.columns if column not in EXPECTED_COLUMNS + ["raw_row"]
+    ]
+    contracts = renamed.loc[contract_mask, EXPECTED_COLUMNS + extra_columns + ["raw_row"]].copy()
 
     contracts["ticker"] = metadata.ticker
     contracts["snapshot_date"] = metadata.snapshot_date
@@ -209,6 +215,33 @@ def _normalize_contracts(raw_df: pd.DataFrame, metadata: SnapshotMetadata) -> pd
     contracts["last_trade"] = contracts["last_trade"].apply(parse_date)
     contracts["quote_count"] = contracts[["bid", "mid", "ask", "last"]].notna().sum(axis=1)
     contracts["has_quote"] = contracts["quote_count"] > 0
+    for column in [
+        "underlying_price",
+        "spread",
+        "spread_pct_of_mid",
+        "entry_premium_mid",
+        "entry_premium_ask",
+        "entry_premium_realistic",
+        "entry_premium_selected",
+        "exit_premium_conservative",
+        "iv_rank",
+        "iv_percentile",
+        "gamma",
+        "theta",
+        "vega",
+        "rho",
+        "itm_probability",
+        "otm_probability",
+        "profit_probability",
+        "moneyness_decimal",
+        "barchart_be_bid",
+        "barchart_be_ask",
+        "barchart_be_mid",
+    ]:
+        if column in contracts.columns:
+            contracts[column] = contracts[column].apply(parse_number)
+    if "model_eligible" in contracts.columns:
+        contracts["model_eligible"] = contracts["model_eligible"].astype(str).str.lower().isin({"true", "1", "yes"})
     contracts = contracts.sort_values(["option_type", "strike"]).reset_index(drop=True)
     return contracts
 

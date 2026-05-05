@@ -418,6 +418,34 @@ def _build_parser() -> argparse.ArgumentParser:
     refresh_rates.add_argument("--full-refresh", action="store_true")
     refresh_rates.add_argument("--series", action="append")
 
+    import_barchart_options = subparsers.add_parser(
+        "import-barchart-options",
+        help="Import a manually downloaded Barchart Options Screener CSV into the local chain store.",
+    )
+    import_barchart_options.add_argument("--ticker", required=True)
+    import_barchart_options.add_argument("--csv", required=True)
+    import_barchart_options.add_argument("--snapshot-date", required=True)
+    import_barchart_options.add_argument("--entry-mode", default="mid", choices=["mid", "ask", "realistic"])
+    import_barchart_options.add_argument("--calls-only", action="store_true", default=True)
+    import_barchart_options.add_argument("--include-puts", action="store_true")
+    import_barchart_options.add_argument("--min-ask", type=float, default=0.0)
+    import_barchart_options.add_argument("--min-iv", type=float, default=0.0001)
+    import_barchart_options.add_argument("--min-dte", type=int, default=1)
+    import_barchart_options.add_argument("--max-dte", type=int, default=900)
+    import_barchart_options.add_argument("--min-open-interest", type=int)
+    import_barchart_options.add_argument("--allow-zero-volume", action="store_true", default=True)
+    import_barchart_options.add_argument("--source", default="barchart_options_screener")
+    import_barchart_options.add_argument("--trust-level", default="manually_downloaded_barchart")
+    import_barchart_options.add_argument("--data-root")
+
+    import_barchart_prices = subparsers.add_parser(
+        "import-barchart-price-history",
+        help="Import a manually downloaded Barchart price-history CSV into the local price store.",
+    )
+    import_barchart_prices.add_argument("--ticker", required=True)
+    import_barchart_prices.add_argument("--csv", required=True)
+    import_barchart_prices.add_argument("--data-root")
+
     snapshots_parser = subparsers.add_parser("list-snapshots", help="List discovered local chain snapshots for a ticker.")
     snapshots_parser.add_argument("--ticker", required=True)
     snapshots_parser.add_argument("--data-root")
@@ -602,6 +630,61 @@ def main(argv: list[str] | None = None) -> int:
                 "manifest_path": manifest.get("manifest_path"),
             }
         )
+        return 0
+
+    if args.command == "import-barchart-options":
+        from .barchart import import_barchart_options_csv
+
+        try:
+            result = import_barchart_options_csv(
+                ticker=args.ticker,
+                csv_path=args.csv,
+                snapshot_date=args.snapshot_date,
+                data_root=args.data_root,
+                entry_mode=args.entry_mode,
+                calls_only=args.calls_only,
+                include_puts=args.include_puts,
+                min_ask=args.min_ask,
+                min_iv=args.min_iv,
+                min_dte=args.min_dte,
+                max_dte=args.max_dte,
+                min_open_interest=args.min_open_interest,
+                allow_zero_volume=args.allow_zero_volume,
+                source=args.source,
+                trust_level=args.trust_level,
+            )
+        except (FileNotFoundError, ValueError) as exc:
+            _print_json({"command": "import-barchart-options", "status": "failed", "error": str(exc)})
+            return 1
+        _print_json(
+            {
+                "command": "import-barchart-options",
+                "status": "succeeded",
+                "ticker": result.ticker,
+                "source": result.source,
+                "trust_level": result.trust_level,
+                "snapshot_date": result.snapshot_date,
+                "raw_csv_path": result.raw_csv_path,
+                "normalized_output_paths": result.normalized_output_paths,
+                "manifest_path": result.manifest_path,
+                "rows_raw": result.rows_raw,
+                "rows_after_footer_cleanup": result.rows_after_footer_cleanup,
+                "rows_for_ticker": result.rows_for_ticker,
+                "rows_model_eligible": result.rows_model_eligible,
+            }
+        )
+        return 0
+
+    if args.command == "import-barchart-price-history":
+        from .barchart import import_barchart_price_history_csv
+
+        try:
+            result = import_barchart_price_history_csv(args.ticker, args.csv, data_root=args.data_root)
+        except (FileNotFoundError, ValueError) as exc:
+            _print_json({"command": "import-barchart-price-history", "status": "failed", "error": str(exc)})
+            return 1
+        result["status"] = "succeeded"
+        _print_json(result)
         return 0
 
     if args.command == "fetch-ibkr-underlying":

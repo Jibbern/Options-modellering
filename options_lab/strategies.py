@@ -26,6 +26,7 @@ class PositionLeg:
     base_iv: float | None = None
     delta: float | None = None
     label: str | None = None
+    quote_metadata: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
 @dataclass
@@ -200,6 +201,7 @@ class StrategyPosition:
                 "base_iv": leg.base_iv,
                 "delta": leg.delta,
                 "label": leg.label,
+                "quote_metadata": dict(leg.quote_metadata),
             }
 
         return {
@@ -223,6 +225,49 @@ class StrategyPosition:
 
 def _resolve_premium(contract: OptionContract, premium_mode: str, side: str) -> float:
     return contract.premium(mode=premium_mode, side=side)
+
+
+def _quote_metadata(contract: OptionContract) -> dict[str, Any]:
+    raw = dict(contract.raw_row or {})
+    payload = {
+        "bid": contract.bid,
+        "ask": contract.ask,
+        "mid": contract.mid,
+        "last": contract.last,
+        "implied_volatility": contract.iv,
+        "delta": contract.delta,
+        "volume": contract.volume,
+        "open_interest": contract.open_interest,
+    }
+    for key in [
+        "source",
+        "trust",
+        "entry_price_mode",
+        "spread",
+        "spread_pct_of_mid",
+        "quality_flags",
+        "liquidity_bucket",
+        "model_eligible",
+        "entry_premium_mid",
+        "entry_premium_ask",
+        "entry_premium_realistic",
+        "entry_premium_selected",
+        "exit_premium_conservative",
+        "iv_rank",
+        "iv_percentile",
+        "gamma",
+        "theta",
+        "vega",
+        "rho",
+        "itm_probability",
+        "otm_probability",
+        "profit_probability",
+        "contract_label",
+        "contract_symbol",
+    ]:
+        if key in raw:
+            payload[key] = raw.get(key)
+    return payload
 
 
 def _next_contract_by_strike(
@@ -341,6 +386,7 @@ def build_strategy(
                 base_iv=contract.iv,
                 delta=contract.delta,
                 label=f"Long call {contract.strike:g}",
+                quote_metadata=_quote_metadata(contract),
             )
         ]
         max_loss = premium * CONTRACT_MULTIPLIER
@@ -375,6 +421,7 @@ def build_strategy(
                 base_iv=contract.iv,
                 delta=contract.delta,
                 label=f"Long put {contract.strike:g}",
+                quote_metadata=_quote_metadata(contract),
             )
         ]
         summary = {
@@ -410,6 +457,7 @@ def build_strategy(
                 base_iv=short_call.iv,
                 delta=short_call.delta,
                 label=f"Short call {short_call.strike:g}",
+                quote_metadata=_quote_metadata(short_call),
             ),
         ]
         summary = {
@@ -445,6 +493,7 @@ def build_strategy(
                 base_iv=short_put.iv,
                 delta=short_put.delta,
                 label=f"Short put {short_put.strike:g}",
+                quote_metadata=_quote_metadata(short_put),
             )
         ]
         summary = {
@@ -487,6 +536,7 @@ def build_strategy(
                 base_iv=long_leg.iv,
                 delta=long_leg.delta,
                 label=f"Long call {long_leg.strike:g}",
+                quote_metadata=_quote_metadata(long_leg),
             ),
             PositionLeg(
                 asset_type="option",
@@ -498,6 +548,7 @@ def build_strategy(
                 base_iv=short_leg.iv,
                 delta=short_leg.delta,
                 label=f"Short call {short_leg.strike:g}",
+                quote_metadata=_quote_metadata(short_leg),
             ),
         ]
         summary = {
@@ -541,6 +592,7 @@ def build_strategy(
                 base_iv=long_leg.iv,
                 delta=long_leg.delta,
                 label=f"Long put {long_leg.strike:g}",
+                quote_metadata=_quote_metadata(long_leg),
             ),
             PositionLeg(
                 asset_type="option",
@@ -552,6 +604,7 @@ def build_strategy(
                 base_iv=short_leg.iv,
                 delta=short_leg.delta,
                 label=f"Short put {short_leg.strike:g}",
+                quote_metadata=_quote_metadata(short_leg),
             ),
         ]
         summary = {

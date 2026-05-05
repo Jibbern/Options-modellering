@@ -99,6 +99,19 @@ SINGLE_OPTION_OUTCOME_SPECS = {
     "stock_better": {"color": "#D55E00", "marker": "s", "linestyle": "-", "label": "Stock better"},
     "fail_too_narrow_or_expiry_issue": {"color": "#7F7F7F", "marker": "x", "linestyle": ":", "label": "Fail / too narrow"},
 }
+REQUIRED_PATH_THRESHOLD_SPECS = {
+    1.5: {"color": "#0072B2", "marker": "o", "linestyle": "-", "label": "1.5x required path"},
+    2.0: {"color": "#CC79A7", "marker": "^", "linestyle": "--", "label": "2.0x required path"},
+}
+REQUIRED_PATH_FAMILY_ABBREVIATIONS = {
+    "fast_breakout": "Fast BO",
+    "slow_grind": "Slow Grind",
+    "late_acceleration": "Late BO",
+    "down_first_recovery": "Down/Recover",
+    "rally_retrace_finish": "Rally/Retrace",
+    "violent_absurd": "Violent",
+    "expiry_only": "Expiry",
+}
 _FIGURE_FACE = "#FCFBF8"
 _AXES_FACE = "#FFFDF9"
 _GRID_COLOR = "#D7D4CE"
@@ -262,6 +275,59 @@ def _apply_date_ticks(ax, tick_map: pd.DataFrame, *, label_column: str = "date")
     rotation = 16 if len(labels) > 4 else 0
     ax.set_xticks(positions)
     ax.set_xticklabels(labels, rotation=rotation, ha="right" if rotation else "center")
+
+
+def _required_path_date_tick_rows(tick_map: pd.DataFrame, *, label_column: str = "date") -> list[dict[str, Any]]:
+    """Return explicit month-day ticks for required-path charts."""
+
+    if tick_map.empty:
+        return []
+    ordered = tick_map.copy()
+    ordered["requested_days"] = pd.to_numeric(ordered.get("requested_days"), errors="coerce")
+    ordered = ordered.dropna(subset=["requested_days"]).sort_values("requested_days")
+    if ordered.empty:
+        return []
+    max_days = float(ordered["requested_days"].max())
+    spacing = 14 if max_days <= 270 else 28
+    desired_positions = list(range(0, int(max_days) + 1, spacing))
+    terminal = int(max_days)
+    if terminal not in desired_positions and (not desired_positions or terminal - desired_positions[-1] >= spacing):
+        desired_positions.append(terminal)
+    rows: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for position in desired_positions:
+        idx = (ordered["requested_days"] - float(position)).abs().idxmin()
+        row = ordered.loc[idx]
+        requested = int(round(float(row.get("requested_days") or 0)))
+        if requested in seen:
+            continue
+        seen.add(requested)
+        parsed = pd.to_datetime(clean_string(row.get(label_column)), errors="coerce")
+        label = clean_string(row.get(label_column)) if pd.isna(parsed) else parsed.strftime("%b %d")
+        rows.append({"requested_days": requested, "label": label})
+    return rows
+
+
+def _apply_required_path_date_ticks(ax, tick_map: pd.DataFrame, *, label_column: str = "date") -> None:
+    rows = _required_path_date_tick_rows(tick_map, label_column=label_column)
+    if not rows:
+        return
+    labels = [row["label"] for row in rows]
+    positions = [row["requested_days"] for row in rows]
+    rotation = 18 if len(labels) > 8 else 0
+    ax.set_xticks(positions)
+    ax.set_xticklabels(labels, rotation=rotation, ha="right" if rotation else "center")
+
+
+def _required_path_reference_label_offsets(entry_spot: float | None, strike: float | None) -> tuple[tuple[int, int], tuple[int, int]]:
+    """Return separated annotation offsets for spot/strike reference labels."""
+
+    if entry_spot is None or strike is None:
+        return (8, 12), (8, -16)
+    gap = abs(float(entry_spot) - float(strike))
+    if gap <= max(abs(float(entry_spot)) * 0.01, 0.18):
+        return (8, 18), (8, -18)
+    return (8, 12), (8, -16)
 
 
 def _finalize(fig, output_path: str | Path) -> Path:
@@ -2748,6 +2814,406 @@ def plot_single_option_decision_view(
     )
     _action_chart_caption(fig, caption)
     return _finalize_caption_chart(fig, output_path, bottom=0.11, top=0.98)
+
+
+def _required_path_threshold_style(threshold: Any) -> dict[str, Any]:
+    parsed = finite_or_none(threshold)
+    if parsed is None:
+        return {"color": "#4B5563", "marker": "D", "linestyle": "-.", "label": "Required path"}
+    closest = 1.5 if abs(float(parsed) - 1.5) <= abs(float(parsed) - 2.0) else 2.0
+    return REQUIRED_PATH_THRESHOLD_SPECS.get(closest, {"color": "#4B5563", "marker": "D", "linestyle": "-.", "label": f"{float(parsed):.1f}x required path"})
+
+
+def _first_clean_value(frame: pd.DataFrame, column: str) -> str:
+    if column not in frame.columns:
+        return ""
+    values = frame[column].dropna()
+    for value in values.tolist():
+        text = clean_string(value)
+        if text:
+            return text
+    return ""
+
+
+def _required_path_holding_period_text(frame: pd.DataFrame) -> str:
+    snapshot = _first_clean_value(frame, "snapshot_date") or _first_clean_value(frame, "date")
+    option_expiry = _first_clean_value(frame, "option_expiry_date") or _first_clean_value(frame, "option_expiry") or _first_clean_value(frame, "expiry")
+    chart_horizon = _first_clean_value(frame, "chart_horizon_date") or _first_clean_value(frame, "path_terminal_date")
+    chart_basis = clean_string(_first_clean_value(frame, "chart_horizon_basis") or _first_clean_value(frame, "terminal_basis")).replace("_", " ")
+    if chart_basis == "option expiry":
+        chart_text = "option expiry"
+    elif chart_horizon:
+        chart_text = chart_horizon
+    else:
+        chart_text = chart_basis or ""
+    parts = []
+    if snapshot:
+        parts.append(f"Snapshot: {snapshot}")
+    if option_expiry:
+        parts.append(f"Option expiry: {option_expiry}")
+    if chart_text:
+        parts.append(f"Chart horizon: {chart_text}")
+    return " | ".join(parts)
+
+
+def plot_required_paths_overview(
+    frame: pd.DataFrame,
+    *,
+    output_path: str | Path,
+    title: str,
+) -> Path:
+    """Render the compact all-candidate required-path overview from frozen rows."""
+
+    data = frame.copy()
+    if data.empty:
+        raise ValueError("Required-path summary frame is empty.")
+    data["required_move_pct"] = pd.to_numeric(data.get("required_move_pct"), errors="coerce")
+    data["max_search_move_pct"] = pd.to_numeric(data.get("max_search_move_pct"), errors="coerce").fillna(10.0)
+    data["_plot_move_pct"] = data["required_move_pct"].where(data["required_move_pct"].notna(), data["max_search_move_pct"])
+    data["_plot_unsolved"] = data["required_move_pct"].isna()
+    data["threshold_multiple"] = pd.to_numeric(data.get("threshold_multiple"), errors="coerce")
+    data["selection_rank"] = pd.to_numeric(data.get("selection_rank"), errors="coerce").fillna(999)
+    data = data.sort_values(["selection_rank", "threshold_multiple", "_plot_move_pct"], na_position="last")
+    labels = list(dict.fromkeys(data.get("contract_label", pd.Series(dtype=str)).astype(str).tolist()))[:10]
+    data = data.loc[data.get("contract_label", pd.Series(dtype=str)).astype(str).isin(labels)].copy()
+    if data.empty:
+        raise ValueError("Required-path summary frame has no plottable contracts.")
+    fig_height = max(5.8, 2.2 + len(labels) * 0.52)
+    fig, ax = plt.subplots(figsize=(12.8, fig_height))
+    _style_axes(ax)
+    label_to_y = {label: idx for idx, label in enumerate(labels)}
+    for threshold, group in data.groupby("threshold_multiple", sort=True):
+        style = _required_path_threshold_style(threshold)
+        xs = pd.to_numeric(group.get("_plot_move_pct"), errors="coerce") * 100.0
+        ys = [label_to_y.get(str(label), 0) for label in group.get("contract_label", pd.Series(dtype=str)).astype(str)]
+        ax.scatter(
+            xs,
+            ys,
+            s=82,
+            color=str(style["color"]),
+            marker=str(style["marker"]),
+            label=str(style["label"]),
+            edgecolor="#1F2937",
+            linewidth=0.4,
+            alpha=0.92,
+            zorder=3,
+        )
+    for _, row in data.dropna(subset=["_plot_move_pct"]).iterrows():
+        x = float(row["_plot_move_pct"]) * 100.0
+        y = label_to_y.get(str(row.get("contract_label")), 0)
+        verdict = "outside explicit search" if bool(row.get("_plot_unsolved")) else clean_string(row.get("verdict")).replace("_", " ")
+        if verdict:
+            ax.text(x + 1.1, y, _wrap_chart_text(verdict, width=24), fontsize=7.6, color="#44403C", va="center")
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels([_wrap_chart_text(label, width=30) for label in labels], fontsize=8.4)
+    ax.invert_yaxis()
+    ax.set_xlabel("Required Stock Move (%)")
+    ax.set_ylabel("Candidate Call")
+    ax.set_title(title, loc="left", fontsize=14.8, fontweight="bold", pad=12)
+    ax.axvline(50, color="#9CA3AF", linestyle=":", linewidth=1.2)
+    ax.axvline(100, color="#6B7280", linestyle="--", linewidth=1.0)
+    ax.text(50, -0.7, "plausible/aggressive line", fontsize=7.4, color="#6B7280", ha="center")
+    ax.legend(loc="lower right", frameon=True, facecolor="#FFFDF9", edgecolor="#DED8CE", fontsize=8.4)
+    caption = "Lower and earlier is better. The 1.5x / 2.0x hurdles are relative to stock return, not absolute option-return targets."
+    _action_chart_caption(fig, caption)
+    return _finalize_caption_chart(fig, output_path, bottom=0.11)
+
+
+def plot_option_required_paths(
+    frame: pd.DataFrame,
+    *,
+    output_path: str | Path,
+    title: str,
+) -> Path:
+    """Render one option-specific required-path chart with stock and option-return paths."""
+
+    data = frame.copy()
+    if data.empty:
+        raise ValueError("Required paths by option frame is empty.")
+    data["days_from_snapshot"] = pd.to_numeric(data.get("days_from_snapshot"), errors="coerce").fillna(0)
+    data["stock_price"] = pd.to_numeric(data.get("stock_price"), errors="coerce")
+    data["option_return_pct"] = pd.to_numeric(data.get("option_return_pct"), errors="coerce")
+    data["option_value"] = pd.to_numeric(data.get("option_value"), errors="coerce")
+    data["threshold_multiple"] = pd.to_numeric(data.get("threshold_multiple"), errors="coerce")
+    data["is_checkpoint_marker"] = data.get("is_checkpoint_marker", pd.Series(False, index=data.index)).astype(str).str.lower().isin({"1", "true", "yes", "y"})
+    data["is_peak_option_return"] = data.get("is_peak_option_return", pd.Series(False, index=data.index)).astype(str).str.lower().isin({"1", "true", "yes", "y"})
+    data = data.dropna(subset=["days_from_snapshot", "stock_price"]).copy()
+    if data.empty:
+        statuses = sorted(
+            {
+                clean_string(value).replace("_", " ")
+                for value in frame.get("status", pd.Series(dtype=str)).dropna().tolist()
+                if clean_string(value)
+            }
+        )
+        drivers = sorted(
+            {
+                clean_string(value).replace("_", " ")
+                for value in frame.get("failure_driver", pd.Series(dtype=str)).dropna().tolist()
+                if clean_string(value)
+            }
+        )
+        fig, ax = plt.subplots(figsize=(13.2, 5.8))
+        ax.axis("off")
+        ax.set_title(title, loc="left", fontsize=14.8, fontweight="bold", pad=12)
+        message = "Required edge cannot be cleared by stock move alone under current premium/IV assumptions."
+        detail_parts = []
+        if statuses:
+            detail_parts.append("Status: " + ", ".join(statuses[:3]))
+        if drivers:
+            detail_parts.append("Likely driver: " + ", ".join(drivers[:3]))
+        detail = " | ".join(detail_parts) if detail_parts else "No plottable required stock path was solved."
+        ax.text(
+            0.5,
+            0.58,
+            message,
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=13.0,
+            color="#111827",
+            fontweight="bold",
+            wrap=True,
+        )
+        ax.text(
+            0.5,
+            0.43,
+            detail,
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=9.4,
+            color="#4B5563",
+            wrap=True,
+        )
+        _action_chart_caption(
+            fig,
+            "No flat entry-spot edge is plotted. The frozen artifact says the hurdle needs IV, entry-price, timing support, or is outside the solved range.",
+        )
+        return _finalize_caption_chart(fig, output_path, bottom=0.14, top=0.90)
+    fig = plt.figure(figsize=(15.8, 8.4))
+    grid = fig.add_gridspec(
+        nrows=2,
+        ncols=2,
+        width_ratios=[4.7, 1.15],
+        height_ratios=[2.2, 1.0],
+        hspace=0.16,
+        wspace=0.08,
+    )
+    stock_ax = fig.add_subplot(grid[0, 0])
+    option_ax = fig.add_subplot(grid[1, 0], sharex=stock_ax)
+    info_ax = fig.add_subplot(grid[:, 1])
+    info_ax.axis("off")
+    _style_axes(stock_ax)
+    _style_axes(option_ax, zero_line=True)
+    entry_spot = finite_or_none(data.get("entry_spot", pd.Series(dtype=float)).dropna().iloc[0]) if data.get("entry_spot", pd.Series(dtype=float)).dropna().size else finite_or_none(data["stock_price"].iloc[0])
+    strike = finite_or_none(data.get("strike", pd.Series(dtype=float)).dropna().iloc[0]) if data.get("strike", pd.Series(dtype=float)).dropna().size else None
+    holding_period_text = _required_path_holding_period_text(data)
+    spot_offset, strike_offset = _required_path_reference_label_offsets(entry_spot, strike)
+    if entry_spot is not None:
+        stock_ax.axhline(float(entry_spot), color="#6B7280", linestyle=":", linewidth=1.0, alpha=0.65)
+        stock_ax.annotate(
+            f"Spot ${float(entry_spot):.2f}",
+            xy=(0, float(entry_spot)),
+            xytext=spot_offset,
+            textcoords="offset points",
+            color="#4B5563",
+            fontsize=7.4,
+            va="bottom",
+        )
+    if strike is not None:
+        stock_ax.axhline(float(strike), color="#111827", linestyle="-.", linewidth=1.0, alpha=0.58)
+        stock_ax.annotate(
+            f"Strike ${float(strike):.2f}",
+            xy=(0, float(strike)),
+            xytext=strike_offset,
+            textcoords="offset points",
+            color="#111827",
+            fontsize=7.4,
+            va="top",
+        )
+    snapshot_text = _first_clean_value(data, "snapshot_date")
+    analysis_horizon_text = _first_clean_value(data, "analysis_horizon_date")
+    if snapshot_text and analysis_horizon_text:
+        snapshot_dt = pd.to_datetime(snapshot_text, errors="coerce")
+        analysis_dt = pd.to_datetime(analysis_horizon_text, errors="coerce")
+        max_day = pd.to_numeric(data.get("days_from_snapshot"), errors="coerce").max()
+        if not pd.isna(snapshot_dt) and not pd.isna(analysis_dt):
+            analysis_day = int((analysis_dt - snapshot_dt).days)
+            if 0 < analysis_day < float(max_day or 0):
+                stock_ax.axvline(analysis_day, color="#6B7280", linestyle=":", linewidth=1.0, alpha=0.50)
+                stock_ax.text(
+                    analysis_day,
+                    0.98,
+                    f"Analysis horizon {analysis_dt.strftime('%b %d')}",
+                    transform=stock_ax.get_xaxis_transform(),
+                    ha="right",
+                    va="top",
+                    rotation=90,
+                    fontsize=7.0,
+                    color="#6B7280",
+                )
+    direct_labels: list[tuple[float, float, str, str]] = []
+    peak_notes: list[tuple[float, str]] = []
+    for (threshold, family), group in data.sort_values(["threshold_multiple", "family_display_order", "days_from_snapshot"]).groupby(["threshold_multiple", "path_family"], sort=True):
+        style = _required_path_threshold_style(threshold)
+        family_key = clean_string(family)
+        family_label = REQUIRED_PATH_FAMILY_ABBREVIATIONS.get(family_key, _human_label(family_key))
+        alpha = 0.96 if family in {"fast_breakout", "slow_grind", "expiry_only"} else 0.45
+        linewidth = 3.1 if family in {"fast_breakout", "slow_grind", "expiry_only"} else 1.7
+        ordered = group.sort_values("days_from_snapshot")
+        stock_ax.plot(
+            ordered["days_from_snapshot"],
+            ordered["stock_price"],
+            color=str(style["color"]),
+            linestyle=style["linestyle"],
+            linewidth=linewidth,
+            alpha=alpha,
+            label=f"{float(threshold):.1f}x {family_label}",
+        )
+        marker_rows = ordered.loc[ordered["is_checkpoint_marker"]].copy()
+        if not marker_rows.empty:
+            stock_ax.scatter(
+                marker_rows["days_from_snapshot"],
+                marker_rows["stock_price"],
+                color=str(style["color"]),
+                marker=str(style["marker"]),
+                s=18 if family in {"fast_breakout", "slow_grind", "expiry_only"} else 12,
+                alpha=min(1.0, alpha + 0.04),
+                edgecolor="#1F2937",
+                linewidth=0.25,
+                zorder=4,
+            )
+        option_ax.plot(
+            ordered["days_from_snapshot"],
+            ordered["option_return_pct"] * 100.0,
+            color="#E69F00" if float(threshold) <= 1.5 else "#4B5563",
+            linestyle=style["linestyle"],
+            linewidth=max(1.2, linewidth - 0.8),
+            alpha=alpha,
+        )
+        peak_rows = ordered.loc[ordered["is_peak_option_return"]].copy()
+        if not peak_rows.empty:
+            peak = peak_rows.sort_values("option_return_pct", ascending=False).iloc[0]
+            option_ax.scatter(
+                [float(peak.get("days_from_snapshot") or 0)],
+                [float(peak.get("option_return_pct") or 0) * 100.0],
+                marker="*",
+                s=84,
+                facecolor="#FFFDF9",
+                edgecolor=str(style["color"]),
+                linewidth=1.2,
+                zorder=5,
+            )
+            peak_return = finite_or_none(peak.get("option_return_pct"))
+            if peak_return is not None:
+                peak_notes.append(
+                    (
+                        float(peak_return),
+                        f"{float(threshold):.1f}x {family_label}: +{float(peak_return) * 100:.0f}% {clean_string(peak.get('date'))}",
+                    )
+                )
+        terminal = ordered.iloc[-1]
+        if family == "slow_grind" and not any(abs(float(threshold) - item[0]) < 1e-9 for item in direct_labels):
+            direct_labels.append(
+                (
+                    float(threshold),
+                    float(terminal.get("stock_price") or 0),
+                    f"{float(threshold):.1f}x",
+                    str(style["color"]),
+                )
+            )
+    if direct_labels:
+        sorted_labels = sorted(direct_labels, key=lambda item: item[1])
+        y_min, y_max = stock_ax.get_ylim()
+        min_gap = max(abs(y_max - y_min) * 0.035, 0.12)
+        adjusted: list[tuple[float, float, str, str]] = []
+        previous_y: float | None = None
+        for threshold, y_value, label, color in sorted_labels:
+            adjusted_y = y_value if previous_y is None else max(y_value, previous_y + min_gap)
+            adjusted.append((threshold, adjusted_y, label, color))
+            previous_y = adjusted_y
+        right_x = float(pd.to_numeric(data["days_from_snapshot"], errors="coerce").max()) + 2.0
+        for _threshold, y_value, label, color in adjusted:
+            stock_ax.text(
+                right_x,
+                y_value,
+                label,
+                fontsize=7.8,
+                color=color,
+                va="center",
+                clip_on=False,
+            )
+    fig.suptitle(title, x=0.06, y=0.988, ha="left", fontsize=15.2, fontweight="bold")
+    fig.text(
+        0.06,
+        0.958,
+        "Threshold rule: option return must be at least 1.5x / 2.0x stock return over the same holding period.",
+        fontsize=8.4,
+        color="#4B5563",
+        ha="left",
+        va="top",
+    )
+    if holding_period_text:
+        fig.text(0.06, 0.935, holding_period_text, fontsize=8.1, color="#57534E", ha="left", va="top")
+    stock_ax.set_ylabel("Required Stock Price ($)")
+    option_ax.set_ylabel("Option Return From Entry Premium (%)")
+    option_ax.set_xlabel("Date")
+    _format_money_axis(stock_ax)
+    option_ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:,.0f}%"))
+    tick_map = data[["date", "days_from_snapshot"]].drop_duplicates().rename(columns={"days_from_snapshot": "requested_days"})
+    _apply_required_path_date_ticks(option_ax, tick_map)
+    stock_ax.tick_params(axis="x", labelbottom=False)
+    handles, labels = stock_ax.get_legend_handles_labels()
+    if handles:
+        info_ax.legend(
+            handles[:14],
+            labels[:14],
+            loc="upper left",
+            bbox_to_anchor=(0.0, 0.98),
+            ncol=1,
+            fontsize=7.0,
+            frameon=True,
+            facecolor="#FFFDF9",
+            edgecolor="#DED8CE",
+        )
+        info_ax.text(
+            0.02,
+            0.44,
+            "Abbrev.\nFast BO = Fast Breakout\nLate BO = Late Breakout\nDown/Recover = down then recover",
+            transform=info_ax.transAxes,
+            fontsize=7.0,
+            color="#57534E",
+            va="top",
+        )
+    terminal_days = pd.to_numeric(data.get("days_from_snapshot"), errors="coerce").max()
+    peak_days = pd.to_numeric(data.loc[data["is_peak_option_return"], "days_from_snapshot"], errors="coerce").dropna()
+    if not peak_days.empty and terminal_days is not None and bool((peak_days >= float(terminal_days) - 1).all()):
+        option_ax.text(
+            0.01,
+            0.92,
+            "Peak return occurs near/at terminal checkpoint under these required paths.",
+            transform=option_ax.transAxes,
+            fontsize=7.8,
+            color="#4B5563",
+            va="top",
+        )
+    elif peak_notes:
+        note_lines = ["Best exits"] + [note for _value, note in sorted(peak_notes, reverse=True)[:3]]
+        info_ax.text(
+            0.02,
+            0.30,
+            "\n".join(note_lines),
+            transform=info_ax.transAxes,
+            fontsize=7.3,
+            color="#374151",
+            ha="left",
+            va="top",
+            bbox={"boxstyle": "round,pad=0.28", "facecolor": "#FFFDF9", "edgecolor": "#DED8CE", "alpha": 0.88},
+        )
+    caption = "Thresholds are relative to stock return, not absolute option return. Stars mark modeled peak option return."
+    _action_chart_caption(fig, caption)
+    return _finalize_caption_chart(fig, output_path, bottom=0.095, top=0.885)
 
 
 def plot_thesis_path_vs_value(

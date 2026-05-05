@@ -1,0 +1,18 @@
+{
+  "generated_at": "2026-05-05T14:24:47Z",
+  "ticker": "PBI",
+  "source": "barchart_price_history",
+  "raw_csv_path": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\historical_prices\\raw\\manual\\pbi_price-history-05-05-2026.csv",
+  "rows_raw": 520,
+  "rows_after_footer_cleanup": 519,
+  "rows_imported": 519,
+  "normalized_files": {
+    "csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\historical_prices\\normalized\\pbi_daily_prices.csv",
+    "parquet": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\historical_prices\\normalized\\pbi_daily_prices.parquet"
+  },
+  "merged_files": {
+    "csv": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\historical_prices\\merged\\pbi_daily_prices_merged.csv",
+    "parquet": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\historical_prices\\merged\\pbi_daily_prices_merged.parquet"
+  },
+  "source_notes": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\PBI\\historical_prices\\metadata\\source_notes.json"
+}

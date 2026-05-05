@@ -95,16 +95,18 @@ def _quote_usability_for_csv(path_text: str) -> dict[str, Any]:
 def _source_priority(location: str, *, quote_usable: bool) -> int:
     normalized = clean_string(location).lower()
     if normalized == "ibkr_full_quoted_snapshot":
-        return 0 if quote_usable else 2
+        return 0 if quote_usable else 4
+    if normalized == "barchart_options_screener":
+        return 1 if quote_usable else 5
     if normalized == "preferred_option_chains":
-        return 1
+        return 2
     if normalized == "ibkr_chain_snapshot":
-        return 2 if quote_usable else 3
+        return 3 if quote_usable else 6
     if normalized == "legacy_ticker_root":
-        return 4
+        return 7
     if normalized == "ibkr_chain_universe":
-        return 5
-    return 6
+        return 8
+    return 9
 
 
 def discover_chain_snapshots(
@@ -117,6 +119,7 @@ def discover_chain_snapshots(
 
     clean_ticker = clean_string(ticker).upper()
     preferred_dir = option_chains_root(clean_ticker, data_root)
+    barchart_options_dir = ticker_root(clean_ticker, data_root) / "options" / "barchart" / "normalized"
     ibkr_dir = ticker_root(clean_ticker, data_root) / "ibkr" / "chains" / "normalized"
     ibkr_option_snapshot_dir = ticker_root(clean_ticker, data_root) / "ibkr" / "snapshots" / "option_quotes" / "normalized"
     legacy_dir = ticker_root(clean_ticker, data_root)
@@ -124,6 +127,11 @@ def discover_chain_snapshots(
     if preferred_dir.exists():
         for path in preferred_dir.glob("*.csv"):
             candidates.append((path, "preferred_option_chains", {}))
+    if barchart_options_dir.exists():
+        for path in barchart_options_dir.glob("*.csv"):
+            sidecar = coerce_metadata_dict(load_sidecar_metadata(path))
+            if sidecar.get("snapshot_date") and sidecar.get("expiry_date"):
+                candidates.append((path, "barchart_options_screener", sidecar))
     if ibkr_dir.exists():
         for path in ibkr_dir.glob("*.csv"):
             sidecar = coerce_metadata_dict(load_sidecar_metadata(path))

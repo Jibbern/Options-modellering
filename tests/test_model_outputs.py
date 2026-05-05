@@ -313,6 +313,70 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
             ]
         ),
     )
+    _write_text(
+        summary_dir / "required_path_summary.md",
+        "\n".join(
+            [
+                "# GPRE Required Paths",
+                "",
+                "## What each call needs",
+                "",
+                "The core read is option outperformance versus owning stock over the same period. The 1.5x / 2.0x hurdles are relative to stock return, not absolute option return.",
+            ]
+        ),
+    )
+    _write_text(
+        summary_dir / "required_path_exit_ladder.md",
+        "\n".join(
+            [
+                "# Required Path Exit Ladder",
+                "",
+                "Best modeled exits are absolute option-return checkpoints from entry premium, separate from the 1.5x / 2.0x stock-relative hurdle.",
+                "",
+                "- `15C Dec-26` fast breakout reaches +50% on 2026-07-15.",
+            ]
+        ),
+    )
+    _write_text(
+        summary_dir / "required_path_tables.html",
+        "\n".join(
+            [
+                "<!doctype html><html><body>",
+                '<div class="section-title">Contract inputs</div>',
+                '<div class="section-title">Required move summary</div>',
+                '<div class="section-title">Path family comparison</div>',
+                '<div class="section-title">Entry premium sensitivity</div>',
+                '<div class="section-title">IV sensitivity</div>',
+                '<div class="section-title">Entry premium x IV matrix</div>',
+                '<div class="section-title">Sell / hold pressure</div>',
+                '<div class="section-title">Absolute option-return exit ladder</div>',
+                "<p>1.5x / 2.0x are relative to stock return, not absolute option return.</p>",
+                "</body></html>",
+            ]
+        ),
+    )
+    _write_text(
+        summary_dir / "required_path_tables.md",
+        "\n".join(
+            [
+                "# Required Path Tables",
+                "",
+                "## How to read the tables",
+                "",
+                "1.5x / 2.0x are relative to stock return, not absolute option return.",
+            ]
+        ),
+    )
+    _write_text(
+        summary_dir / "top_required_path_candidates.md",
+        "\n".join(
+            [
+                "# GPRE Top Required-Path Candidates",
+                "",
+                "1. `15C Dec-26`: requires extreme move.",
+            ]
+        ),
+    )
 
     _write_csv(
         tables_dir / "summary.csv",
@@ -1426,6 +1490,283 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
                 "upgrade_rule": "Upgrade if premium cools below the current reference.",
             }
         ],
+        "goal_required_path_summary.csv": [
+            {
+                "summary_scope": "candidate",
+                "summary_label": "Long Call 2026-12-18 15.00",
+                "strategy_family": "long_call",
+                "goal": "break_even",
+                "iv_variant": "flat",
+                "first_cleared_horizon": "3m",
+                "required_stock_price_at_target": "20.0",
+                "required_path_difficulty": "roughly matched",
+            }
+        ],
+        "required_path_summary.csv": [
+            {
+                "ticker": "GPRE",
+                "contract_label": "15C Dec-26",
+                "candidate_slug": "long-call-2026-12-18-15-00",
+                "contract_slug": "long-call-2026-12-18-15-00",
+                "option_type": "call",
+                "strike": "15.0",
+                "expiry": "2026-12-18",
+                "dte": "250",
+                "entry_premium": "320.0",
+                "entry_iv": "0.55",
+                "snapshot_date": "2026-04-12",
+                "analysis_horizon_date": "2026-07-15",
+                "chart_horizon_date": "2026-12-18",
+                "path_terminal_date": "2026-12-18",
+                "option_expiry_date": "2026-12-18",
+                "terminal_basis": "option_expiry",
+                "chart_horizon_basis": "option_expiry",
+                "threshold_multiple": "1.5",
+                "required_terminal_stock_price": "34.0",
+                "required_terminal_stock_return_pct": "1.23",
+                "required_move_pct": "1.23",
+                "earliest_valid_date": "2026-07-15",
+                "latest_valid_date": "2026-12-18",
+                "minimum_required_move_by_expiry": "1.23",
+                "path_count_generated": "6",
+                "plausible_path_count": "0",
+                "extreme_path_count": "6",
+                "status": "solved",
+                "verdict": "requires_extreme_move",
+                "concise_explanation": "Requires an extreme stock move; stock may be cleaner.",
+            },
+            {
+                "ticker": "GPRE",
+                "contract_label": "15C Dec-26",
+                "candidate_slug": "long-call-2026-12-18-15-00",
+                "contract_slug": "long-call-2026-12-18-15-00",
+                "option_type": "call",
+                "strike": "15.0",
+                "expiry": "2026-12-18",
+                "dte": "250",
+                "entry_premium": "320.0",
+                "entry_iv": "0.55",
+                "snapshot_date": "2026-04-12",
+                "analysis_horizon_date": "2026-07-15",
+                "chart_horizon_date": "2026-12-18",
+                "path_terminal_date": "2026-12-18",
+                "option_expiry_date": "2026-12-18",
+                "terminal_basis": "option_expiry",
+                "chart_horizon_basis": "option_expiry",
+                "threshold_multiple": "2.0",
+                "required_terminal_stock_price": "41.0",
+                "required_terminal_stock_return_pct": "1.69",
+                "required_move_pct": "1.69",
+                "earliest_valid_date": "2026-12-18",
+                "latest_valid_date": "2026-12-18",
+                "minimum_required_move_by_expiry": "1.69",
+                "path_count_generated": "6",
+                "plausible_path_count": "0",
+                "extreme_path_count": "6",
+                "status": "solved",
+                "verdict": "stock_cleaner",
+                "concise_explanation": "Requires an unrealistic move under current assumptions.",
+            },
+        ],
+        "required_paths_by_option.csv": [
+            {
+                "contract_label": "15C Dec-26",
+                "candidate_slug": "long-call-2026-12-18-15-00",
+                "threshold_multiple": "1.5",
+                "path_id": "long-call-2026-12-18-15-00__1_5x__fast_breakout",
+                "path_label": "Fast Breakout Required Path (1.5x)",
+                "path_family": "fast_breakout",
+                "snapshot_date": "2026-04-12",
+                "analysis_horizon_date": "2026-07-15",
+                "chart_horizon_date": "2026-12-18",
+                "path_terminal_date": "2026-12-18",
+                "option_expiry": "2026-12-18",
+                "option_expiry_date": "2026-12-18",
+                "terminal_basis": "option_expiry",
+                "chart_horizon_basis": "option_expiry",
+                "date": "2026-04-12",
+                "days_from_snapshot": "0",
+                "valuation_date": "2026-04-12",
+                "effective_days": "0",
+                "time_to_expiry_days": "250",
+                "intrinsic_value": "100.0",
+                "time_value": "220.0",
+                "shape_template": "fast_breakout",
+                "shape_source_path": "rally_early_then_fade_then_rally_again",
+                "stock_price": "16.0",
+                "option_value": "320.0",
+                "option_return_pct": "0.0",
+                "stock_return_pct": "0.0",
+                "option_vs_stock_multiple": "",
+                "clears_threshold": "False",
+                "realism_bucket": "extreme",
+            },
+            {
+                "contract_label": "15C Dec-26",
+                "candidate_slug": "long-call-2026-12-18-15-00",
+                "threshold_multiple": "1.5",
+                "path_id": "long-call-2026-12-18-15-00__1_5x__fast_breakout",
+                "path_label": "Fast Breakout Required Path (1.5x)",
+                "path_family": "fast_breakout",
+                "snapshot_date": "2026-04-12",
+                "analysis_horizon_date": "2026-07-15",
+                "chart_horizon_date": "2026-12-18",
+                "path_terminal_date": "2026-12-18",
+                "option_expiry": "2026-12-18",
+                "option_expiry_date": "2026-12-18",
+                "terminal_basis": "option_expiry",
+                "chart_horizon_basis": "option_expiry",
+                "date": "2026-12-18",
+                "days_from_snapshot": "250",
+                "valuation_date": "2026-12-18",
+                "effective_days": "250",
+                "time_to_expiry_days": "0",
+                "intrinsic_value": "1900.0",
+                "time_value": "0.0",
+                "shape_template": "fast_breakout",
+                "shape_source_path": "rally_early_then_fade_then_rally_again",
+                "stock_price": "34.0",
+                "option_value": "1900.0",
+                "option_return_pct": "4.9375",
+                "stock_return_pct": "1.12",
+                "option_vs_stock_multiple": "1.59",
+                "clears_threshold": "True",
+                "realism_bucket": "extreme",
+            },
+        ],
+        "required_path_family_summary.csv": [
+            {
+                "contract_label": "15C Dec-26",
+                "candidate_slug": "long-call-2026-12-18-15-00",
+                "threshold_multiple": "1.5",
+                "path_family": "fast_breakout",
+                "min_required_move_pct": "0.0",
+                "median_required_move_pct": "0.8",
+                "earliest_clear_date": "2026-07-15",
+                "latest_clear_date": "2026-12-18",
+                "clears_count": "2",
+                "realism_bucket": "extreme",
+                "failure_driver": "none",
+                "peak_option_return_pct": "1.78",
+                "peak_date": "2026-07-15",
+            }
+        ],
+        "required_path_peak_summary.csv": [
+            {
+                "contract_label": "15C Dec-26",
+                "candidate_slug": "long-call-2026-12-18-15-00",
+                "threshold_multiple": "1.5",
+                "path_id": "long-call-2026-12-18-15-00__1_5x__fast_breakout",
+                "path_family": "fast_breakout",
+                "peak_option_return_pct": "1.78",
+                "peak_option_value": "2100.0",
+                "peak_date": "2026-07-15",
+                "peak_days_from_snapshot": "94",
+                "stock_price_at_peak": "34.0",
+                "option_vs_stock_multiple_at_peak": "1.59",
+                "terminal_option_return_pct": "1.78",
+                "terminal_option_vs_stock_multiple": "1.59",
+                "status": "solved",
+            }
+        ],
+        "required_path_exit_ladder.csv": [
+            {
+                "contract_label": "15C Dec-26",
+                "candidate_slug": "long-call-2026-12-18-15-00",
+                "threshold_multiple": "1.5",
+                "path_id": "long-call-2026-12-18-15-00__1_5x__fast_breakout",
+                "path_family": "fast_breakout",
+                "ticker": "GPRE",
+                "strike": "15.0",
+                "expiry": "2026-12-18",
+                "target_absolute_option_return_pct": "0.5",
+                "first_hit_date": "2026-07-15",
+                "stock_price_at_first_hit": "34.0",
+                "option_return_pct_at_first_hit": "1.78",
+                "option_value_at_first_hit": "2100.0",
+                "hit_status": "hit",
+                "exit_return_label": "+50%",
+                "exit_return_pct": "0.5",
+                "first_exit_date": "2026-07-15",
+                "first_exit_days_from_snapshot": "94",
+                "stock_price_at_exit": "34.0",
+                "option_value_at_exit": "2100.0",
+                "option_return_pct_at_exit": "1.78",
+                "stock_return_pct_at_exit": "1.12",
+                "option_vs_stock_multiple_at_exit": "1.59",
+                "status": "solved",
+                "realism_bucket": "extreme",
+            }
+        ],
+        "required_path_entry_sensitivity.csv": [
+            {
+                "ticker": "GPRE",
+                "contract_label": "15C Dec-26",
+                "strike": "15.0",
+                "expiry": "2026-12-18",
+                "threshold_multiple": "1.5",
+                "path_family": "fast_breakout",
+                "entry_shift_pct": "0.0",
+                "adjusted_entry_premium": "320.0",
+                "required_terminal_stock_price": "34.0",
+                "required_move_pct": "1.23",
+                "realism_bucket": "extreme",
+                "verdict": "requires_extreme_move",
+            }
+        ],
+        "required_path_iv_sensitivity.csv": [
+            {
+                "ticker": "GPRE",
+                "contract_label": "15C Dec-26",
+                "strike": "15.0",
+                "expiry": "2026-12-18",
+                "threshold_multiple": "1.5",
+                "path_family": "fast_breakout",
+                "iv_shift_vol_points": "0.0",
+                "adjusted_iv": "0.55",
+                "required_terminal_stock_price": "34.0",
+                "required_move_pct": "1.23",
+                "realism_bucket": "extreme",
+                "verdict": "requires_extreme_move",
+            }
+        ],
+        "required_path_entry_iv_matrix.csv": [
+            {
+                "ticker": "GPRE",
+                "contract_label": "15C Dec-26",
+                "strike": "15.0",
+                "expiry": "2026-12-18",
+                "threshold_multiple": "1.5",
+                "path_family": "fast_breakout",
+                "entry_shift_pct": "0.0",
+                "iv_shift_vol_points": "0.0",
+                "adjusted_entry_premium": "320.0",
+                "adjusted_iv": "0.55",
+                "required_terminal_stock_price": "34.0",
+                "required_move_pct": "1.23",
+                "realism_bucket": "extreme",
+                "verdict": "requires_extreme_move",
+            }
+        ],
+        "required_path_sell_hold_summary.csv": [
+            {
+                "ticker": "GPRE",
+                "contract_label": "15C Dec-26",
+                "strike": "15.0",
+                "expiry": "2026-12-18",
+                "threshold_multiple": "1.5",
+                "path_family": "fast_breakout",
+                "peak_option_return_pct": "1.78",
+                "peak_date": "2026-07-15",
+                "stock_price_at_peak": "34.0",
+                "option_return_2w_after_peak": "1.60",
+                "option_return_1m_after_peak": "1.55",
+                "terminal_option_return_pct": "1.50",
+                "expiry_option_return_pct": "1.50",
+                "decay_from_peak_to_expiry_pct": "0.28",
+                "interpretation": "Hold acceptable",
+            }
+        ],
         "single_option_decision_summary.csv": [
             {
                 "ticker": "GPRE",
@@ -1842,6 +2183,8 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
         "top_candidate_cards.png",
         "stock_vs_option_preference_chart.png",
         "required_stock_path_to_buy.png",
+        "required_paths_overview.png",
+        "required_paths_long-call-2026-12-18-15-00.png",
         "required_move_speed_vs_magnitude.png",
         "required_move_vs_stock_chart.png",
         "strike_expiry_entry_barrier_map.png",
@@ -1977,6 +2320,11 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
                 "top_candidate_cards.md": "summary/top_candidate_cards.md",
                 "chain_overview.md": "summary/chain_overview.md",
                 "single_option_decision.md": "summary/single_option_decision.md",
+                "required_path_summary.md": "summary/required_path_summary.md",
+                "required_path_exit_ladder.md": "summary/required_path_exit_ladder.md",
+                "required_path_tables.html": "summary/required_path_tables.html",
+                "required_path_tables.md": "summary/required_path_tables.md",
+                "top_required_path_candidates.md": "summary/top_required_path_candidates.md",
             },
             "tables": {
                 "summary.csv": "tables/summary.csv",
@@ -2004,6 +2352,16 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
                 "stock_preference_summary.csv": "tables/stock_preference_summary.csv",
                 "entry_justification_candidates.csv": "tables/entry_justification_candidates.csv",
                 "required_stock_path_to_buy.csv": "tables/required_stock_path_to_buy.csv",
+                "goal_required_path_summary.csv": "tables/goal_required_path_summary.csv",
+                "required_path_summary.csv": "tables/required_path_summary.csv",
+                "required_paths_by_option.csv": "tables/required_paths_by_option.csv",
+                "required_path_family_summary.csv": "tables/required_path_family_summary.csv",
+                "required_path_peak_summary.csv": "tables/required_path_peak_summary.csv",
+                "required_path_exit_ladder.csv": "tables/required_path_exit_ladder.csv",
+                "required_path_entry_sensitivity.csv": "tables/required_path_entry_sensitivity.csv",
+                "required_path_iv_sensitivity.csv": "tables/required_path_iv_sensitivity.csv",
+                "required_path_entry_iv_matrix.csv": "tables/required_path_entry_iv_matrix.csv",
+                "required_path_sell_hold_summary.csv": "tables/required_path_sell_hold_summary.csv",
                 "required_move_summary.csv": "tables/required_move_summary.csv",
                 "required_move_vs_stock.csv": "tables/required_move_vs_stock.csv",
                 "required_iv_support_summary.csv": "tables/required_iv_support_summary.csv",
@@ -2089,6 +2447,8 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
                 "top_candidate_cards.png": "charts/top_candidate_cards.png",
                 "stock_vs_option_preference_chart.png": "charts/stock_vs_option_preference_chart.png",
                 "required_stock_path_to_buy.png": "charts/required_stock_path_to_buy.png",
+                "required_paths_overview.png": "charts/required_paths_overview.png",
+                "required_paths_long-call-2026-12-18-15-00.png": "charts/required_paths_long-call-2026-12-18-15-00.png",
                 "required_move_speed_vs_magnitude.png": "charts/required_move_speed_vs_magnitude.png",
                 "required_move_vs_stock_chart.png": "charts/required_move_vs_stock_chart.png",
                 "strike_expiry_entry_barrier_map.png": "charts/strike_expiry_entry_barrier_map.png",
@@ -2199,198 +2559,83 @@ def test_build_model_outputs_projects_primary_contract_selection_artifacts(temp_
     assert (promoted_dir / "summary.md").exists()
     assert (promoted_dir / "summary.csv").exists()
     assert (promoted_dir / "00_core_view" / "START_HERE.md").exists()
-    assert (promoted_dir / "00_core_view" / "bullish_action_board.md").exists()
-    assert (promoted_dir / "00_core_view" / "chain_overview.md").exists()
-    assert (promoted_dir / "00_core_view" / "entry_justification.md").exists()
-    assert (promoted_dir / "00_core_view" / "stress_tests.md").exists()
-    assert (promoted_dir / "00_core_view" / "single_option_decision.md").exists()
-    assert (promoted_dir / "00_core_view" / "top_candidate_cards.png").exists()
-    assert (promoted_dir / "00_core_view" / "chain_overview.png").exists()
-    assert (promoted_dir / "00_core_view" / "current_vs_justified_premium.png").exists()
-    assert (promoted_dir / "00_core_view" / "stock_vs_option_preference_chart.png").exists()
-    assert (promoted_dir / "00_core_view" / "stress_test_overview.png").exists()
-    assert (promoted_dir / "00_core_view" / "premium_sensitivity_chart.png").exists()
-    assert (promoted_dir / "00_core_view" / "timing_slip_chart.png").exists()
-    assert (promoted_dir / "00_core_view" / "target_stress_chart.png").exists()
-    assert (promoted_dir / "00_core_view" / "top_candidate_stress_cards.png").exists()
-    assert (promoted_dir / "00_core_view" / "single_option_decision_view.png").exists()
-    assert (promoted_dir / "00_core_view" / "required_stock_path_to_buy.png").exists()
-    assert (promoted_dir / "00_core_view" / "required_move_speed_vs_magnitude.png").exists()
-    assert (promoted_dir / "00_core_view" / "bullish_long_call_watchlist.csv").exists()
-    assert (promoted_dir / "00_core_view" / "bullish_long_call_triggers.csv").exists()
-    assert (promoted_dir / "00_core_view" / "chain_overview_summary.csv").exists()
-    assert (promoted_dir / "00_core_view" / "chain_overview_candidates.csv").exists()
-    assert (promoted_dir / "00_core_view" / "candidate_stress_grid.csv").exists()
-    assert (promoted_dir / "00_core_view" / "premium_sensitivity_summary.csv").exists()
-    assert (promoted_dir / "00_core_view" / "timing_slip_summary.csv").exists()
-    assert (promoted_dir / "00_core_view" / "target_stress_summary.csv").exists()
-    assert (promoted_dir / "00_core_view" / "stress_transition_summary.csv").exists()
-    assert (promoted_dir / "00_core_view" / "single_option_decision_summary.csv").exists()
-    assert (promoted_dir / "00_core_view" / "single_option_decision_path_selections.csv").exists()
-    assert (promoted_dir / "00_core_view" / "single_option_path_outcomes.csv").exists()
-    assert (promoted_dir / "00_core_view" / "single_option_required_path_to_beat_stock_1_5x.csv").exists()
-    assert (promoted_dir / "00_core_view" / "single_option_required_path_to_beat_stock_2_0x.csv").exists()
-    assert (promoted_dir / "00_core_view" / "single_option_closest_representative_path_to_edge.csv").exists()
-    assert (promoted_dir / "00_core_view" / "single_option_edge_gap_by_path_family.csv").exists()
-    assert (promoted_dir / "00_core_view" / "single_option_iv_sensitivity.csv").exists()
-    assert (promoted_dir / "00_core_view" / "single_option_entry_sensitivity.csv").exists()
-    assert (promoted_dir / "01_thesis_view" / "thesis_mode.md").exists()
-    assert (promoted_dir / "01_thesis_view" / "thesis_candidate_overview.png").exists()
-    assert (promoted_dir / "01_thesis_view" / "thesis_path_gallery.png").exists()
-    assert (promoted_dir / "01_thesis_view" / "thesis_stock_vs_option.png").exists()
-    assert (promoted_dir / "01_thesis_view" / "current_vs_justified_premium.png").exists()
-    assert (promoted_dir / "01_thesis_view" / "thesis_candidate_ranking.csv").exists()
-    assert (promoted_dir / "03_tables" / "chain_source_summary.csv").exists()
-    assert (promoted_dir / "03_tables" / "market_context_summary.csv").exists()
-    assert (promoted_dir / "03_tables" / "family_comparison.csv").exists()
-    assert (promoted_dir / "03_tables" / "candidate_comparison.csv").exists()
-    assert (promoted_dir / "03_tables" / "bullish_long_call_action_board.csv").exists()
-    assert (promoted_dir / "03_tables" / "stock_path_library.csv").exists()
-    assert (promoted_dir / "03_tables" / "required_move_summary.csv").exists()
-    assert (promoted_dir / "04_secondary" / "action_board.md").exists()
-    assert (promoted_dir / "04_secondary" / "highlights.md").exists()
-    assert (promoted_dir / "04_secondary" / "other_structures.md").exists()
-    assert (promoted_dir / "04_secondary" / "bullish_action_board_overview.png").exists()
-    assert (promoted_dir / "04_secondary" / "bullish_trigger_map.png").exists()
-    assert (promoted_dir / "04_secondary" / "stock_path_gallery.png").exists()
-    assert (promoted_dir / "04_secondary" / "iv_path_gallery.png").exists()
-    assert (promoted_dir / "04_secondary" / "representative_stock_paths.png").exists()
-    assert (promoted_dir / "04_secondary" / "representative_iv_paths.png").exists()
+    assert (promoted_dir / "00_core_view" / "required_paths_overview.png").exists()
+    assert (promoted_dir / "00_core_view" / "required_path_summary.md").exists()
+    assert (promoted_dir / "00_core_view" / "required_path_summary.csv").exists()
+    assert (promoted_dir / "00_core_view" / "required_path_tables.html").exists()
+    assert (promoted_dir / "00_core_view" / "required_path_tables.md").exists()
+    assert (promoted_dir / "00_core_view" / "top_required_path_candidates.md").exists()
+    assert (promoted_dir / "01_option_required_paths" / "required_paths_by_option.csv").exists()
+    assert (promoted_dir / "01_option_required_paths" / "required_path_family_summary.csv").exists()
+    assert (promoted_dir / "01_option_required_paths" / "required_path_peak_summary.csv").exists()
+    assert (promoted_dir / "01_option_required_paths" / "required_path_exit_ladder.csv").exists()
+    assert (promoted_dir / "01_option_required_paths" / "required_path_entry_sensitivity.csv").exists()
+    assert (promoted_dir / "01_option_required_paths" / "required_path_iv_sensitivity.csv").exists()
+    assert (promoted_dir / "01_option_required_paths" / "required_path_entry_iv_matrix.csv").exists()
+    assert (promoted_dir / "01_option_required_paths" / "required_path_sell_hold_summary.csv").exists()
+    assert (promoted_dir / "01_option_required_paths" / "required_path_exit_ladder.md").exists()
+    assert (promoted_dir / "01_option_required_paths" / "required_paths_long-call-2026-12-18-15-00.png").exists()
+    assert (promoted_dir / "99_secondary_or_debug" / "action_board.md").exists()
+    assert (promoted_dir / "99_secondary_or_debug" / "thesis_mode.md").exists()
+    assert not (promoted_dir / "99_secondary_or_debug" / "single_option_decision_view.png").exists()
+    assert not (promoted_dir / "99_secondary_or_debug" / "stock_path_gallery.png").exists()
+    assert not (promoted_dir / "99_secondary_or_debug" / "thesis_path_gallery.png").exists()
+    assert not list((promoted_dir / "99_secondary_or_debug").rglob("*.png"))
     assert not (promoted_dir / "00_overview").exists()
-    late_pack = promoted_dir / "02_path_packs" / "late_breakout"
-    range_pack = promoted_dir / "02_path_packs" / "range_bound_flat"
-    assert (late_pack / "README.md").exists()
-    assert (late_pack / "compare_vs_stock_delta.png").exists()
-    assert (late_pack / "long_call_strike_value.png").exists()
-    assert (late_pack / "long_call_strike_delta.png").exists()
-    assert (late_pack / "long_call_expiry_value.png").exists()
-    assert (late_pack / "long_call_expiry_delta.png").exists()
-    assert (late_pack / "long_call_best_of_value.png").exists()
-    assert (late_pack / "long_call_best_of_delta.png").exists()
-    assert (late_pack / "checkpoints.csv").exists()
-    assert (late_pack / "iv_path_value.png").exists()
-    assert (late_pack / "iv_path_delta.png").exists()
-    assert (late_pack / "iv_checkpoints.csv").exists()
-    assert (late_pack / "iv_robustness_summary.csv").exists()
-    assert (late_pack / "long_call_strike_iv_value.png").exists()
-    assert (late_pack / "long_call_strike_iv_delta.png").exists()
-    assert (late_pack / "long_call_strike_iv_checkpoints.csv").exists()
-    assert (late_pack / "long_call_expiry_iv_value.png").exists()
-    assert (late_pack / "long_call_expiry_iv_delta.png").exists()
-    assert (late_pack / "long_call_expiry_iv_checkpoints.csv").exists()
-    assert (late_pack / "long_call_best_of_iv_value.png").exists()
-    assert (late_pack / "long_call_best_of_iv_delta.png").exists()
-    assert (late_pack / "long_call_best_of_iv_checkpoints.csv").exists()
-    assert (range_pack / "compare_vs_stock_delta.png").exists()
-    assert not (promoted_dir / "03_tables" / "path_case_rows.csv").exists()
-    assert not (promoted_dir / "04_secondary" / "heatmap_strike_target_price.png").exists()
+    assert not (promoted_dir / "01_thesis_view").exists()
+    assert not (promoted_dir / "03_tables").exists()
+    assert not (promoted_dir / "04_secondary").exists()
+    assert not (promoted_dir / "00_core_view" / "single_option_decision_view.png").exists()
+    late_pack = promoted_dir / "99_secondary_or_debug" / "path_packs" / "late_breakout"
+    range_pack = promoted_dir / "99_secondary_or_debug" / "path_packs" / "range_bound_flat"
+    assert not late_pack.exists()
+    assert not range_pack.exists()
+    assert not (promoted_dir / "99_secondary_or_debug" / "path_case_rows.csv").exists()
+    assert not (promoted_dir / "99_secondary_or_debug" / "heatmap_strike_target_price.png").exists()
     assert archive_manifest.exists()
 
     start_here = (promoted_dir / "START_HERE.md").read_text(encoding="utf-8")
     latest_manifest = json.loads((latest_dir / "model_output_manifest.json").read_text(encoding="utf-8"))
     projection_manifest = json.loads((promoted_dir / "model_output_manifest.json").read_text(encoding="utf-8"))
-    chain_source_text = (promoted_dir / "03_tables" / "chain_source_summary.csv").read_text(encoding="utf-8")
     core_start_here = (promoted_dir / "00_core_view" / "START_HERE.md").read_text(encoding="utf-8")
-    action_board_text = (promoted_dir / "04_secondary" / "action_board.md").read_text(encoding="utf-8")
-    bullish_action_board_text = (promoted_dir / "00_core_view" / "bullish_action_board.md").read_text(encoding="utf-8")
-    chain_overview_text = (promoted_dir / "00_core_view" / "chain_overview.md").read_text(encoding="utf-8")
-    top_candidate_cards_text = (promoted_dir / "00_core_view" / "top_candidate_cards.md").read_text(encoding="utf-8")
-    stress_tests_text = (promoted_dir / "00_core_view" / "stress_tests.md").read_text(encoding="utf-8")
-    single_option_text = (promoted_dir / "00_core_view" / "single_option_decision.md").read_text(encoding="utf-8")
-    thesis_mode_text = (promoted_dir / "01_thesis_view" / "thesis_mode.md").read_text(encoding="utf-8")
+    required_summary_text = (promoted_dir / "00_core_view" / "required_path_summary.md").read_text(encoding="utf-8")
+    secondary_action_text = (promoted_dir / "99_secondary_or_debug" / "action_board.md").read_text(encoding="utf-8")
 
     assert "analysis_outputs/GPRE/snapshot_2026-04-12/contract_selection/demo-run" in start_here
     expected_open_first = [
-        "1. `00_core_view/bullish_action_board.md`",
-        "2. `00_core_view/chain_overview.md`",
-        "3. `00_core_view/chain_overview.png`",
-        "4. `00_core_view/entry_justification.md`",
-        "5. `01_thesis_view/thesis_mode.md`",
-        "6. `00_core_view/stress_tests.md`",
-        "7. `00_core_view/single_option_decision.md`",
-        "8. `00_core_view/top_candidate_cards.png`",
-        "9. `00_core_view/current_vs_justified_premium.png`",
-        "10. `00_core_view/stock_vs_option_preference_chart.png`",
-        "11. `00_core_view/stress_test_overview.png`",
-        "12. `00_core_view/premium_sensitivity_chart.png`",
-        "13. `00_core_view/timing_slip_chart.png`",
-        "14. `00_core_view/target_stress_chart.png`",
-        "15. `00_core_view/top_candidate_stress_cards.png`",
-        "16. `00_core_view/single_option_decision_view.png`",
-        "17. `00_core_view/required_stock_path_to_buy.png`",
-        "18. `00_core_view/required_move_speed_vs_magnitude.png`",
-        "19. `00_core_view/bullish_long_call_watchlist.csv`",
-        "20. `00_core_view/bullish_long_call_triggers.csv`",
-        "21. Then use `01_thesis_view/` for deeper target-thesis charts and tables",
-        "22. Then choose a scenario folder under `02_path_packs/` for deeper path analysis",
-        "23. Then use `03_tables/` and `04_secondary/` only as supporting detail",
+        "1. `00_core_view/required_paths_overview.png`",
+        "2. `00_core_view/required_path_summary.md`",
+        "3. `00_core_view/required_path_summary.csv`",
+        "4. `00_core_view/required_path_tables.html`",
+        "5. `00_core_view/required_path_tables.md`",
+        "6. `00_core_view/top_required_path_candidates.md`",
+        "7. `01_option_required_paths/required_paths_by_option.csv`",
+        "8. `01_option_required_paths/required_path_family_summary.csv`",
+        "9. `01_option_required_paths/required_path_peak_summary.csv`",
+        "10. Then open the per-option charts in `01_option_required_paths/`",
+        "11. Then use `99_secondary_or_debug/` only as supporting detail",
     ]
     assert all(line in start_here for line in expected_open_first)
     assert [start_here.index(line) for line in expected_open_first] == sorted(start_here.index(line) for line in expected_open_first)
-    assert "00_core_view/bullish_action_board.md" in start_here.split("## Open First", 1)[1].split("## Decision Snapshot", 1)[0]
-    assert "00_core_view/chain_overview.md" in start_here
-    assert "01_thesis_view/thesis_mode.md" in start_here
-    assert "01_thesis_view/thesis_stock_vs_option.png" in start_here
-    assert "04_secondary/highlights.md" in start_here
-    assert "04_secondary/highlights_overview.png" in start_here
-    assert "04_secondary/candidate_robustness_vs_upside.png" in start_here
-    assert "04_secondary/stock_vs_option_decision_chart.png" in start_here
+    open_first_block = start_here.split("## Open First", 1)[1].split("## Decision Snapshot", 1)[0]
+    assert "single_option_decision_view.png" not in open_first_block
+    assert "thesis_path_gallery.png" not in open_first_block
+    assert "required_stock_path_to_buy.png" not in open_first_block
+    assert "99_secondary_or_debug/thesis_path_gallery.png" not in start_here
+    assert "99_secondary_or_debug/single_option_decision_view.png" not in start_here
     assert "summary.md" in start_here
-    assert "single_option_decision_path_selections.csv" in start_here
-    assert "single_option_required_path_to_beat_stock_1_5x.csv" in start_here
-    assert "single_option_edge_gap_by_path_family.csv" in start_here
-    assert "stock_path_library.csv" in start_here
-    assert "stock_path_gallery.png" in start_here
-    assert "iv_path_gallery.png" in start_here
-    assert "required_path_vs_assumed_path.png" in start_here
-    assert "02_path_packs/late_breakout/README.md" in start_here
-    assert "02_path_packs/range_bound_flat/README.md" in start_here
-    assert "03_tables/candidate_comparison.csv" in start_here
+    assert "99_secondary_or_debug/path_packs/" not in start_here
+    assert "option return relative to stock return" in start_here
     assert "2026-04-17" in start_here
     assert "2027-01-15" in start_here
     assert "C:/Users" not in start_here
     assert "C:\\Users" not in start_here
     assert core_start_here == start_here
-    assert "00_core_view/bullish_action_board.md" in core_start_here
-    assert "00_core_view/chain_overview.md" in core_start_here
-    assert "00_core_view/entry_justification.md" in core_start_here
-    assert "01_thesis_view/thesis_mode.md" in core_start_here
-    assert "required_stock_path_to_buy.png" in core_start_here
-    assert "required_move_speed_vs_magnitude.png" in core_start_here
-    assert "04_secondary/required_move_vs_stock_chart.png" in core_start_here
-    assert "04_secondary/strike_expiry_entry_barrier_map.png" in core_start_here
-    assert "04_secondary/iv_support_requirement_chart.png" in core_start_here
-    assert "What Looks Most Actionable Right Now" in action_board_text
-    assert "Best Bullish Long Calls Right Now" in bullish_action_board_text
-    assert "Watchlist: Interesting But Not Buyable Yet" in bullish_action_board_text
-    assert "Key Triggers To Watch" in bullish_action_board_text
-    assert "Chain Overview / Compare Options" in chain_overview_text
-    assert "Top Bullish Call Cards" in top_candidate_cards_text
-    assert "Thesis Snapshot" in thesis_mode_text
-    assert "Current Premium vs Thesis-Justified Premium" in thesis_mode_text
-    assert "Stress Snapshot" in stress_tests_text
-    assert "Which Candidates Are Price-Sensitive?" in stress_tests_text
-    assert "Single-Option Decision View" in single_option_text
-    assert "Upgrade if" in top_candidate_cards_text
-    assert "When Stock Is Still Better" in action_board_text
+    assert "What each call needs" in required_summary_text
+    assert "relative to stock return" in required_summary_text
+    assert "What Looks Most Actionable Right Now" in secondary_action_text
     assert "C:/Users" not in core_start_here
     assert "C:\\Users" not in core_start_here
-    assert "C:/Users" not in action_board_text
-    assert "C:\\Users" not in action_board_text
-    assert "C:/Users" not in bullish_action_board_text
-    assert "C:\\Users" not in bullish_action_board_text
-    assert "C:/Users" not in chain_overview_text
-    assert "C:\\Users" not in chain_overview_text
-    assert "C:/Users" not in top_candidate_cards_text
-    assert "C:\\Users" not in top_candidate_cards_text
-    assert "C:/Users" not in stress_tests_text
-    assert "C:\\Users" not in stress_tests_text
-    assert "C:/Users" not in single_option_text
-    assert "C:\\Users" not in single_option_text
-    assert "C:/Users" not in thesis_mode_text
-    assert "C:\\Users" not in thesis_mode_text
-    assert "C:/Users" not in chain_source_text
-    assert "C:\\Users" not in chain_source_text
 
     assert projection_manifest["source_bundle_path"] == "analysis_outputs/GPRE/snapshot_2026-04-12/contract_selection/demo-run"
     assert projection_manifest["analysis_kind"] == "contract_selection"
@@ -2399,68 +2644,38 @@ def test_build_model_outputs_projects_primary_contract_selection_artifacts(temp_
     assert projection_manifest["fallback_only_expiry_count"] == 2
     assert projection_manifest["spot_source"] == "nasdaq_historical_quotes"
     assert projection_manifest["risk_free_source"] == "fred_local_store"
-    assert "03_tables/chain_source_summary.csv" in projection_manifest["promoted_files"]
     assert "00_core_view/START_HERE.md" in projection_manifest["promoted_files"]
-    assert "00_core_view/bullish_action_board.md" in projection_manifest["promoted_files"]
-    assert "00_core_view/chain_overview.md" in projection_manifest["promoted_files"]
-    assert "00_core_view/entry_justification.md" in projection_manifest["promoted_files"]
-    assert "00_core_view/stress_tests.md" in projection_manifest["promoted_files"]
-    assert "00_core_view/single_option_decision.md" in projection_manifest["promoted_files"]
-    assert "00_core_view/top_candidate_cards.png" in projection_manifest["promoted_files"]
-    assert "00_core_view/chain_overview.png" in projection_manifest["promoted_files"]
-    assert "00_core_view/current_vs_justified_premium.png" in projection_manifest["promoted_files"]
-    assert "00_core_view/stock_vs_option_preference_chart.png" in projection_manifest["promoted_files"]
-    assert "00_core_view/required_stock_path_to_buy.png" in projection_manifest["promoted_files"]
-    assert "00_core_view/required_move_speed_vs_magnitude.png" in projection_manifest["promoted_files"]
-    assert "00_core_view/stress_test_overview.png" in projection_manifest["promoted_files"]
-    assert "00_core_view/premium_sensitivity_chart.png" in projection_manifest["promoted_files"]
-    assert "00_core_view/timing_slip_chart.png" in projection_manifest["promoted_files"]
-    assert "00_core_view/target_stress_chart.png" in projection_manifest["promoted_files"]
-    assert "00_core_view/top_candidate_stress_cards.png" in projection_manifest["promoted_files"]
-    assert "00_core_view/single_option_decision_view.png" in projection_manifest["promoted_files"]
-    assert "00_core_view/single_option_decision_path_selections.csv" in projection_manifest["promoted_files"]
-    assert "00_core_view/single_option_required_path_to_beat_stock_1_5x.csv" in projection_manifest["promoted_files"]
-    assert "00_core_view/single_option_required_path_to_beat_stock_2_0x.csv" in projection_manifest["promoted_files"]
-    assert "00_core_view/single_option_closest_representative_path_to_edge.csv" in projection_manifest["promoted_files"]
-    assert "00_core_view/single_option_edge_gap_by_path_family.csv" in projection_manifest["promoted_files"]
-    assert "00_core_view/bullish_long_call_watchlist.csv" in projection_manifest["promoted_files"]
-    assert "00_core_view/bullish_long_call_triggers.csv" in projection_manifest["promoted_files"]
-    assert "00_core_view/chain_overview_summary.csv" in projection_manifest["promoted_files"]
-    assert "00_core_view/chain_overview_candidates.csv" in projection_manifest["promoted_files"]
-    assert "00_core_view/candidate_stress_grid.csv" in projection_manifest["promoted_files"]
-    assert "00_core_view/premium_sensitivity_summary.csv" in projection_manifest["promoted_files"]
-    assert "00_core_view/timing_slip_summary.csv" in projection_manifest["promoted_files"]
-    assert "00_core_view/target_stress_summary.csv" in projection_manifest["promoted_files"]
-    assert "00_core_view/stress_transition_summary.csv" in projection_manifest["promoted_files"]
-    assert "00_core_view/single_option_decision_summary.csv" in projection_manifest["promoted_files"]
-    assert "00_core_view/single_option_path_outcomes.csv" in projection_manifest["promoted_files"]
-    assert "00_core_view/single_option_iv_sensitivity.csv" in projection_manifest["promoted_files"]
-    assert "00_core_view/single_option_entry_sensitivity.csv" in projection_manifest["promoted_files"]
-    assert "01_thesis_view/thesis_mode.md" in projection_manifest["promoted_files"]
-    assert "01_thesis_view/thesis_candidate_overview.png" in projection_manifest["promoted_files"]
-    assert "01_thesis_view/thesis_path_gallery.png" in projection_manifest["promoted_files"]
-    assert "01_thesis_view/thesis_stock_vs_option.png" in projection_manifest["promoted_files"]
-    assert "01_thesis_view/current_vs_justified_premium.png" in projection_manifest["promoted_files"]
-    assert "03_tables/bullish_long_call_action_board.csv" in projection_manifest["promoted_files"]
-    assert "03_tables/stock_path_library.csv" in projection_manifest["promoted_files"]
-    assert "01_thesis_view/current_vs_justified_premium.csv" in projection_manifest["promoted_files"]
-    assert "04_secondary/bullish_action_board_overview.png" in projection_manifest["promoted_files"]
-    assert "04_secondary/bullish_trigger_map.png" in projection_manifest["promoted_files"]
-    assert "04_secondary/highlights.md" in projection_manifest["promoted_files"]
-    assert "04_secondary/stock_path_gallery.png" in projection_manifest["promoted_files"]
-    assert "04_secondary/iv_path_gallery.png" in projection_manifest["promoted_files"]
-    assert "02_path_packs/late_breakout/long_call_strike_value.csv" in projection_manifest["promoted_files"]
-    assert "02_path_packs/late_breakout/checkpoints.csv" in projection_manifest["promoted_files"]
-    assert "02_path_packs/late_breakout/iv_path_value.csv" in projection_manifest["promoted_files"]
-    assert "02_path_packs/late_breakout/iv_path_delta.png" in projection_manifest["promoted_files"]
-    assert "02_path_packs/late_breakout/iv_checkpoints.csv" in projection_manifest["promoted_files"]
-    assert "02_path_packs/late_breakout/iv_robustness_summary.csv" in projection_manifest["promoted_files"]
-    assert "02_path_packs/late_breakout/long_call_strike_iv_value.png" in projection_manifest["promoted_files"]
-    assert "02_path_packs/late_breakout/long_call_expiry_iv_value.csv" in projection_manifest["promoted_files"]
-    assert "02_path_packs/late_breakout/long_call_best_of_iv_delta.png" in projection_manifest["promoted_files"]
-    assert "02_path_packs/range_bound_flat/compare_vs_stock_delta.csv" in projection_manifest["promoted_files"]
-    assert "02_path_packs/late_breakout/compare_vs_stock_delta.png" in projection_manifest["promoted_files"]
-    assert "02_path_packs/late_breakout/long_call_best_of_delta.png" in projection_manifest["promoted_files"]
+    assert "00_core_view/required_paths_overview.png" in projection_manifest["promoted_files"]
+    assert "00_core_view/required_path_summary.md" in projection_manifest["promoted_files"]
+    assert "00_core_view/required_path_summary.csv" in projection_manifest["promoted_files"]
+    assert "00_core_view/required_path_tables.html" in projection_manifest["promoted_files"]
+    assert "00_core_view/required_path_tables.md" in projection_manifest["promoted_files"]
+    assert "00_core_view/top_required_path_candidates.md" in projection_manifest["promoted_files"]
+    assert "01_option_required_paths/required_paths_by_option.csv" in projection_manifest["promoted_files"]
+    assert "01_option_required_paths/required_path_family_summary.csv" in projection_manifest["promoted_files"]
+    assert "01_option_required_paths/required_path_peak_summary.csv" in projection_manifest["promoted_files"]
+    assert "01_option_required_paths/required_path_exit_ladder.csv" in projection_manifest["promoted_files"]
+    assert "01_option_required_paths/required_path_entry_sensitivity.csv" in projection_manifest["promoted_files"]
+    assert "01_option_required_paths/required_path_iv_sensitivity.csv" in projection_manifest["promoted_files"]
+    assert "01_option_required_paths/required_path_entry_iv_matrix.csv" in projection_manifest["promoted_files"]
+    assert "01_option_required_paths/required_path_sell_hold_summary.csv" in projection_manifest["promoted_files"]
+    assert "01_option_required_paths/required_path_exit_ladder.md" in projection_manifest["promoted_files"]
+    assert "01_option_required_paths/required_paths_long-call-2026-12-18-15-00.png" in projection_manifest["promoted_files"]
+    assert "99_secondary_or_debug/thesis_path_gallery.png" not in projection_manifest["promoted_files"]
+    assert "99_secondary_or_debug/single_option_decision_view.png" not in projection_manifest["promoted_files"]
+    promoted_pngs = [path for path in projection_manifest["promoted_files"] if path.endswith(".png")]
+    assert promoted_pngs
+    assert all(
+        path == "00_core_view/required_paths_overview.png"
+        or path.startswith("01_option_required_paths/required_paths_")
+        for path in promoted_pngs
+    )
+    assert all(not path.endswith(".png") for path in projection_manifest["promoted_files"] if path.startswith("99_secondary_or_debug/"))
+    assert all(not path.startswith("99_secondary_or_debug/path_packs/") for path in projection_manifest["promoted_files"])
+    assert all(not path.startswith("00_core_view/single_option") for path in projection_manifest["promoted_files"])
+    assert all(not path.startswith("01_thesis_view/") for path in projection_manifest["promoted_files"])
+    assert all(not path.startswith("03_tables/") for path in projection_manifest["promoted_files"])
+    assert all(not path.startswith("04_secondary/") for path in projection_manifest["promoted_files"])
     assert latest_manifest["source_bundle_path"] == projection_manifest["source_bundle_path"]
 
 

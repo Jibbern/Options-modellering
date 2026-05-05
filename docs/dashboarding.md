@@ -24,6 +24,7 @@ That metadata already includes the trust/provenance fields resolved during analy
 - spot source, field used, matched date, and same-day rejection note
 - risk-free source, series, matched date, and fallback note
 - expiry-level source-quality summaries and bundle-level trust rollups
+- option-chain provenance such as `barchart_options_screener` / `manually_downloaded_barchart` when a manually imported Barchart chain was selected
 
 It writes:
 
@@ -57,13 +58,9 @@ When mirrored, the library is rebuilt from `published_manifest.json` files only.
 
 For contract-selection, the curated `latest/` view is grouped for decision reading:
 
-- `00_core_view/`: bullish Action Board first, then chain overview / compare options, entry justification, stress tests, the single-option decision view, and the most important decision charts/tables
-- `01_thesis_view/`: explicit target-thesis charts and tables
-- `02_path_packs/`: deeper scenario/path packs
-- `03_tables/` and `04_secondary/`: supporting tables and lower-priority visuals
-- `01_path_packs/<path_alias>/`: value, delta-vs-stock, single-anchor IV-path, IV-expanded strike/expiry/best-of, and robustness-summary outputs for one named stock scenario
-- `02_tables/`: source/trust and decision tables
-- `03_secondary/`: representative-path support artifacts
+- `00_core_view/`: the required-path engine first: overview, summary table, summary Markdown, spreadsheet-style required-path workbook, and top required-path candidates
+- `01_option_required_paths/`: per-option required-path charts plus path-level, family-level, peak/best-exit, exit-ladder, entry-premium sensitivity, IV sensitivity, entry x IV matrix, and sell/hold required-path tables
+- `99_secondary_or_debug/`: supporting Markdown and CSV diagnostics only; old fixed-target, single-option, gallery, and path-pack charts are intentionally not promoted into `model_outputs`
 
 ## Page roles
 
@@ -81,27 +78,11 @@ Contract-selection publish pages now render the saved bundle artifacts directly 
 The primary published reading order is:
 
 - Decision Snapshot
+- Required-Path Engine
+- Per-Option Required Paths
 - Chain Overview / Compare Options
-- Action Board / Contract Picker
-- Entry Justification / Required Stock Path
-- Thesis / Price Target Mode
-- Single-Option Decision View
-- Decision Highlights
 - Market Context / Trust Summary
-- Stock Path Gallery
-- IV Path Gallery
-- Required vs Assumed Path
-- Path-Centric Compare vs Stock
-- Path-Centric Long-Call Strike Ladders
-- Path-Centric Long-Call Expiry Ladders
-- Path-Centric Best-Of Long-Call Views
-- Path-Centric IV-Path Value / Delta Views
-- IV-Expanded Strike / Expiry / Best-Of Views
-- IV Robustness Summaries
-- Path-Centric Checkpoint Tables
-- Representative Paths
-- Same-Path Strike Comparison
-- Same-Path Expiry Comparison
+- Supporting frozen tables for required-vs-assumed, representative paths, option value, stock comparison, strike, and expiry
 - Family / Candidate Highlights
 - Warnings / Risk Notes
 
@@ -109,6 +90,8 @@ That means the main contract-selection page is readable on its own from the froz
 
 The contract-selection bundle is the canonical source for:
 
+- required-path artifacts that solve backwards from long-call outperformance versus owning stock by 1.5x and 2.0x, where those hurdles mean option return is at least 1.5 or 2.0 times stock return over the same holding period
+- per-option required-path charts whose main horizon is option expiry; shorter analysis horizons are displayed as reference context rather than truncating the required stock path
 - action-board buckets, watchlist triggers, action-score breakdowns, and stock-preference reads
 - entry-justification reads describing what the stock has to do, how quickly, how much IV support matters, and when stock still remains cleaner
 - thesis-mode reads describing what a specific target price/date implies for bullish calls, current versus thesis-justified premium, endpoint-aware stock paths, IV sensitivity, and when stock still beats calls even if the target is reached
@@ -142,6 +125,7 @@ That means published visuals inherit their quality directly from the saved bundl
 - chart-reading notes already written in `summary.md`
 - summary tables that are pre-rounded and column-ordered for readability
 - risk-free and source-snapshot provenance that was already resolved and frozen during analysis
+- imported quote metadata such as Barchart bid/ask/mid, spread, IV, volume, open interest, liquidity bucket, and quality flags when those columns exist in the frozen bundle
 - spot / expiry trust language that was already resolved and frozen during analysis
 
 Contract-selection publish pages no longer depend on legacy selection heatmap/slice tables. They link and render the bundle-written path/simulation artifacts instead.

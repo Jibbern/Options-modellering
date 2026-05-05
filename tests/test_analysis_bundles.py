@@ -71,7 +71,25 @@ def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_h
     assert manifest["run_slug"] == result.run_slug
     assert (bundle.bundle_dir / "tables" / "candidate_summary.csv").exists()
     assert (bundle.bundle_dir / "tables" / "required_path_rows.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "goal_required_path_summary.csv").exists()
     assert (bundle.bundle_dir / "tables" / "required_path_summary.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "required_paths_by_option.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "required_path_family_summary.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "required_path_peak_summary.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "required_path_exit_ladder.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "required_path_entry_sensitivity.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "required_path_iv_sensitivity.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "required_path_entry_iv_matrix.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "required_path_sell_hold_summary.csv").exists()
+    assert (bundle.bundle_dir / "summary" / "required_path_tables.html").exists()
+    assert (bundle.bundle_dir / "summary" / "required_path_tables.md").exists()
+    assert (bundle.bundle_dir / "summary" / "required_path_exit_ladder.md").exists()
+    assert manifest["file_map"]["tables"]["required_path_entry_sensitivity.csv"] == "tables/required_path_entry_sensitivity.csv"
+    assert manifest["file_map"]["tables"]["required_path_iv_sensitivity.csv"] == "tables/required_path_iv_sensitivity.csv"
+    assert manifest["file_map"]["tables"]["required_path_entry_iv_matrix.csv"] == "tables/required_path_entry_iv_matrix.csv"
+    assert manifest["file_map"]["tables"]["required_path_sell_hold_summary.csv"] == "tables/required_path_sell_hold_summary.csv"
+    assert manifest["file_map"]["summary"]["required_path_tables.html"] == "summary/required_path_tables.html"
+    assert manifest["file_map"]["summary"]["required_path_tables.md"] == "summary/required_path_tables.md"
     assert (bundle.bundle_dir / "tables" / "chain_source_summary.csv").exists()
     assert (bundle.bundle_dir / "tables" / "market_context_summary.csv").exists()
     assert (bundle.bundle_dir / "tables" / "assumed_path_trace_rows.csv").exists()
@@ -150,6 +168,75 @@ def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_h
     assert (bundle.bundle_dir / "tables" / "chain_overview_summary.csv").exists()
     assert (bundle.bundle_dir / "tables" / "chain_overview_candidates.csv").exists()
     assert (bundle.bundle_dir / "tables" / "required_vs_assumed_path_summary.csv").exists()
+    required_summary = pd.read_csv(bundle.bundle_dir / "tables" / "required_path_summary.csv")
+    required_paths = pd.read_csv(bundle.bundle_dir / "tables" / "required_paths_by_option.csv")
+    required_family = pd.read_csv(bundle.bundle_dir / "tables" / "required_path_family_summary.csv")
+    required_peaks = pd.read_csv(bundle.bundle_dir / "tables" / "required_path_peak_summary.csv")
+    required_exit_ladder = pd.read_csv(bundle.bundle_dir / "tables" / "required_path_exit_ladder.csv")
+    assert {"contract_label", "threshold_multiple", "required_move_pct", "verdict"} <= set(required_summary.columns)
+    assert {
+        "path_family",
+        "option_value",
+        "option_return_pct",
+        "stock_return_pct",
+        "clears_threshold",
+        "is_checkpoint_marker",
+        "display_marker",
+        "checkpoint_label",
+        "snapshot_date",
+        "analysis_horizon_date",
+        "chart_horizon_date",
+        "path_terminal_date",
+        "option_expiry",
+        "option_expiry_date",
+        "terminal_basis",
+        "chart_horizon_basis",
+        "valuation_date",
+        "effective_days",
+        "time_to_expiry_days",
+        "intrinsic_value",
+        "time_value",
+        "shape_template",
+        "shape_source_path",
+    } <= set(required_paths.columns)
+    assert {
+        "failure_driver",
+        "realism_bucket",
+        "clears_count",
+        "peak_option_return_pct",
+        "peak_date",
+    } <= set(required_family.columns)
+    assert {"peak_date", "peak_option_return_pct", "stock_price_at_peak"} <= set(required_peaks.columns)
+    assert {
+        "exit_return_label",
+        "exit_return_pct",
+        "first_exit_date",
+        "stock_price_at_exit",
+        "option_return_pct_at_exit",
+    } <= set(required_exit_ladder.columns)
+    label_strikes = pd.to_numeric(required_summary["contract_label"].astype(str).str.extract(r"^(\d+(?:\.\d+)?)C")[0], errors="coerce")
+    actual_strikes = pd.to_numeric(required_summary["strike"], errors="coerce")
+    assert actual_strikes[label_strikes.notna()].eq(label_strikes[label_strikes.notna()]).all()
+    solved_summary = required_summary.loc[required_summary["status"].astype(str).str.startswith("solved")]
+    assert not solved_summary.empty
+    assert pd.to_numeric(solved_summary["required_move_pct"], errors="coerce").notna().all()
+    solved_paths = required_paths.loc[required_paths["status"].astype(str).str.startswith("solved")]
+    assert pd.to_numeric(solved_paths["stock_price"], errors="coerce").notna().any()
+    assert pd.to_numeric(solved_paths["option_value"], errors="coerce").notna().any()
+    selected_long_dated = solved_paths.loc[
+        (solved_paths["contract_label"].astype(str).str.contains("Dec-26"))
+        & (solved_paths["path_family"].astype(str).eq("slow_grind"))
+        & (pd.to_numeric(solved_paths["threshold_multiple"], errors="coerce").eq(1.5))
+    ]
+    assert selected_long_dated["days_from_snapshot"].nunique() > 30
+    assert pd.to_datetime(selected_long_dated["date"]).max().date().isoformat() == "2026-12-18"
+    assert selected_long_dated["chart_horizon_date"].astype(str).eq("2026-12-18").all()
+    assert selected_long_dated["chart_horizon_basis"].astype(str).eq("option_expiry").all()
+    assert pd.to_numeric(selected_long_dated["time_to_expiry_days"], errors="coerce").min() == 0
+    assert pd.to_numeric(required_peaks["peak_option_return_pct"], errors="coerce").notna().any()
+    reached_exits = required_exit_ladder.loc[required_exit_ladder["first_exit_date"].notna()]
+    assert not reached_exits.empty
+    assert pd.to_numeric(reached_exits["stock_price_at_exit"], errors="coerce").notna().all()
     for path_name in [
         "rally_early_then_fade_then_rally_again",
         "range_bound_near_flat",
@@ -235,6 +322,8 @@ def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_h
     assert (bundle.bundle_dir / "charts" / "top_candidate_stress_cards.png").exists()
     assert (bundle.bundle_dir / "charts" / "chain_overview.png").exists()
     assert (bundle.bundle_dir / "charts" / "single_option_decision_view.png").exists()
+    assert (bundle.bundle_dir / "charts" / "required_paths_overview.png").exists()
+    assert [path for path in (bundle.bundle_dir / "charts").glob("required_paths_*.png") if path.name != "required_paths_overview.png"]
     for path_name in [
         "rally_early_then_fade_then_rally_again",
         "range_bound_near_flat",
@@ -277,6 +366,8 @@ def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_h
     assert (bundle.bundle_dir / "summary" / "top_candidate_cards.md").exists()
     assert (bundle.bundle_dir / "summary" / "chain_overview.md").exists()
     assert (bundle.bundle_dir / "summary" / "single_option_decision.md").exists()
+    assert (bundle.bundle_dir / "summary" / "required_path_summary.md").exists()
+    assert (bundle.bundle_dir / "summary" / "top_required_path_candidates.md").exists()
     assert report_metadata["report_kind"] == "contract_selection"
     assert "contract_selection" in report_metadata
     assert report_metadata["decision_highlights"]
@@ -604,6 +695,8 @@ def test_contract_selection_publish_uses_bundle_relative_dashboard_links_without
     assert "Chain Overview Candidate Table" in html
     assert "Market Context / Trust Summary" in html
     assert "Required vs Assumed Path" in html
+    assert "required_path_tables.html" in html
+    assert "Required Path Tables" in html
     assert "Representative Paths" in html
     assert "Option Value Over Path" in html
     assert "Compare vs Stock Over Path" in html

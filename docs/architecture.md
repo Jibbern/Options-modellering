@@ -7,6 +7,7 @@ Options Lab is organized around three runtime layers plus one curated outputs la
 These modules resolve and persist local inputs:
 
 - `options_lab/ibkr/`
+- `options_lab/barchart/`
 - `options_lab/prices/`
 - `options_lab/rates/`
 - `options_lab/research_metadata/`
@@ -19,6 +20,7 @@ Responsibilities:
 - discover local option-chain snapshots
 - resolve spot, rates, and research context
 - refresh local historical prices and local FRED/Treasury rates when requested through thin CLI wrappers
+- import manually downloaded Barchart Options Screener and price-history CSVs into normalized local stores without moving the loose source files
 - expose quote-usability and coverage on discovered chain slices so source precedence is explicit and testable
 - persist delayed-only IBKR underlying, chain, and option snapshots
 - persist one-shot delayed-only full quoted chain snapshots for current-chain work
@@ -61,6 +63,7 @@ Responsibilities:
 - rank path cases at both family and candidate level
 - rank strategy families and exact contracts
 - compute Action Board / Contract Picker buckets from frozen contract-selection outputs: Buy Now, Watchlist, Avoid For Now, and Prefer Stock Instead
+- compute the long-call required-path engine from the same valuation model so each call is judged by what stock path is required to beat owning stock by 1.5x and 2.0x, where the threshold is relative to stock return rather than an absolute option-return target
 - compute entry-justification / required-stock-path summaries from the same frozen contract-selection outputs so the product can answer what has to happen before a bullish call looks worth buying
 - compute Thesis / Price Target Mode outputs from the same frozen contract-selection engine so the product can answer what a specific target price/date means for bullish calls, max justified premium, path sensitivity, IV sensitivity, and stock-vs-option preference
 - compute a Chain Overview / Compare Options layer from the same frozen contract-selection outputs so bullish long calls can be compared side by side against long stock across one shared representative path-family set
@@ -80,7 +83,7 @@ The contract-selection product is path/simulation-first. Legacy strike/expiry he
 
 `analyze-contract-selection` is the primary path-engine entrypoint inside this layer. It owns the canonical required-path, path-case, contract-ranking, same-path strike/expiry comparison, and compare-vs-stock outputs that both on-disk summaries and published contract-selection pages consume directly.
 
-When same-date full quoted IBKR slices exist locally, contract-selection now prefers that richer quoted chain over manual fallback slices only when the slice is quote-usable. The canonical gate is currently 20% usable-quote coverage for that same-day expiry slice. Sparse same-day IBKR slices remain visible in provenance, but they no longer silently override a better local quoted fallback.
+When same-date full quoted IBKR slices exist locally, contract-selection now prefers that richer quoted chain over manual fallback slices only when the slice is quote-usable. The canonical gate is currently 20% usable-quote coverage for that same-day expiry slice. Same-day manually downloaded Barchart Options Screener slices are the next preferred local chain source before older `option_chains/` fallback files. Sparse same-day IBKR slices remain visible in provenance, but they no longer silently override a better local quoted fallback.
 
 The market-context resolver writes that decision through to the bundle so analysis stays auditable on disk:
 
@@ -102,6 +105,7 @@ That same resolver now makes the spot and trust rules explicit:
 - if same-day delayed IBKR spot fails, canonical analysis falls back to the local historical-price store
 - expiry slices are labeled with source-quality classes such as `same_day_quoted`, `same_day_sparse`, `prior_day_quoted`, and `prior_day_sparse`
 - contract-selection summaries carry a bundle-level trust rollup so sparse/fallback expiries are visible before any HTML is opened
+- Barchart imports carry `source = barchart_options_screener`, `trust = manually_downloaded_barchart`, `entry_price_mode`, bid/ask/mid, spread, IV, volume, open interest, liquidity, quality flags, and model eligibility through candidate and required-path outputs
 
 Inside that bundle, the ranking model is intentionally split into two analysis-first layers:
 
@@ -110,6 +114,8 @@ Inside that bundle, the ranking model is intentionally split into two analysis-f
 
 Path-analysis terminology in the bundle layer:
 
+- required-path engine: the primary long-call product surface; it solves backwards from option-over-stock outperformance and writes `required_path_summary.csv`, `required_paths_by_option.csv`, `required_path_family_summary.csv`, `required_path_peak_summary.csv`, `required_path_exit_ladder.csv`, `required_path_entry_sensitivity.csv`, `required_path_iv_sensitivity.csv`, `required_path_entry_iv_matrix.csv`, `required_path_sell_hold_summary.csv`, `required_path_tables.html`, `required_paths_overview.png`, and per-contract `required_paths_<contract_slug>.png`
+- per-option required-path chart: the chart horizon defaults to option expiry, while any shorter analysis horizon is only a reference marker; option values are computed along the path with remaining time to expiry declining to intrinsic value at expiry
 - required path: the minimum stock path needed to clear a specific goal by each sampled horizon
 - assumed path: the active user-selected stock and IV paths used for the main modeled trace
 - IV path: the volatility-shift curve sampled alongside the stock path
@@ -313,7 +319,7 @@ Responsibilities:
 - write a `model_output_manifest.json` that links back to the canonical source bundle
 - maintain an obvious `latest/` workspace for each ticker
 - keep simple archive bookkeeping for promoted runs
-- group contract-selection output into `00_overview/`, `01_path_packs/`, `02_tables/`, and `03_secondary/`
+- group contract-selection output into `00_core_view/`, `01_option_required_paths/`, and `99_secondary_or_debug/`
 
 This layer is intentionally not a second analysis engine:
 
@@ -325,21 +331,14 @@ For contract-selection, `model_outputs/` is where the user should look first. `a
 
 The curated reading order for `model_outputs/<TICKER>/latest/` is:
 
-1. `00_core_view/bullish_action_board.md`
-2. `00_core_view/chain_overview.md`
-3. `00_core_view/entry_justification.md`
-4. `01_thesis_view/thesis_mode.md`
-5. `00_core_view/stress_tests.md`
-6. `00_core_view/single_option_decision.md`
-7. `00_core_view/single_option_decision_view.png`
-7. the remaining core charts and bullish watchlist/trigger tables
-8. `01_thesis_view/` for explicit target-thesis detail
-9. `02_path_packs/` for path-level strike/expiry/IV details
-10. `03_tables/` and `04_secondary/` for supporting artifacts
-13. review `iv_robustness_summary.csv`
-14. read delta-vs-stock charts second: compare-vs-stock plus strike, expiry, best-of, and IV-expanded delta views
-15. review `checkpoints.csv` and IV checkpoint CSVs
-16. use representative-path outputs as secondary support
+1. `00_core_view/required_paths_overview.png`
+2. `00_core_view/required_path_summary.md`
+3. `00_core_view/required_path_summary.csv`
+4. `00_core_view/required_path_tables.html`
+5. `00_core_view/required_path_tables.md`
+6. `00_core_view/top_required_path_candidates.md`
+7. `01_option_required_paths/` for per-contract required stock and option-return charts plus sensitivity/sell-hold CSVs
+8. `99_secondary_or_debug/` for supporting Markdown and CSV diagnostics; old fixed-target, single-option, gallery, and path-pack charts stay out of the curated model-output surface
 
 ## 5. Runtime directories
 

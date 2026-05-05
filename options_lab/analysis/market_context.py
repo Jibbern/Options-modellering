@@ -86,10 +86,11 @@ class _SpotContext:
 
 
 _NEARBY_SOURCE_RANK = {
-    "preferred_option_chains": 0,
-    "ibkr_full_quoted_snapshot": 1,
-    "ibkr_chain_snapshot": 2,
-    "legacy_ticker_root": 3,
+    "ibkr_full_quoted_snapshot": 0,
+    "barchart_options_screener": 1,
+    "preferred_option_chains": 2,
+    "ibkr_chain_snapshot": 3,
+    "legacy_ticker_root": 4,
 }
 
 
@@ -103,6 +104,8 @@ def _slice_sort_key(row: pd.Series, requested_snapshot: date) -> tuple[int, int,
 def _chosen_reason(fallback_level: str, row: pd.Series) -> str:
     mapping = {
         "exact_same_day_ibkr_full_quoted": "Same-day quote-usable IBKR full quoted slice won the source precedence.",
+        "exact_same_day_barchart_options_screener": "Same-day manually downloaded Barchart Options Screener slice was used.",
+        "same_day_fallback_from_sparse_ibkr_to_barchart": "Same-day IBKR full quoted slice was too sparse, so the same-day Barchart Options Screener slice was used instead.",
         "same_day_fallback_from_sparse_ibkr": "Same-day IBKR full quoted slice was too sparse, so the same-day local option_chains slice was used instead.",
         "exact_same_day_preferred_option_chain": "Same-day preferred local option_chains slice was used because no quote-usable same-day IBKR full quoted slice existed.",
         "exact_same_day_local_quoted": "Same-day quoted local slice was used because it was the best available exact-date source.",
@@ -189,6 +192,21 @@ def _resolve_chain_row_for_expiry(group: pd.DataFrame, requested_snapshot: date)
             ascending=[False, False, False],
         ).iloc[0]
         return chosen, "exact_snapshot", "exact_same_day_ibkr_full_quoted", None
+
+    exact_barchart = same_day.loc[
+        (same_day["storage_location"] == "barchart_options_screener") & (same_day["quote_usable"].fillna(False))
+    ].copy()
+    if not exact_barchart.empty:
+        chosen = exact_barchart.sort_values(
+            ["usable_quote_coverage_pct", "usable_quote_count", "contract_count"],
+            ascending=[False, False, False],
+        ).iloc[0]
+        rejected = same_day_sparse_ibkr.sort_values(
+            ["usable_quote_coverage_pct", "usable_quote_count", "contract_count"],
+            ascending=[False, False, False],
+        ).iloc[0] if not same_day_sparse_ibkr.empty else None
+        fallback_level = "same_day_fallback_from_sparse_ibkr_to_barchart" if rejected is not None else "exact_same_day_barchart_options_screener"
+        return chosen, "exact_snapshot", fallback_level, rejected
 
     exact_preferred = same_day.loc[same_day["storage_location"] == "preferred_option_chains"].copy()
     if not exact_preferred.empty:
@@ -376,6 +394,12 @@ def resolve_market_context(
     pricing_candidates = slices.loc[slices["storage_location"] != "ibkr_chain_universe"].copy()
     if pricing_candidates.empty:
         raise ValueError(f"No local quoted chain slices were available for {ticker_label}; only chain-universe metadata exists.")
+    pricing_candidates = pricing_candidates.loc[
+        pricing_candidates["expiry_date"].notna()
+        & (pricing_candidates["expiry_date"] >= pd.Timestamp(requested_snapshot))
+    ].copy()
+    if pricing_candidates.empty:
+        raise ValueError(f"No non-expired local quoted chain slices were available for {ticker_label} on {requested_snapshot.isoformat()}.")
 
     resolved_inputs: list[ResolvedChainInput] = []
     warnings: list[str] = []

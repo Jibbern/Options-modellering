@@ -33,6 +33,7 @@ NORMALIZED_COLUMNS = [
 
 PRICE_COLUMN_ALIASES = {
     "date": "date",
+    "time": "date",
     "trade_date": "date",
     "open": "open",
     "opening_price": "open",
@@ -48,6 +49,7 @@ PRICE_COLUMN_ALIASES = {
     "close_last_trade": "close",
     "close_last_trade_price": "close",
     "last": "close",
+    "latest": "close",
     "last_sale": "close",
     "volume": "volume",
     "share_volume": "volume",

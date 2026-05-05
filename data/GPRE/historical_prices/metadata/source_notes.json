@@ -1,18 +1,11 @@
 {
   "ticker": "GPRE",
-  "primary_source": "nasdaq_historical_quotes",
-  "transport": "direct_json_xhr",
-  "endpoint": "https://api.nasdaq.com/api/quote/gpre/historical",
-  "request_headers": {
-    "accept": "application/json, text/plain, */*",
-    "accept-language": "en-US,en;q=0.9",
-    "origin": "https://www.nasdaq.com",
-    "referer": "https://www.nasdaq.com/market-activity/stocks/gpre/historical"
-  },
+  "primary_source": "barchart_price_history",
   "manual_import_directory": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\historical_prices\\raw\\manual",
-  "notes": [
-    "The downloader targets Nasdaq historical quotes JSON/XHR rather than scraping HTML.",
-    "If Nasdaq returns unavailable data or blocks the request, drop a manual CSV into raw/manual and normalize it with normalize_manual_price_file(...)."
-  ],
-  "latest_downloaded_at": "2026-04-22T15:39:19Z"
+  "last_manual_import": {
+    "source_file": "gpre_price-history-05-05-2026.csv",
+    "raw_copy": "C:\\Users\\Jibbe\\Aktier\\Options\\data\\GPRE\\historical_prices\\raw\\manual\\gpre_price-history-05-05-2026.csv",
+    "imported_at": "2026-05-05T14:24:42Z",
+    "row_count": 519
+  }
 }

@@ -24,9 +24,12 @@ CONTRACT_SELECTION_OVERVIEW_SUMMARIES = {
     "chain_overview.md",
     "other_structures.md",
     "entry_justification.md",
+    "required_path_summary.md",
+    "required_path_exit_ladder.md",
     "thesis_mode.md",
     "stress_tests.md",
     "top_candidate_cards.md",
+    "top_required_path_candidates.md",
     "single_option_decision.md",
 }
 # Projection allowlists only: model_outputs never computes analysis. New
@@ -43,6 +46,9 @@ PRIMARY_MODEL_ARTIFACTS: dict[str, tuple[str, ...]] = {
         "thesis_mode.md",
         "stress_tests.md",
         "top_candidate_cards.md",
+        "required_path_summary.md",
+        "required_path_exit_ladder.md",
+        "top_required_path_candidates.md",
         "single_option_decision.md",
     ),
     "tables": (
@@ -86,6 +92,10 @@ PRIMARY_MODEL_ARTIFACTS: dict[str, tuple[str, ...]] = {
         "required_move_vs_stock.csv",
         "required_iv_support_summary.csv",
         "entry_barrier_summary.csv",
+        "goal_required_path_summary.csv",
+        "required_path_summary.csv",
+        "required_paths_by_option.csv",
+        "required_path_family_summary.csv",
         "thesis_path_gallery.csv",
         "thesis_iv_gallery.csv",
         "thesis_mode_candidates.csv",
@@ -138,6 +148,7 @@ PRIMARY_MODEL_ARTIFACTS: dict[str, tuple[str, ...]] = {
         "required_move_vs_stock_chart.png",
         "strike_expiry_entry_barrier_map.png",
         "iv_support_requirement_chart.png",
+        "required_paths_overview.png",
         "thesis_path_gallery.png",
         "thesis_iv_gallery.png",
         "thesis_candidate_overview.png",
@@ -471,6 +482,28 @@ SECONDARY_CHARTS = (
     "long_call_value_over_path_expiry_view.png",
     "long_call_value_over_path_best_of.png",
 )
+
+# Contract-selection product projection: keep the default human-facing surface
+# focused on required paths, and demote older thesis/debug material.
+CORE_VIEW_SUMMARIES = {
+    "required_path_summary.md",
+    "required_path_tables.html",
+    "required_path_tables.md",
+    "top_required_path_candidates.md",
+}
+CORE_VIEW_CHARTS = {"required_paths_overview.png"}
+CORE_VIEW_TABLES = {"required_path_summary.csv"}
+OPTION_REQUIRED_PATH_TABLES = {
+    "required_paths_by_option.csv",
+    "required_path_family_summary.csv",
+    "required_path_peak_summary.csv",
+    "required_path_exit_ladder.csv",
+    "required_path_entry_sensitivity.csv",
+    "required_path_iv_sensitivity.csv",
+    "required_path_entry_iv_matrix.csv",
+    "required_path_sell_hold_summary.csv",
+}
+OPTION_REQUIRED_PATH_SUMMARIES = {"required_path_exit_ladder.md"}
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -823,26 +856,15 @@ def _start_here_text(
 
     open_first_paths = numbered_available(
         [
-            "00_core_view/bullish_action_board.md",
-            "00_core_view/chain_overview.md",
-            "00_core_view/chain_overview.png",
-            "00_core_view/entry_justification.md",
-            "01_thesis_view/thesis_mode.md",
-            "00_core_view/stress_tests.md",
-            "00_core_view/single_option_decision.md",
-            "00_core_view/top_candidate_cards.png",
-            "00_core_view/current_vs_justified_premium.png",
-            "00_core_view/stock_vs_option_preference_chart.png",
-            "00_core_view/stress_test_overview.png",
-            "00_core_view/premium_sensitivity_chart.png",
-            "00_core_view/timing_slip_chart.png",
-            "00_core_view/target_stress_chart.png",
-            "00_core_view/top_candidate_stress_cards.png",
-            "00_core_view/single_option_decision_view.png",
-            "00_core_view/required_stock_path_to_buy.png",
-            "00_core_view/required_move_speed_vs_magnitude.png",
-            "00_core_view/bullish_long_call_watchlist.csv",
-            "00_core_view/bullish_long_call_triggers.csv",
+            "00_core_view/required_paths_overview.png",
+            "00_core_view/required_path_summary.md",
+            "00_core_view/required_path_summary.csv",
+            "00_core_view/required_path_tables.html",
+            "00_core_view/required_path_tables.md",
+            "00_core_view/top_required_path_candidates.md",
+            "01_option_required_paths/required_paths_by_option.csv",
+            "01_option_required_paths/required_path_family_summary.csv",
+            "01_option_required_paths/required_path_peak_summary.csv",
         ]
     )
     if not open_first_paths:
@@ -857,22 +879,21 @@ def _start_here_text(
     )
     lines.extend([f"{idx}. `{path}`" for idx, path in enumerate(open_first_paths, start=1)])
     next_idx = len(open_first_paths) + 1
-    if any(path.startswith("01_thesis_view/") for path in promoted_set):
-        lines.append(f"{next_idx}. Then use `01_thesis_view/` for deeper target-thesis charts and tables")
+    if any(path.startswith("01_option_required_paths/required_paths_") and path.endswith(".png") for path in promoted_set):
+        lines.append(f"{next_idx}. Then open the per-option charts in `01_option_required_paths/`")
         next_idx += 1
-    if path_focus_paths:
-        lines.append(f"{next_idx}. Then choose a scenario folder under `02_path_packs/` for deeper path analysis")
-        next_idx += 1
-    lines.append(f"{next_idx}. Then use `03_tables/` and `04_secondary/` only as supporting detail")
+    lines.append(f"{next_idx}. Then use `99_secondary_or_debug/` only as supporting detail")
 
     companion_views = [
         path
         for path in [
-            "00_core_view/bullish_action_board.md",
-            "00_core_view/chain_overview.md",
-            "00_core_view/top_candidate_cards.md",
-            "04_secondary/bullish_action_board_overview.png",
-            "04_secondary/bullish_conviction_vs_robustness.png",
+            "00_core_view/required_path_summary.md",
+            "00_core_view/top_required_path_candidates.md",
+            "00_core_view/required_path_tables.html",
+            "00_core_view/required_path_tables.md",
+            "01_option_required_paths/required_paths_by_option.csv",
+            "99_secondary_or_debug/bullish_action_board.md",
+            "99_secondary_or_debug/chain_overview.md",
         ]
         if available(path)
     ]
@@ -880,7 +901,8 @@ def _start_here_text(
         lines.extend(
             [
                 "",
-                "Bullish-first companion views remain available where the source bundle contains bullish long-call rows.",
+                "The required-path engine is the primary read. Older bullish, thesis, and diagnostic notes/tables remain available in secondary/debug output when present, but legacy charts are not promoted into the human-facing output.",
+                "Definition: `1.5x` / `2.0x` means option return relative to stock return over the same holding period, not absolute option return.",
             ]
         )
     lines.extend(
@@ -917,73 +939,26 @@ def _start_here_text(
         lines.extend(["", "## Trusted Expiries", ""] + trusted_lines)
     if fallback_lines:
         lines.extend(["", "## Fallback-Only Expiries", ""] + fallback_lines)
-    if path_focus_paths:
-        lines.extend(["", "## Path Packs", ""])
-        for row in path_focus_paths:
-            path_label = clean_string(row.get("path_label")) or _humanize_path_name(clean_string(row.get("path_name")))
-            alias = _path_pack_alias(row)
-            lines.append(f"- {path_label}: `02_path_packs/{alias}/README.md`")
     inspect_items = bullets_for_available(
         [
-            ("00_core_view/bullish_action_board.md", "primary bullish long-call shortlist under the active assumptions"),
-            ("00_core_view/chain_overview.md", "compare bullish calls side by side against stock across the same representative path families"),
-            ("00_core_view/chain_overview.png", "six top compare-options cards plus verdict distribution"),
-            ("00_core_view/chain_overview_candidates.csv", "compact contract-by-contract compare-options table"),
-            ("00_core_view/chain_overview_summary.csv", "frozen payload behind the six summary cards"),
-            ("00_core_view/entry_justification.md", "what the stock actually has to do before the calls look worth buying"),
-            ("00_core_view/single_option_decision.md", "one selected call tested directly against buying stock across curated decision paths"),
-            ("00_core_view/single_option_decision_view.png", "hero view showing curated decision paths plus required 1.5x/2.0x option-over-stock edge paths"),
-            ("00_core_view/single_option_decision_path_selections.csv", "the 5-8 selected decision paths with family, outcome, score, and reason"),
-            ("00_core_view/single_option_required_path_to_beat_stock_1_5x.csv", "minimum stock path required for the selected call to beat stock after the meaningful bullish stock-PnL floor"),
-            ("00_core_view/single_option_required_path_to_beat_stock_2_0x.csv", "strong-edge stock path required for the selected call after the meaningful bullish stock-PnL floor"),
-            ("00_core_view/single_option_closest_representative_path_to_edge.csv", "closest curated path when the option misses the stock benchmark edge"),
-            ("00_core_view/single_option_edge_gap_by_path_family.csv", "path-family gaps showing whether misses need more stock move, earlier timing, IV support, or entry discount"),
-            ("00_core_view/top_candidate_cards.png", "card-style first read for contract, why, trigger, trust, and stock note"),
-            ("00_core_view/current_vs_justified_premium.png", "current premium versus thesis-justified max premium"),
-            ("00_core_view/stock_vs_option_preference_chart.png", "stock versus option preference read"),
-            ("00_core_view/required_stock_path_to_buy.png", "required path versus active assumed path for the leading bullish calls"),
-            ("00_core_view/required_move_speed_vs_magnitude.png", "how fast and how far the stock needs to move"),
-            ("00_core_view/bullish_long_call_watchlist.csv", "bullish calls worth monitoring"),
-            ("00_core_view/bullish_long_call_triggers.csv", "richer bullish trigger map"),
-            ("01_thesis_view/thesis_mode.md", "thesis-first read for the explicit target price/date and justified-entry premium"),
-            ("01_thesis_view/thesis_candidate_overview.png", "compact thesis-mode contract picker"),
-            ("01_thesis_view/thesis_path_gallery.png", "multiple routes to the same thesis endpoint"),
-            ("01_thesis_view/thesis_stock_vs_option.png", "where stock still beats calls even if the thesis endpoint is reached"),
-            ("01_thesis_view/current_vs_justified_premium.png", "premium gap inside the thesis view"),
-            ("01_thesis_view/thesis_candidate_ranking.csv", "thesis-mode ranking table"),
-            ("01_thesis_view/current_vs_justified_premium.csv", "current-vs-justified premium table"),
-            ("04_secondary/bullish_action_board_overview.png", "full bullish scorecard with Why / Warning / Trigger / Trust"),
-            ("04_secondary/bullish_buy_watch_avoid_matrix.png", "bullish buy / watch / avoid support read"),
-            ("04_secondary/bullish_conviction_vs_robustness.png", "bullish long calls plus stock baseline, separated from other structures"),
-            ("04_secondary/bullish_trigger_map.png", "full trigger map for bullish watchlist names"),
-            ("03_tables/bullish_long_call_action_board.csv", "bullish long-call board with reasons and triggers"),
-            ("03_tables/bullish_long_call_avoid.csv", "bullish calls to keep out of the active shortlist"),
-            ("03_tables/top_candidate_cards.csv", "source table behind the card visual"),
-            ("03_tables/single_option_path_outcomes.csv", "path-by-path option-vs-stock outcomes behind the single-option hero view"),
-            ("03_tables/single_option_edge_gap_by_path_family.csv", "family-by-family required-edge gap behind the single-option hero view"),
-            ("03_tables/single_option_iv_sensitivity.csv", "low/base/high IV sensitivity for the selected option"),
-            ("03_tables/single_option_entry_sensitivity.csv", "cheap/reference/expensive entry sensitivity for the selected option"),
-            ("03_tables/stock_path_library.csv", "broad stock-path library metadata with family and timing labels"),
-            ("04_secondary/required_move_vs_stock_chart.png", "whether stock still dominates even after the required path is met"),
-            ("04_secondary/strike_expiry_entry_barrier_map.png", "which strike/expiry pairs ask the least or most from the stock path"),
-            ("04_secondary/iv_support_requirement_chart.png", "which calls need IV support versus which tolerate lower IV"),
-            ("03_tables/required_move_summary.csv", "numeric entry-speed and magnitude read"),
-            ("03_tables/required_move_vs_stock.csv", "stock-cleaner versus option-edge read after the required path is achieved"),
-            ("03_tables/required_iv_support_summary.csv", "lower-IV penalty versus friendlier-IV relief"),
-            ("03_tables/entry_barrier_summary.csv", "compact strike/expiry barrier table"),
-            ("04_secondary/other_structures.md", "covered calls / CSPs / spreads as secondary context"),
+            ("00_core_view/required_paths_overview.png", "compact overview of what each long call needs to beat stock by 1.5x and 2.0x"),
+            ("00_core_view/required_path_summary.md", "human summary of plausible, aggressive, extreme, and stock-cleaner reads"),
+            ("00_core_view/required_path_summary.csv", "one row per call and threshold with required terminal move and verdict"),
+            ("00_core_view/required_path_tables.html", "spreadsheet-style workbook for required moves, entry risk, IV risk, and sell/hold pressure"),
+            ("00_core_view/required_path_tables.md", "short guide to reading the required-path workbook"),
+            ("00_core_view/top_required_path_candidates.md", "small ranked shortlist by required-path burden"),
+            ("01_option_required_paths/required_paths_by_option.csv", "path/date-level required stock and option-return rows"),
+            ("01_option_required_paths/required_path_family_summary.csv", "family-level timing and failure-driver aggregation"),
+            ("01_option_required_paths/required_path_peak_summary.csv", "best-exit / peak-return metadata for each required path family"),
+            ("01_option_required_paths/required_path_exit_ladder.csv", "absolute option-return exit checkpoints for each required path family"),
+            ("01_option_required_paths/required_path_entry_sensitivity.csv", "fill-price sensitivity for required stock moves"),
+            ("01_option_required_paths/required_path_iv_sensitivity.csv", "vol-point IV sensitivity for required stock moves"),
+            ("01_option_required_paths/required_path_entry_iv_matrix.csv", "combined entry-premium and IV stress matrix"),
+            ("01_option_required_paths/required_path_sell_hold_summary.csv", "sell/hold pressure from peak return to expiry"),
+            ("01_option_required_paths/required_path_exit_ladder.md", "compact secondary summary of best modeled exits"),
             ("summary.md", "compact full-bundle summary after the action-board read"),
-            ("04_secondary/highlights.md", "broader robustness highlights before the path-pack detail"),
-            ("04_secondary/highlights_overview.png", "compact category-to-candidate decision map"),
-            ("04_secondary/candidate_robustness_vs_upside.png", "aggressive upside versus robustness, with stock as baseline"),
-            ("04_secondary/stock_vs_option_decision_chart.png", "where options beat or lag the long-stock benchmark"),
-            ("04_secondary/stock_path_gallery.png", "scenario menu for deliberate named stock paths"),
-            ("04_secondary/iv_path_gallery.png", "named IV-regime menu, kept separate from stock paths"),
-            ("04_secondary/required_path_vs_assumed_path.png", "required-path sanity check"),
-            ("03_tables/chain_source_summary.csv", "per-expiry source, trust label, coverage, and fallback reason"),
-            ("03_tables/market_context_summary.csv", "bundle-level spot, rate, and metadata context"),
-            ("03_tables/family_comparison.csv", "family-level decision read under current assumptions"),
-            ("03_tables/candidate_comparison.csv", "exact candidate ranking and benchmark comparison"),
+            ("99_secondary_or_debug/action_board.md", "legacy action-board notes, kept as supporting text only"),
+            ("99_secondary_or_debug/chain_overview.md", "legacy chain-overview notes, kept as supporting text only"),
         ]
     )
     lines.extend(["", "## Inspect Next", ""])
@@ -991,20 +966,9 @@ def _start_here_text(
         lines.extend(inspect_items)
     else:
         lines.append("- `model_output_manifest.json`: complete promoted file list")
-    if path_focus_paths:
-        lines.extend(
-            [
-                "- `02_path_packs/<path>/iv_path_value.png`: same stock path and same anchor long call, but multiple IV regimes",
-                "- `02_path_packs/<path>/iv_path_delta.png`: stock-relative version of the IV-regime comparison",
-                "- `02_path_packs/<path>/long_call_strike_iv_value.png`: strike ladder where IV is an explicit axis",
-                "- `02_path_packs/<path>/long_call_expiry_iv_value.png`: expiry ladder where IV is an explicit axis",
-                "- `02_path_packs/<path>/long_call_best_of_iv_value.png`: best-of long-call set across IV regimes",
-                "- `02_path_packs/<path>/iv_robustness_summary.csv`: compact decision read for IV robustness and stock dominance",
-            ]
-        )
     lines.extend(
         [
-            "- `04_secondary/`: representative-path and broad support artifacts, intentionally behind the core and thesis views",
+            "- `99_secondary_or_debug/`: supporting Markdown and CSV diagnostics only; old fixed-target and path-pack charts are intentionally omitted from model outputs",
             "",
             "## Full Manifest",
             "",
@@ -1062,91 +1026,32 @@ def _selected_targets(
 
     for filename in CORE_VIEW_SUMMARIES:
         add_copy(summary_map, filename, Path("00_core_view") / filename)
-    for filename in THESIS_VIEW_SUMMARIES:
-        add_copy(summary_map, filename, Path("01_thesis_view") / filename)
-    for filename in SECONDARY_VIEW_SUMMARIES:
-        add_copy(summary_map, filename, Path("04_secondary") / filename)
 
     for filename in CORE_VIEW_CHARTS:
         add_copy(charts_map, filename, Path("00_core_view") / filename)
-    for filename in THESIS_VIEW_CHARTS:
-        add_copy(charts_map, filename, Path("01_thesis_view") / filename)
-    for filename in SECONDARY_VIEW_CHARTS:
-        add_copy(charts_map, filename, Path("04_secondary") / filename)
 
     for filename in CORE_VIEW_TABLES:
         add_copy(tables_map, filename, Path("00_core_view") / filename)
-    for filename in THESIS_VIEW_TABLES:
-        add_copy(tables_map, filename, Path("01_thesis_view") / filename)
-    for filename in sorted(CURATED_TABLES - CORE_VIEW_TABLES - THESIS_VIEW_TABLES):
-        add_copy(tables_map, filename, Path("03_tables") / filename)
-    for filename in SECONDARY_TABLES:
-        add_copy(tables_map, filename, Path("04_secondary") / filename)
-    for filename in SECONDARY_CHARTS:
-        add_copy(charts_map, filename, Path("04_secondary") / filename)
+    for filename in OPTION_REQUIRED_PATH_TABLES:
+        add_copy(tables_map, filename, Path("01_option_required_paths") / filename)
+    for filename in OPTION_REQUIRED_PATH_SUMMARIES:
+        add_copy(summary_map, filename, Path("01_option_required_paths") / filename)
+    for filename, rel in sorted(charts_map.items()):
+        if filename.startswith("required_paths_") and filename != "required_paths_overview.png":
+            target = Path("01_option_required_paths") / filename
+            if target.as_posix() not in promoted_files:
+                copies.append((bundle_dir / rel, target))
+                promoted_files.append(target.as_posix())
 
-    for row in path_focus_paths or []:
-        alias = _path_pack_alias(row)
-        pack_dir = Path("02_path_packs") / alias
-        path_targets = [
-            ("compare_table", "compare_vs_stock_delta.csv", tables_map),
-            ("compare_chart", "compare_vs_stock_delta.png", charts_map),
-            ("strike_value_table", "long_call_strike_value.csv", tables_map),
-            ("strike_value_chart", "long_call_strike_value.png", charts_map),
-            ("strike_delta_table", "long_call_strike_delta.csv", tables_map),
-            ("strike_delta_chart", "long_call_strike_delta.png", charts_map),
-            ("expiry_value_table", "long_call_expiry_value.csv", tables_map),
-            ("expiry_value_chart", "long_call_expiry_value.png", charts_map),
-            ("expiry_delta_table", "long_call_expiry_delta.csv", tables_map),
-            ("expiry_delta_chart", "long_call_expiry_delta.png", charts_map),
-            ("best_of_value_table", "long_call_best_of_value.csv", tables_map),
-            ("best_of_value_chart", "long_call_best_of_value.png", charts_map),
-            ("best_of_delta_table", "long_call_best_of_delta.csv", tables_map),
-            ("best_of_delta_chart", "long_call_best_of_delta.png", charts_map),
-            ("checkpoint_table", "checkpoints.csv", tables_map),
-            ("iv_value_table", "iv_path_value.csv", tables_map),
-            ("iv_value_chart", "iv_path_value.png", charts_map),
-            ("iv_delta_table", "iv_path_delta.csv", tables_map),
-            ("iv_delta_chart", "iv_path_delta.png", charts_map),
-            ("iv_checkpoint_table", "iv_checkpoints.csv", tables_map),
-            ("iv_robustness_summary_table", "iv_robustness_summary.csv", tables_map),
-            ("strike_iv_value_table", "long_call_strike_iv_value.csv", tables_map),
-            ("strike_iv_value_chart", "long_call_strike_iv_value.png", charts_map),
-            ("strike_iv_delta_table", "long_call_strike_iv_delta.csv", tables_map),
-            ("strike_iv_delta_chart", "long_call_strike_iv_delta.png", charts_map),
-            ("strike_iv_checkpoint_table", "long_call_strike_iv_checkpoints.csv", tables_map),
-            ("expiry_iv_value_table", "long_call_expiry_iv_value.csv", tables_map),
-            ("expiry_iv_value_chart", "long_call_expiry_iv_value.png", charts_map),
-            ("expiry_iv_delta_table", "long_call_expiry_iv_delta.csv", tables_map),
-            ("expiry_iv_delta_chart", "long_call_expiry_iv_delta.png", charts_map),
-            ("expiry_iv_checkpoint_table", "long_call_expiry_iv_checkpoints.csv", tables_map),
-            ("best_of_iv_value_table", "long_call_best_of_iv_value.csv", tables_map),
-            ("best_of_iv_value_chart", "long_call_best_of_iv_value.png", charts_map),
-            ("best_of_iv_delta_table", "long_call_best_of_iv_delta.csv", tables_map),
-            ("best_of_iv_delta_chart", "long_call_best_of_iv_delta.png", charts_map),
-            ("best_of_iv_checkpoint_table", "long_call_best_of_iv_checkpoints.csv", tables_map),
-        ]
-        for metadata_key, target_name, source_map in path_targets:
-            filename = clean_string(row.get(metadata_key))
-            if not filename:
-                continue
-            add_copy(source_map, filename, pack_dir / target_name)
-
-    if not path_focus_paths:
-        for filename, rel in sorted(tables_map.items()):
-            if any(filename.endswith(suffix) for suffix in PATH_CENTRIC_TABLE_SUFFIXES):
-                path_name = filename.split("__", 1)[0]
-                target = Path("02_path_packs") / path_name / filename
-                if target.as_posix() not in promoted_files:
-                    copies.append((bundle_dir / rel, target))
-                    promoted_files.append(target.as_posix())
-        for filename, rel in sorted(charts_map.items()):
-            if any(filename.endswith(suffix) for suffix in PATH_CENTRIC_CHART_SUFFIXES):
-                path_name = filename.split("__", 1)[0]
-                target = Path("02_path_packs") / path_name / filename
-                if target.as_posix() not in promoted_files:
-                    copies.append((bundle_dir / rel, target))
-                    promoted_files.append(target.as_posix())
+    primary_summary_names = set(PRIMARY_MODEL_ARTIFACTS["summary"]) | set(CONTRACT_SELECTION_OVERVIEW_SUMMARIES)
+    for filename in sorted(primary_summary_names):
+        if filename in CORE_VIEW_SUMMARIES or filename in OPTION_REQUIRED_PATH_SUMMARIES:
+            continue
+        add_copy(summary_map, filename, Path("99_secondary_or_debug") / filename)
+    for filename in sorted(set(PRIMARY_MODEL_ARTIFACTS["tables"]) | set(CURATED_TABLES) | set(SECONDARY_TABLES)):
+        if filename == "summary.csv" or filename in CORE_VIEW_TABLES or filename in OPTION_REQUIRED_PATH_TABLES:
+            continue
+        add_copy(tables_map, filename, Path("99_secondary_or_debug") / filename)
 
     return copies, sorted(promoted_files), sorted(missing_files)
 
@@ -1271,20 +1176,6 @@ def build_model_outputs(
     for source, relative_target in copies:
         if source.exists():
             _copy_sanitized(source, promoted_dir / relative_target, workspace_root=workspace_root)
-
-    if resolved_kind == "contract_selection":
-        for row in path_focus_paths:
-            alias = _path_pack_alias(row)
-            pack_dir = promoted_dir / "02_path_packs" / alias
-            if not pack_dir.exists():
-                continue
-            readme_path = pack_dir / "README.md"
-            readme_path.write_text(
-                _sanitize_text(_path_pack_readme_text(row), workspace_root=workspace_root),
-                encoding="utf-8",
-            )
-            promoted_files.append((Path("02_path_packs") / alias / "README.md").as_posix())
-        promoted_files = sorted(dict.fromkeys(promoted_files))
 
     summary_row = _summary_row(bundle_dir)
     chain_rows = _table_rows(bundle_dir, "chain_source_summary.csv")

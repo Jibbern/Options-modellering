@@ -7013,6 +7013,20 @@ def _render_contract_selection_body(
     expiry_comparison_under_path = _load_csv(artifact_dir / "expiry_comparison_under_path.csv")
     path_risk_summary = _load_csv(artifact_dir / "path_risk_summary.csv")
     stock_path_library = _load_csv(artifact_dir / "stock_path_library.csv")
+    required_path_summary = _load_csv(artifact_dir / "required_path_summary.csv")
+    required_paths_by_option = _load_csv(artifact_dir / "required_paths_by_option.csv")
+    required_path_family_summary = _load_csv(artifact_dir / "required_path_family_summary.csv")
+    required_path_peak_summary = _load_csv(artifact_dir / "required_path_peak_summary.csv")
+    required_path_exit_ladder = _load_csv(artifact_dir / "required_path_exit_ladder.csv")
+    required_path_entry_sensitivity = _load_csv(artifact_dir / "required_path_entry_sensitivity.csv")
+    required_path_iv_sensitivity = _load_csv(artifact_dir / "required_path_iv_sensitivity.csv")
+    required_path_entry_iv_matrix = _load_csv(artifact_dir / "required_path_entry_iv_matrix.csv")
+    required_path_sell_hold_summary = _load_csv(artifact_dir / "required_path_sell_hold_summary.csv")
+    required_path_markdown = _load_markdown(artifact_dir / "required_path_summary.md")
+    required_path_exit_ladder_markdown = _load_markdown(artifact_dir / "required_path_exit_ladder.md")
+    required_path_tables_markdown = _load_markdown(artifact_dir / "required_path_tables.md")
+    required_path_tables_html_path = artifact_dir / "required_path_tables.html"
+    top_required_path_markdown = _load_markdown(artifact_dir / "top_required_path_candidates.md")
     chain_overview_summary = _load_csv(artifact_dir / "chain_overview_summary.csv")
     chain_overview_candidates = _load_csv(artifact_dir / "chain_overview_candidates.csv")
     chain_overview_markdown = _load_markdown(artifact_dir / "chain_overview.md")
@@ -7033,6 +7047,9 @@ def _render_contract_selection_body(
             if path.name == filename:
                 return path
         return None
+
+    def charts_by_prefix(prefix: str) -> list[str]:
+        return sorted(path.name for path in images if path.name.startswith(prefix))
 
     def subset_frame(frame: pd.DataFrame, columns: list[str], *, limit: int | None = None) -> pd.DataFrame:
         if frame is None or frame.empty:
@@ -7090,6 +7107,18 @@ def _render_contract_selection_body(
             f'<section class="panel"><h2>{escape(title)}</h2>'
             '<p class="section-intro">Frozen Markdown generated upstream in analysis.</p>'
             f'<pre class="raw-notes">{escape(text)}</pre></section>'
+        )
+
+    def render_required_path_tables_workbook() -> str:
+        if not required_path_tables_html_path.exists():
+            return ""
+        href = Path(_relative_href(required_path_tables_html_path, base_dir)).as_posix()
+        return (
+            '<section class="panel"><h2>Required Path Tables</h2>'
+            '<p class="section-intro">Spreadsheet-style frozen workbook for required moves, entry premium sensitivity, IV sensitivity, sell/hold pressure, and absolute option-return exit ladders.</p>'
+            f'<p><a class="scenario-link-chip" href="{escape(href)}">Open required_path_tables.html</a></p>'
+            f'<iframe title="Required Path Tables" src="{escape(href)}" style="width:100%; min-height:760px; border:1px solid #c8d7e6; border-radius:6px; background:#fff;"></iframe>'
+            "</section>"
         )
 
     def render_chain_overview_cards(frame: pd.DataFrame) -> str:
@@ -7315,6 +7344,157 @@ def _render_contract_selection_body(
         ],
         limit=12,
     )
+    required_path_summary_table = subset_frame(
+        required_path_summary,
+        [
+            "contract_label",
+            "threshold_multiple",
+            "strike",
+            "expiry",
+            "chart_horizon_date",
+            "entry_premium",
+            "required_terminal_stock_price",
+            "required_move_pct",
+            "earliest_valid_date",
+            "status",
+            "verdict",
+            "concise_explanation",
+        ],
+        limit=18,
+    )
+    required_paths_by_option_table = subset_frame(
+        required_paths_by_option,
+        [
+            "contract_label",
+            "threshold_multiple",
+            "path_family",
+            "date",
+            "time_to_expiry_days",
+            "stock_price",
+            "option_value",
+            "intrinsic_value",
+            "time_value",
+            "option_return_pct",
+            "stock_return_pct",
+            "option_vs_stock_multiple",
+            "is_checkpoint_marker",
+            "is_peak_option_return",
+            "clears_threshold",
+            "realism_bucket",
+        ],
+        limit=24,
+    )
+    required_path_family_table = subset_frame(
+        required_path_family_summary,
+        [
+            "contract_label",
+            "threshold_multiple",
+            "path_family",
+            "min_required_move_pct",
+            "median_required_move_pct",
+            "earliest_clear_date",
+            "latest_clear_date",
+            "clears_count",
+            "realism_bucket",
+            "failure_driver",
+            "peak_option_return_pct",
+            "peak_date",
+        ],
+        limit=24,
+    )
+    required_path_peak_table = subset_frame(
+        required_path_peak_summary,
+        [
+            "contract_label",
+            "threshold_multiple",
+            "path_family",
+            "peak_date",
+            "peak_option_return_pct",
+            "peak_option_value",
+            "stock_price_at_peak",
+            "option_vs_stock_multiple_at_peak",
+            "terminal_option_return_pct",
+            "terminal_option_vs_stock_multiple",
+        ],
+        limit=24,
+    )
+    required_path_exit_ladder_table = subset_frame(
+        required_path_exit_ladder,
+        [
+            "contract_label",
+            "threshold_multiple",
+            "path_family",
+            "exit_return_label",
+            "first_exit_date",
+            "stock_price_at_exit",
+            "option_return_pct_at_exit",
+            "stock_return_pct_at_exit",
+            "option_vs_stock_multiple_at_exit",
+        ],
+        limit=24,
+    )
+    required_path_entry_sensitivity_table = subset_frame(
+        required_path_entry_sensitivity,
+        [
+            "contract_label",
+            "threshold_multiple",
+            "path_family",
+            "entry_shift_pct",
+            "adjusted_entry_premium",
+            "required_terminal_stock_price",
+            "required_move_pct",
+            "realism_bucket",
+            "verdict",
+        ],
+        limit=24,
+    )
+    required_path_iv_sensitivity_table = subset_frame(
+        required_path_iv_sensitivity,
+        [
+            "contract_label",
+            "threshold_multiple",
+            "path_family",
+            "iv_shift_vol_points",
+            "adjusted_iv",
+            "required_terminal_stock_price",
+            "required_move_pct",
+            "realism_bucket",
+            "verdict",
+        ],
+        limit=24,
+    )
+    required_path_entry_iv_matrix_table = subset_frame(
+        required_path_entry_iv_matrix,
+        [
+            "contract_label",
+            "threshold_multiple",
+            "path_family",
+            "entry_shift_pct",
+            "iv_shift_vol_points",
+            "adjusted_entry_premium",
+            "adjusted_iv",
+            "required_move_pct",
+            "realism_bucket",
+        ],
+        limit=24,
+    )
+    required_path_sell_hold_table = subset_frame(
+        required_path_sell_hold_summary,
+        [
+            "contract_label",
+            "threshold_multiple",
+            "path_family",
+            "peak_option_return_pct",
+            "peak_date",
+            "stock_price_at_peak",
+            "option_return_2w_after_peak",
+            "option_return_1m_after_peak",
+            "expiry_option_return_pct",
+            "decay_from_peak_to_expiry_pct",
+            "interpretation",
+        ],
+        limit=24,
+    )
     single_option_summary_table = subset_frame(
         single_option_summary,
         [
@@ -7503,7 +7683,7 @@ def _render_contract_selection_body(
         '<div data-contract-selection-page>'
         '<section class="hero"><div class="hero-top"><div><div class="eyebrow">Contract Selection</div>'
         f'<h1>{escape(clean_string(payload.get("ticker") or metadata.get("ticker")))} Contract Selection</h1>'
-        '<p class="subtitle">This page reads the frozen contract-selection bundle directly. Start with trust-aware market context, then read required-vs-assumed path and same-path strike / expiry comparisons before deciding whether stock, an option, or a spread fits the thesis best.</p>'
+        '<p class="subtitle">This page reads the frozen contract-selection bundle directly. The core question is what each long call needs from the stock path before it beats owning stock by the configured outperformance hurdles.</p>'
         '</div></div></section>'
         + _render_shareability_note(published=published, embed_images=embed_images, has_supporting_links=True)
         + (f'<section class="panel sticky-summary-strip">{top_strip}</section>' if top_strip else "")
@@ -7532,27 +7712,33 @@ def _render_contract_selection_body(
         )
         + "</section>"
         + render_chart_section(
-            "Chain Overview / Compare Options",
-            "This frozen layer compares bullish long calls against long stock across the same representative path families, so you can see which calls are robust, selective, too narrow, or simply worse than stock.",
-            ["chain_overview.png"],
+            "Required-Path Engine",
+            "This is the primary product view: each long call is solved backwards from the 1.5x and 2.0x option-over-stock thresholds. Those thresholds are relative to stock return, not absolute option return.",
+            ["required_paths_overview.png"],
         )
+        + render_required_path_tables_workbook()
+        + render_markdown_panel("Required Path Summary", required_path_markdown)
+        + render_markdown_panel("Required Path Tables Notes", required_path_tables_markdown)
+        + render_markdown_panel("Top Required-Path Candidates", top_required_path_markdown)
+        + _render_inline_dataframe("Required Path Summary Table", required_path_summary_table, table_id="required-path-summary", published=published)
+        + render_chart_section(
+            "Per-Option Required Paths",
+            "Each chart shows the stock path the option requires over time, plus the option-return path that the stock move implies. These charts are frozen artifacts, not dashboard recomputation.",
+            [name for name in charts_by_prefix("required_paths_") if name != "required_paths_overview.png"][:6],
+        )
+        + _render_inline_dataframe("Required Paths By Option", required_paths_by_option_table, table_id="required-paths-by-option", published=published)
+        + _render_inline_dataframe("Required Path Family Summary", required_path_family_table, table_id="required-path-family-summary", published=published)
+        + _render_inline_dataframe("Required Path Peak Summary", required_path_peak_table, table_id="required-path-peak-summary", published=published)
+        + _render_inline_dataframe("Required Path Entry Premium Sensitivity", required_path_entry_sensitivity_table, table_id="required-path-entry-sensitivity", published=published)
+        + _render_inline_dataframe("Required Path IV Sensitivity", required_path_iv_sensitivity_table, table_id="required-path-iv-sensitivity", published=published)
+        + _render_inline_dataframe("Required Path Entry x IV Matrix", required_path_entry_iv_matrix_table, table_id="required-path-entry-iv-matrix", published=published)
+        + _render_inline_dataframe("Required Path Sell / Hold Summary", required_path_sell_hold_table, table_id="required-path-sell-hold-summary", published=published)
+        + render_markdown_panel("Required Path Exit Ladder Notes", required_path_exit_ladder_markdown)
+        + _render_inline_dataframe("Required Path Exit Ladder", required_path_exit_ladder_table, table_id="required-path-exit-ladder", published=published)
+        + '<section class="panel"><h2>Chain Overview / Compare Options</h2><p class="section-intro">Supporting tables and notes only. Legacy comparison charts are intentionally omitted so the page stays centered on the required-path engine.</p></section>'
         + render_markdown_panel("Chain Overview Notes", chain_overview_markdown)
         + render_chain_overview_cards(chain_overview_summary)
         + _render_inline_dataframe("Chain Overview Candidate Table", chain_overview_table, table_id="chain-overview-candidates", published=published)
-        + render_chart_section(
-            "Single-Option Decision View",
-            "This frozen section asks what stock paths make the selected call worth buying instead of buying stock. It uses a curated decision-path subset, while the broad scenario gallery remains separate.",
-            ["single_option_decision_view.png"],
-        )
-        + render_markdown_panel("Single-Option Decision Notes", single_option_markdown)
-        + _render_inline_dataframe("Single-Option Summary", single_option_summary_table, table_id="single-option-summary", published=published)
-        + _render_inline_dataframe("Curated Decision Path Selection", single_option_decision_paths_table, table_id="single-option-decision-paths", published=published)
-        + _render_inline_dataframe("Single-Option Path Outcomes", single_option_outcomes_table, table_id="single-option-path-outcomes", published=published)
-        + _render_inline_dataframe("Required Edge Paths", single_option_required_edge_table, table_id="single-option-required-edge-paths", published=published)
-        + _render_inline_dataframe("Closest Representative Path To Edge", single_option_closest_edge_table, table_id="single-option-closest-edge", published=published)
-        + _render_inline_dataframe("Edge Gap By Path Family", single_option_edge_gap_table, table_id="single-option-edge-gap", published=published)
-        + _render_inline_dataframe("Single-Option IV Sensitivity", single_option_iv_table, table_id="single-option-iv", published=published)
-        + _render_inline_dataframe("Single-Option Entry Sensitivity", single_option_entry_table, table_id="single-option-entry", published=published)
         + '<section class="panel"><h2>Market Context / Trust Summary</h2><p class="section-intro">These tables show which local market data actually drove the run, how trustworthy each expiry is, and why the chosen spot and risk-free inputs were accepted.</p>'
         + _render_key_value_rows(
             [
@@ -7571,48 +7757,13 @@ def _render_contract_selection_body(
         + _render_inline_dataframe("Expiry Trust Table", chain_source_table, table_id="contract-chain-source", published=published)
         + _render_inline_dataframe("Bundle Market Context", market_context_table, table_id="contract-market-context", published=published)
         + "</section>"
-        + render_chart_section(
-            "Required vs Assumed Path",
-            "Start here. This is the clearest direct read on whether the configured thesis path actually clears the required stock path.",
-            ["required_path_vs_assumed_path.png", "required_path_strategy_compare.png"],
-        )
         + _render_inline_dataframe("Required vs Assumed Path Summary", required_vs_assumed_table, table_id="required-vs-assumed", published=published)
-        + render_chart_section(
-            "Stock Path Gallery",
-            "The full named stock-path library is a browsing surface for possible futures. It is intentionally broader than the single-option decision chart.",
-            ["stock_path_gallery.png"],
-        )
         + _render_inline_dataframe("Stock Path Library Metadata", stock_path_library_table, table_id="stock-path-library", published=published)
-        + render_chart_section(
-            "Representative Paths",
-            "Representative paths keep stock and IV separate, so you can see how the same thesis behaves under different noisy futures without treating them as forecasts.",
-            ["representative_stock_paths.png", "representative_iv_paths.png"],
-        )
         + _render_inline_dataframe("Representative Paths Summary", representative_table, table_id="representative-paths", published=published)
         + _render_inline_dataframe("Path Pair Summary", path_pair_table, table_id="path-pair-summary", published=published)
-        + render_chart_section(
-            "Option Value Over Path",
-            "This chart holds one stock path plus IV path fixed and compares structures under that same future, which is the main product read for strike / expiry choice.",
-            ["option_value_over_path.png"],
-        )
         + _render_inline_dataframe("Option Value Over Path", option_value_table, table_id="option-value-over-path", published=published)
-        + render_chart_section(
-            "Compare vs Stock Over Path",
-            "Long stock stays the benchmark. Use this section to see when an option or spread actually earns its complexity under the same path.",
-            ["compare_vs_stock_over_path.png", "compare_vs_stock_path_delta.png"],
-        )
         + _render_inline_dataframe("Compare vs Stock Over Path", compare_vs_stock_table, table_id="compare-vs-stock-over-path", published=published)
-        + render_chart_section(
-            "Same-Path Strike Comparison",
-            "Use the same stock path plus IV path and only change strike to see which strike looked best without mixing assumptions.",
-            ["strike_comparison_under_same_path.png"],
-        )
         + _render_inline_dataframe("Same-Path Strike Comparison", strike_table, table_id="same-path-strike", published=published)
-        + render_chart_section(
-            "Same-Path Expiry Comparison",
-            "Use the same stock path plus IV path and only change expiry to see whether extra time rescued the thesis or just added cost.",
-            ["expiry_comparison_under_same_path.png"],
-        )
         + _render_inline_dataframe("Same-Path Expiry Comparison", expiry_table, table_id="same-path-expiry", published=published)
         + '<section class="panel"><h2>Family / Candidate Highlights</h2><p class="section-intro">These are supporting highlight layers. Use them after the same-path tables, not before them.</p>'
         + _render_strategy_selector_rank_cards(

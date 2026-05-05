@@ -59,6 +59,8 @@ from ..plots import (
     plot_representative_iv_paths,
     plot_representative_stock_paths,
     plot_required_path_strategy_compare,
+    plot_required_paths_overview,
+    plot_option_required_paths,
     plot_required_move_speed_vs_magnitude,
     plot_required_move_vs_stock_chart,
     plot_required_stock_path_to_buy,
@@ -918,6 +920,17 @@ TABLE_COLUMN_ORDERS: dict[str, list[str]] = {
         "source_quality",
         "source_trust_label",
         "source_quality_note",
+        "option_data_source",
+        "entry_price_mode",
+        "bid",
+        "ask",
+        "mid",
+        "spread_pct_of_mid",
+        "implied_volatility",
+        "open_interest",
+        "volume",
+        "quality_flags",
+        "liquidity_bucket",
         "warning_or_note",
     ],
     "family_comparison.csv": [
@@ -1046,6 +1059,47 @@ TABLE_COLUMN_ORDERS: dict[str, list[str]] = {
         "candidate_count_for_expiry",
     ],
     "required_path_summary.csv": [
+        "ticker",
+        "contract_label",
+        "option_type",
+        "strike",
+        "expiry",
+        "dte",
+        "entry_premium",
+        "entry_iv",
+        "option_data_source",
+        "option_data_trust",
+        "entry_price_mode",
+        "bid",
+        "ask",
+        "mid",
+        "spread_pct_of_mid",
+        "implied_volatility",
+        "open_interest",
+        "volume",
+        "quality_flags",
+        "snapshot_date",
+        "analysis_horizon_date",
+        "chart_horizon_date",
+        "path_terminal_date",
+        "option_expiry_date",
+        "terminal_basis",
+        "chart_horizon_basis",
+        "threshold_multiple",
+        "required_terminal_stock_price",
+        "required_terminal_stock_return_pct",
+        "required_move_pct",
+        "earliest_valid_date",
+        "latest_valid_date",
+        "minimum_required_move_by_expiry",
+        "path_count_generated",
+        "plausible_path_count",
+        "extreme_path_count",
+        "status",
+        "verdict",
+        "concise_explanation",
+    ],
+    "goal_required_path_summary.csv": [
         "summary_scope",
         "summary_label",
         "strategy_family",
@@ -1059,6 +1113,178 @@ TABLE_COLUMN_ORDERS: dict[str, list[str]] = {
         "unreached",
         "clamped_to_expiry",
         "target_beyond_expiry",
+    ],
+    "required_paths_by_option.csv": [
+        "contract_label",
+        "threshold_multiple",
+        "strike",
+        "entry_spot",
+        "path_id",
+        "path_label",
+        "path_family",
+        "date",
+        "days_from_snapshot",
+        "snapshot_date",
+        "analysis_horizon_date",
+        "chart_horizon_date",
+        "path_terminal_date",
+        "option_expiry",
+        "option_expiry_date",
+        "terminal_basis",
+        "chart_horizon_basis",
+        "valuation_date",
+        "effective_days",
+        "time_to_expiry_days",
+        "intrinsic_value",
+        "time_value",
+        "shape_template",
+        "shape_source_path",
+        "is_checkpoint_marker",
+        "display_marker",
+        "checkpoint_label",
+        "is_peak_option_return",
+        "stock_price",
+        "option_value",
+        "option_return_pct",
+        "stock_return_pct",
+        "option_vs_stock_multiple",
+        "clears_threshold",
+        "realism_bucket",
+    ],
+    "required_path_family_summary.csv": [
+        "contract_label",
+        "threshold_multiple",
+        "path_family",
+        "min_required_move_pct",
+        "median_required_move_pct",
+        "earliest_clear_date",
+        "latest_clear_date",
+        "clears_count",
+        "realism_bucket",
+        "failure_driver",
+        "peak_option_return_pct",
+        "peak_option_value",
+        "peak_date",
+        "peak_days_from_snapshot",
+        "stock_price_at_peak",
+        "option_vs_stock_multiple_at_peak",
+        "terminal_option_return_pct",
+        "terminal_option_vs_stock_multiple",
+    ],
+    "required_path_peak_summary.csv": [
+        "contract_label",
+        "candidate_slug",
+        "threshold_multiple",
+        "path_id",
+        "path_label",
+        "path_family",
+        "peak_option_return_pct",
+        "peak_option_value",
+        "peak_date",
+        "peak_days_from_snapshot",
+        "stock_price_at_peak",
+        "option_vs_stock_multiple_at_peak",
+        "terminal_option_return_pct",
+        "terminal_option_vs_stock_multiple",
+        "status",
+        "realism_bucket",
+    ],
+    "required_path_exit_ladder.csv": [
+        "ticker",
+        "contract_label",
+        "candidate_slug",
+        "strike",
+        "expiry",
+        "threshold_multiple",
+        "path_id",
+        "path_label",
+        "path_family",
+        "target_absolute_option_return_pct",
+        "first_hit_date",
+        "stock_price_at_first_hit",
+        "option_return_pct_at_first_hit",
+        "option_value_at_first_hit",
+        "hit_status",
+        "exit_return_label",
+        "exit_return_pct",
+        "first_exit_date",
+        "first_exit_days_from_snapshot",
+        "stock_price_at_exit",
+        "option_value_at_exit",
+        "option_return_pct_at_exit",
+        "stock_return_pct_at_exit",
+        "option_vs_stock_multiple_at_exit",
+        "snapshot_date",
+        "analysis_horizon_date",
+        "chart_horizon_date",
+        "path_terminal_date",
+        "option_expiry",
+        "option_expiry_date",
+        "terminal_basis",
+        "chart_horizon_basis",
+        "status",
+        "realism_bucket",
+    ],
+    "required_path_entry_sensitivity.csv": [
+        "ticker",
+        "contract_label",
+        "strike",
+        "expiry",
+        "threshold_multiple",
+        "path_family",
+        "entry_shift_pct",
+        "adjusted_entry_premium",
+        "required_terminal_stock_price",
+        "required_move_pct",
+        "realism_bucket",
+        "verdict",
+    ],
+    "required_path_iv_sensitivity.csv": [
+        "ticker",
+        "contract_label",
+        "strike",
+        "expiry",
+        "threshold_multiple",
+        "path_family",
+        "iv_shift_vol_points",
+        "adjusted_iv",
+        "required_terminal_stock_price",
+        "required_move_pct",
+        "realism_bucket",
+        "verdict",
+    ],
+    "required_path_entry_iv_matrix.csv": [
+        "ticker",
+        "contract_label",
+        "strike",
+        "expiry",
+        "threshold_multiple",
+        "path_family",
+        "entry_shift_pct",
+        "iv_shift_vol_points",
+        "adjusted_entry_premium",
+        "adjusted_iv",
+        "required_terminal_stock_price",
+        "required_move_pct",
+        "realism_bucket",
+        "verdict",
+    ],
+    "required_path_sell_hold_summary.csv": [
+        "ticker",
+        "contract_label",
+        "strike",
+        "expiry",
+        "threshold_multiple",
+        "path_family",
+        "peak_option_return_pct",
+        "peak_date",
+        "stock_price_at_peak",
+        "option_return_2w_after_peak",
+        "option_return_1m_after_peak",
+        "terminal_option_return_pct",
+        "expiry_option_return_pct",
+        "decay_from_peak_to_expiry_pct",
+        "interpretation",
     ],
     "assumed_path_trace_rows.csv": [
         "trace_scope",
@@ -2562,7 +2788,16 @@ def _write_contract_selection_bundle(
         "chain_source_summary.csv": result.chain_source_summary,
         "market_context_summary.csv": result.market_context_summary,
         "required_path_rows.csv": result.required_path_rows,
-        "required_path_summary.csv": result.required_path_summary,
+        "goal_required_path_summary.csv": result.required_path_summary,
+        "required_path_summary.csv": result.required_path_core_summary,
+        "required_paths_by_option.csv": result.required_paths_by_option,
+        "required_path_family_summary.csv": result.required_path_family_summary,
+        "required_path_peak_summary.csv": result.required_path_peak_summary,
+        "required_path_exit_ladder.csv": result.required_path_exit_ladder,
+        "required_path_entry_sensitivity.csv": result.required_path_entry_sensitivity,
+        "required_path_iv_sensitivity.csv": result.required_path_iv_sensitivity,
+        "required_path_entry_iv_matrix.csv": result.required_path_entry_iv_matrix,
+        "required_path_sell_hold_summary.csv": result.required_path_sell_hold_summary,
         "assumed_path_trace_rows.csv": result.assumed_path_trace_rows,
         "iv_path_trace_rows.csv": result.iv_path_trace_rows,
         "compare_vs_stock_path_rows.csv": result.compare_vs_stock_path_rows,
@@ -2971,6 +3206,52 @@ def _write_contract_selection_bundle(
                 title=f"{result.ticker} Bullish Long-Call Trigger Map",
             ),
         )
+    if not result.required_path_core_summary.empty:
+        _track_chart(
+            bundle_dir,
+            file_map,
+            plot_required_paths_overview(
+                result.required_path_core_summary,
+                output_path=_section_path(bundle_dir, "charts", "required_paths_overview.png"),
+                title=f"{result.ticker} Required Paths To Beat Stock",
+            ),
+        )
+    if not result.required_paths_by_option.empty:
+        selected_contracts = result.required_path_core_summary.copy()
+        if not selected_contracts.empty:
+            selected_contracts["selection_rank"] = pd.to_numeric(selected_contracts.get("selection_rank"), errors="coerce").fillna(999)
+            selected_contracts["required_move_pct"] = pd.to_numeric(selected_contracts.get("required_move_pct"), errors="coerce")
+            selected_contracts = (
+                selected_contracts.sort_values(["selection_rank", "threshold_multiple", "required_move_pct"], na_position="last")
+                .drop_duplicates(subset=["candidate_slug"], keep="first")
+                .head(6)
+            )
+        else:
+            selected_contracts = (
+                result.required_paths_by_option.drop_duplicates(subset=["candidate_slug"], keep="first")
+                .head(6)
+            )
+        for row in selected_contracts.to_dict("records"):
+            candidate_slug = clean_string(row.get("candidate_slug"))
+            contract_slug = clean_string(row.get("contract_slug")) or candidate_slug
+            if not candidate_slug:
+                continue
+            option_paths = result.required_paths_by_option.loc[
+                result.required_paths_by_option.get("candidate_slug", pd.Series(dtype=str)).astype(str).eq(candidate_slug)
+            ].copy()
+            if option_paths.empty:
+                continue
+            contract_label = clean_string(row.get("contract_label")) or clean_string(option_paths.iloc[0].get("contract_label"))
+            chart_name = f"required_paths_{slugify(contract_slug)[:80]}.png"
+            _track_chart(
+                bundle_dir,
+                file_map,
+                plot_option_required_paths(
+                    option_paths,
+                    output_path=_section_path(bundle_dir, "charts", chart_name),
+                    title=f"Required Paths For {contract_label} To Beat Stock By 1.5x / 2.0x",
+                ),
+            )
     if not result.required_stock_path_to_buy.empty:
         _track_chart(
             bundle_dir,
@@ -3845,7 +4126,7 @@ def _write_contract_selection_bundle(
         "",
         (
             f"Path-first contract-selection bundle for {result.ticker} using local chain, spot, risk-free, and metadata inputs. "
-            "Read the action board first, then the chain overview compare-options layer, then the entry-justification layer, and then the deeper single-option, trust, and path-centric views."
+            "Read the required-path engine first: the core thesis is whether each long call can beat owning stock by the configured 1.5x and 2.0x hurdles."
         ),
         "",
         "## Decision Snapshot",
@@ -3860,6 +4141,32 @@ def _write_contract_selection_bundle(
                 ("Target Date", result.target_date.isoformat()),
                 ("Assumed Stock Path", result.stock_path_name.replace("_", " ")),
                 ("Assumed IV Path", result.iv_path_name.replace("_", " ")),
+            ]
+        ),
+        "",
+        "## Required-Path Engine / Core Product",
+        "",
+        *_markdown_table(
+            [
+                ("Required Paths Overview", "charts/required_paths_overview.png"),
+                ("Required Path Summary", "summary/required_path_summary.md"),
+                ("Required Path Tables Workbook", "summary/required_path_tables.html"),
+                ("Required Path Tables Notes", "summary/required_path_tables.md"),
+                ("Top Required-Path Candidates", "summary/top_required_path_candidates.md"),
+                ("Required Path Summary Table", "tables/required_path_summary.csv"),
+                ("Required Paths By Option", "tables/required_paths_by_option.csv"),
+                ("Required Path Family Summary", "tables/required_path_family_summary.csv"),
+                ("Required Path Peak Summary", "tables/required_path_peak_summary.csv"),
+                ("Required Path Exit Ladder", "tables/required_path_exit_ladder.csv"),
+                ("Required Path Entry Sensitivity", "tables/required_path_entry_sensitivity.csv"),
+                ("Required Path IV Sensitivity", "tables/required_path_iv_sensitivity.csv"),
+                ("Required Path Entry x IV Matrix", "tables/required_path_entry_iv_matrix.csv"),
+                ("Required Path Sell/Hold Summary", "tables/required_path_sell_hold_summary.csv"),
+                ("Required Path Exit Ladder Notes", "summary/required_path_exit_ladder.md"),
+                (
+                    "How To Read It",
+                    "This layer solves backwards from option-over-stock outperformance. Fixed target-price thesis charts remain secondary examples, not the core buy case.",
+                ),
             ]
         ),
         "",
@@ -4054,7 +4361,7 @@ def _write_contract_selection_bundle(
                 ("Required Path Read", str(decision_snapshot.iloc[0]["required_path_difficulty"] or "n/a")),
                 ("First Cleared Horizon", str(decision_snapshot.iloc[0]["first_cleared_horizon"] or "not cleared")),
                 ("Gap At Target", _fmt_currency(decision_snapshot.iloc[0]["required_path_gap_at_target"])),
-                ("Required Path Table", "tables/required_path_summary.csv"),
+                ("Goal-Based Required Path Table", "tables/goal_required_path_summary.csv"),
                 ("Required vs Assumed Table", "tables/required_vs_assumed_path_summary.csv"),
                 ("How To Read It", "If the assumed path stays above a required-path line, that family clears the goal more easily at that checkpoint."),
             ]
@@ -4256,6 +4563,16 @@ def _write_contract_selection_bundle(
         _write_markdown(bundle_dir, file_map, "other_structures.md", result.other_structures_markdown)
     if clean_string(result.entry_justification_markdown):
         _write_markdown(bundle_dir, file_map, "entry_justification.md", result.entry_justification_markdown)
+    if clean_string(result.required_path_summary_markdown):
+        _write_markdown(bundle_dir, file_map, "required_path_summary.md", result.required_path_summary_markdown)
+    if clean_string(result.required_path_exit_ladder_markdown):
+        _write_markdown(bundle_dir, file_map, "required_path_exit_ladder.md", result.required_path_exit_ladder_markdown)
+    if clean_string(result.required_path_tables_markdown):
+        _write_markdown(bundle_dir, file_map, "required_path_tables.md", result.required_path_tables_markdown)
+    if clean_string(result.required_path_tables_html):
+        _write_markdown(bundle_dir, file_map, "required_path_tables.html", result.required_path_tables_html)
+    if clean_string(result.top_required_path_candidates_markdown):
+        _write_markdown(bundle_dir, file_map, "top_required_path_candidates.md", result.top_required_path_candidates_markdown)
     if clean_string(result.thesis_mode_markdown):
         _write_markdown(bundle_dir, file_map, "thesis_mode.md", result.thesis_mode_markdown)
     if clean_string(result.stress_tests_markdown):

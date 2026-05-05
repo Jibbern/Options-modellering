@@ -10,6 +10,7 @@ Typical contents:
 
 - option-chain CSV snapshots
 - historical prices
+- manually downloaded Barchart Options Screener exports
 - rates data
 - research metadata
 - IBKR delayed snapshots and manifests
@@ -21,12 +22,66 @@ Local chain discovery is handled through `options_lab.snapshots` and `options_la
 Preferred order for chain snapshots:
 
 1. same-date full quoted IBKR slices under `data/<TICKER>/ibkr/snapshots/option_quotes/`, but only when that expiry slice is quote-usable
-2. manual `data/<TICKER>/option_chains/` fallback slices
-3. legacy flat files directly under `data/<TICKER>/`
+2. same-date manually downloaded Barchart Options Screener slices under `data/<TICKER>/options/barchart/normalized/`
+3. manual `data/<TICKER>/option_chains/` fallback slices
+4. legacy flat files directly under `data/<TICKER>/`
 
 IBKR chain-universe metadata under `data/<TICKER>/ibkr/chains/` remains useful provenance, but it does not outrank a usable quoted slice.
 
 The current quote-usability gate for same-day full quoted IBKR precedence is 20% usable-quote coverage per expiry slice. If the same-day IBKR slice is discovered but too sparse, analysis keeps that fact in provenance and falls back to the best local quoted slice instead of silently pretending the sparse file was authoritative.
+
+## Barchart manual CSV imports
+
+Barchart support is local CSV import only:
+
+- no Barchart API credentials
+- no Barchart for Excel dependency
+- no scraping
+- no mutation of the loose source export
+
+Use the Options Screener custom view with these columns when possible:
+
+`Symbol`, `Type`, `Price~`, `Latest`, `Exp Date`, `DTE`, `Strike`, `Moneyness`, `Bid`, `Ask`, `Mid`, `Volume`, `Open Int`, `IV`, `IV Rank`, `IV Pctl`, `Delta`, `Gamma`, `Theta`, `Vega`, `Rho`, `ITM Prob`, `OTM Prob`, `Profit Prob`, `BE (Bid)`, `Links`.
+
+Then import the downloaded local file:
+
+```powershell
+..\.venv\Scripts\python.exe -m options_lab.cli import-barchart-options `
+  --ticker GPRE `
+  --csv ".\options-screener-GPRE_2026-05-05.csv" `
+  --snapshot-date 2026-05-05 `
+  --entry-mode mid
+```
+
+PBI uses the same importer:
+
+```powershell
+..\.venv\Scripts\python.exe -m options_lab.cli import-barchart-options `
+  --ticker PBI `
+  --csv ".\options-screener-PBI_2026-05-05.csv" `
+  --snapshot-date 2026-05-05 `
+  --entry-mode mid
+```
+
+The importer copies the raw CSV into `data/<TICKER>/options/barchart/raw/`, writes normalized per-expiry slices into `data/<TICKER>/options/barchart/normalized/`, and writes a manifest into `data/<TICKER>/options/barchart/manifests/`. If the raw copy already exists with identical content, the import is idempotent; if the name exists with different content, the importer versions the stored copy.
+
+Normalized Barchart chains keep bid/ask/mid, spread, IV, Greeks, probabilities, volume, open interest, liquidity bucket, quality flags, model eligibility, and explicit provenance. For required-path long-call analysis the default usable entry is mid; ask and realistic entry (`mid + 0.25 * spread`) are preserved for sensitivity and conservative reads. `Latest` is imported for reference only and is not used as the entry premium.
+
+The loose Barchart price-history files can refresh the local historical price store:
+
+```powershell
+..\.venv\Scripts\python.exe -m options_lab.cli import-barchart-price-history `
+  --ticker GPRE `
+  --csv ".\gpre_price-history-05-05-2026.csv"
+```
+
+```powershell
+..\.venv\Scripts\python.exe -m options_lab.cli import-barchart-price-history `
+  --ticker PBI `
+  --csv ".\pbi_price-history-05-05-2026.csv"
+```
+
+Barchart price-history imports copy the raw file into `data/<TICKER>/historical_prices/raw/manual/` and merge normalized `Time` / `Latest` rows into the existing local price store.
 
 ## Spot and rates resolution
 

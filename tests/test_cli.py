@@ -188,6 +188,31 @@ def test_cli_parser_accepts_canonical_analyze_and_publish_commands():
             "--full-refresh",
         ]
     )
+    import_options_args = parser.parse_args(
+        [
+            "import-barchart-options",
+            "--ticker",
+            "GPRE",
+            "--csv",
+            "options-screener-GPRE_2026-05-05.csv",
+            "--snapshot-date",
+            "2026-05-05",
+            "--entry-mode",
+            "realistic",
+            "--include-puts",
+            "--min-open-interest",
+            "10",
+        ]
+    )
+    import_price_args = parser.parse_args(
+        [
+            "import-barchart-price-history",
+            "--ticker",
+            "GPRE",
+            "--csv",
+            "gpre_price-history-05-05-2026.csv",
+        ]
+    )
 
     assert contract_args.command == "analyze-contract-selection"
     assert contract_args.goal == "itm_1c"
@@ -217,6 +242,12 @@ def test_cli_parser_accepts_canonical_analyze_and_publish_commands():
     assert refresh_prices_args.full_refresh is True
     assert refresh_rates_args.command == "refresh-risk-free-rates"
     assert refresh_rates_args.series == ["DGS1MO"]
+    assert import_options_args.command == "import-barchart-options"
+    assert import_options_args.calls_only is True
+    assert import_options_args.include_puts is True
+    assert import_options_args.entry_mode == "realistic"
+    assert import_options_args.min_open_interest == 10
+    assert import_price_args.command == "import-barchart-price-history"
 
 
 def test_cli_analyze_strategy_maps_target_selection_flags(capsys, temp_analysis_root: Path):
@@ -493,10 +524,19 @@ def test_cli_build_model_outputs_projects_existing_bundle_without_recomputing_an
     assert Path(payload["latest_dir"]).exists()
     assert Path(payload["start_here_path"]).exists()
     assert Path(payload["manifest_path"]).exists()
-    assert "03_tables/chain_source_summary.csv" in payload["promoted_files"]
-    assert "04_secondary/stock_path_gallery.png" in payload["promoted_files"]
-    assert "04_secondary/iv_path_gallery.png" in payload["promoted_files"]
-    assert "04_secondary/required_path_vs_assumed_path.png" in payload["promoted_files"]
-    assert "04_secondary/compare_vs_stock_path_delta.png" in payload["promoted_files"]
-    assert any(path.endswith("/long_call_strike_value.png") for path in payload["promoted_files"])
-    assert any(path.endswith("/long_call_best_of_delta.png") for path in payload["promoted_files"])
+    assert "00_core_view/required_paths_overview.png" in payload["promoted_files"]
+    assert "00_core_view/required_path_summary.csv" in payload["promoted_files"]
+    assert "00_core_view/required_path_tables.html" in payload["promoted_files"]
+    assert "00_core_view/required_path_tables.md" in payload["promoted_files"]
+    assert "01_option_required_paths/required_paths_by_option.csv" in payload["promoted_files"]
+    assert "01_option_required_paths/required_path_entry_sensitivity.csv" in payload["promoted_files"]
+    assert "01_option_required_paths/required_path_iv_sensitivity.csv" in payload["promoted_files"]
+    assert "01_option_required_paths/required_path_entry_iv_matrix.csv" in payload["promoted_files"]
+    assert "01_option_required_paths/required_path_sell_hold_summary.csv" in payload["promoted_files"]
+    assert "99_secondary_or_debug/stock_path_gallery.png" not in payload["promoted_files"]
+    assert "99_secondary_or_debug/iv_path_gallery.png" not in payload["promoted_files"]
+    assert "99_secondary_or_debug/required_path_vs_assumed_path.png" not in payload["promoted_files"]
+    assert "99_secondary_or_debug/compare_vs_stock_path_delta.png" not in payload["promoted_files"]
+    assert all(not path.endswith(".png") for path in payload["promoted_files"] if path.startswith("99_secondary_or_debug/"))
+    assert all(not path.startswith("99_secondary_or_debug/path_packs/") for path in payload["promoted_files"])
+    assert any(path.startswith("01_option_required_paths/required_paths_") and path.endswith(".png") for path in payload["promoted_files"])
