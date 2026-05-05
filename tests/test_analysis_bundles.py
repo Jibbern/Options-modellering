@@ -81,6 +81,9 @@ def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_h
     assert (bundle.bundle_dir / "tables" / "required_path_iv_sensitivity.csv").exists()
     assert (bundle.bundle_dir / "tables" / "required_path_entry_iv_matrix.csv").exists()
     assert (bundle.bundle_dir / "tables" / "required_path_sell_hold_summary.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "required_path_execution_realism.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "required_path_candidate_ranking.csv").exists()
+    assert (bundle.bundle_dir / "tables" / "required_path_historical_realism.csv").exists()
     assert (bundle.bundle_dir / "summary" / "required_path_tables.html").exists()
     assert (bundle.bundle_dir / "summary" / "required_path_tables.md").exists()
     assert (bundle.bundle_dir / "summary" / "required_path_exit_ladder.md").exists()
@@ -88,6 +91,9 @@ def test_contract_selection_analysis_bundle_writes_canonical_artifacts_without_h
     assert manifest["file_map"]["tables"]["required_path_iv_sensitivity.csv"] == "tables/required_path_iv_sensitivity.csv"
     assert manifest["file_map"]["tables"]["required_path_entry_iv_matrix.csv"] == "tables/required_path_entry_iv_matrix.csv"
     assert manifest["file_map"]["tables"]["required_path_sell_hold_summary.csv"] == "tables/required_path_sell_hold_summary.csv"
+    assert manifest["file_map"]["tables"]["required_path_execution_realism.csv"] == "tables/required_path_execution_realism.csv"
+    assert manifest["file_map"]["tables"]["required_path_candidate_ranking.csv"] == "tables/required_path_candidate_ranking.csv"
+    assert manifest["file_map"]["tables"]["required_path_historical_realism.csv"] == "tables/required_path_historical_realism.csv"
     assert manifest["file_map"]["summary"]["required_path_tables.html"] == "summary/required_path_tables.html"
     assert manifest["file_map"]["summary"]["required_path_tables.md"] == "summary/required_path_tables.md"
     assert (bundle.bundle_dir / "tables" / "chain_source_summary.csv").exists()
@@ -697,6 +703,8 @@ def test_contract_selection_publish_uses_bundle_relative_dashboard_links_without
     assert "Required vs Assumed Path" in html
     assert "required_path_tables.html" in html
     assert "Required Path Tables" in html
+    assert "Required Path Candidate Ranking" in html
+    assert "Required Path Historical Realism" in html
     assert "Representative Paths" in html
     assert "Option Value Over Path" in html
     assert "Compare vs Stock Over Path" in html

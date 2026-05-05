@@ -65,7 +65,9 @@ PBI uses the same importer:
 
 The importer copies the raw CSV into `data/<TICKER>/options/barchart/raw/`, writes normalized per-expiry slices into `data/<TICKER>/options/barchart/normalized/`, and writes a manifest into `data/<TICKER>/options/barchart/manifests/`. If the raw copy already exists with identical content, the import is idempotent; if the name exists with different content, the importer versions the stored copy.
 
-Normalized Barchart chains keep bid/ask/mid, spread, IV, Greeks, probabilities, volume, open interest, liquidity bucket, quality flags, model eligibility, and explicit provenance. For required-path long-call analysis the default usable entry is mid; ask and realistic entry (`mid + 0.25 * spread`) are preserved for sensitivity and conservative reads. `Latest` is imported for reference only and is not used as the entry premium.
+Normalized Barchart chains keep bid/ask/mid, spread, IV, Greeks, probabilities, volume, open interest, liquidity bucket, quality flags, model eligibility, and explicit provenance. For required-path long-call analysis the default usable entry is mid; ask and realistic entry (`mid + 0.25 * spread`, or `mid + 0.40 * spread` for very wide markets) are preserved for sensitivity, conservative reads, and execution-realism scoring. `Latest` is imported for reference only and is not used as the entry premium.
+
+Required-path runs write `tables/required_path_execution_realism.csv` when quote metadata is available. That table classifies liquidity, fill quality, recommended entry mode, expected slippage, exit-liquidity risk, stale quote flags, wide spread flags, and an execution penalty score. A call with an attractive theoretical required path should still be treated cautiously when this layer says `avoid_due_to_spread`.
 
 The loose Barchart price-history files can refresh the local historical price store:
 
@@ -81,7 +83,7 @@ The loose Barchart price-history files can refresh the local historical price st
   --csv ".\pbi_price-history-05-05-2026.csv"
 ```
 
-Barchart price-history imports copy the raw file into `data/<TICKER>/historical_prices/raw/manual/` and merge normalized `Time` / `Latest` rows into the existing local price store.
+Barchart price-history imports copy the raw file into `data/<TICKER>/historical_prices/raw/manual/` and merge normalized `Time` / `Latest` rows into the existing local price store. When that price history is available, contract-selection writes `tables/required_path_historical_realism.csv`: a descriptive comparison between each option's required move and comparable historical forward-return windows. The hit rate is historical frequency in available local history, not a forecast probability.
 
 ## Spot and rates resolution
 

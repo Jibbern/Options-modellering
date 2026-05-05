@@ -494,6 +494,7 @@ CORE_VIEW_SUMMARIES = {
 CORE_VIEW_CHARTS = {"required_paths_overview.png"}
 CORE_VIEW_TABLES = {"required_path_summary.csv"}
 OPTION_REQUIRED_PATH_TABLES = {
+    "required_path_candidate_ranking.csv",
     "required_paths_by_option.csv",
     "required_path_family_summary.csv",
     "required_path_peak_summary.csv",
@@ -502,6 +503,8 @@ OPTION_REQUIRED_PATH_TABLES = {
     "required_path_iv_sensitivity.csv",
     "required_path_entry_iv_matrix.csv",
     "required_path_sell_hold_summary.csv",
+    "required_path_execution_realism.csv",
+    "required_path_historical_realism.csv",
 }
 OPTION_REQUIRED_PATH_SUMMARIES = {"required_path_exit_ladder.md"}
 
@@ -857,9 +860,10 @@ def _start_here_text(
     open_first_paths = numbered_available(
         [
             "00_core_view/required_paths_overview.png",
+            "00_core_view/required_path_tables.html",
+            "01_option_required_paths/required_path_candidate_ranking.csv",
             "00_core_view/required_path_summary.md",
             "00_core_view/required_path_summary.csv",
-            "00_core_view/required_path_tables.html",
             "00_core_view/required_path_tables.md",
             "00_core_view/top_required_path_candidates.md",
             "01_option_required_paths/required_paths_by_option.csv",
@@ -875,6 +879,7 @@ def _start_here_text(
             "",
             "## Open First",
             "",
+            "Open Candidate Ranking first, then Required Move Summary, then charts.",
         ]
     )
     lines.extend([f"{idx}. `{path}`" for idx, path in enumerate(open_first_paths, start=1)])
@@ -891,6 +896,7 @@ def _start_here_text(
             "00_core_view/top_required_path_candidates.md",
             "00_core_view/required_path_tables.html",
             "00_core_view/required_path_tables.md",
+            "01_option_required_paths/required_path_candidate_ranking.csv",
             "01_option_required_paths/required_paths_by_option.csv",
             "99_secondary_or_debug/bullish_action_board.md",
             "99_secondary_or_debug/chain_overview.md",
@@ -947,6 +953,7 @@ def _start_here_text(
             ("00_core_view/required_path_tables.html", "spreadsheet-style workbook for required moves, entry risk, IV risk, and sell/hold pressure"),
             ("00_core_view/required_path_tables.md", "short guide to reading the required-path workbook"),
             ("00_core_view/top_required_path_candidates.md", "small ranked shortlist by required-path burden"),
+            ("01_option_required_paths/required_path_candidate_ranking.csv", "one-row-per-contract final ranking that combines path burden, execution, sensitivity, sell/hold, and historical realism"),
             ("01_option_required_paths/required_paths_by_option.csv", "path/date-level required stock and option-return rows"),
             ("01_option_required_paths/required_path_family_summary.csv", "family-level timing and failure-driver aggregation"),
             ("01_option_required_paths/required_path_peak_summary.csv", "best-exit / peak-return metadata for each required path family"),
@@ -955,6 +962,8 @@ def _start_here_text(
             ("01_option_required_paths/required_path_iv_sensitivity.csv", "vol-point IV sensitivity for required stock moves"),
             ("01_option_required_paths/required_path_entry_iv_matrix.csv", "combined entry-premium and IV stress matrix"),
             ("01_option_required_paths/required_path_sell_hold_summary.csv", "sell/hold pressure from peak return to expiry"),
+            ("01_option_required_paths/required_path_execution_realism.csv", "liquidity, spread, slippage, and fill-realism scoring"),
+            ("01_option_required_paths/required_path_historical_realism.csv", "historical frequency of required moves in available price history"),
             ("01_option_required_paths/required_path_exit_ladder.md", "compact secondary summary of best modeled exits"),
             ("summary.md", "compact full-bundle summary after the action-board read"),
             ("99_secondary_or_debug/action_board.md", "legacy action-board notes, kept as supporting text only"),

@@ -64,6 +64,7 @@ from ..strategies import StrategyPosition, build_strategy
 from ..utils import CONTRACT_MULTIPLIER, build_stock_grid, clean_string, finite_or_none, horizon_to_days, parse_date, slugify
 from .scenario import _budget_fields, _dedupe
 from .market_context import resolve_market_context
+from ..prices.price_store import load_price_history
 
 
 SUPPORTED_CONTRACT_SELECTION_FAMILIES = [
@@ -197,6 +198,9 @@ REQUIRED_PATH_EXIT_RETURN_LEVELS = (
     (3.00, "+300%"),
     (5.00, "+500%"),
 )
+REQUIRED_PATH_HISTORICAL_WINDOWS = (5, 10, 20, 30, 60, 90, 180)
+REQUIRED_PATH_HISTORICAL_MIN_SAMPLE_COUNT = 5
+REQUIRED_PATH_HISTORICAL_DRAWDOWN_DAYS = 20
 REQUIRED_PATH_CHART_CONTRACT_LIMIT = 6
 SINGLE_OPTION_REPRESENTATIVE_PATH_ROLES = [
     (
@@ -327,6 +331,9 @@ class ContractSelectionComputation:
     required_path_iv_sensitivity: pd.DataFrame
     required_path_entry_iv_matrix: pd.DataFrame
     required_path_sell_hold_summary: pd.DataFrame
+    required_path_execution_realism: pd.DataFrame
+    required_path_historical_realism: pd.DataFrame
+    required_path_candidate_ranking: pd.DataFrame
     required_path_summary_markdown: str
     required_path_exit_ladder_markdown: str
     required_path_tables_markdown: str
@@ -755,6 +762,244 @@ def _moneyness_bucket(*, strategy_family: str, primary_strike: float | None, spo
     return clean_string(family) or "unknown"
 
 
+def _execution_quality_flag_set(value: Any) -> set[str]:
+    cleaned = clean_string(value).lower()
+    if not cleaned:
+        return set()
+    normalized = cleaned.replace(",", ";").replace("|", ";")
+    return {clean_string(part).lower() for part in normalized.split(";") if clean_string(part)}
+
+
+def _execution_int(value: Any) -> int:
+    parsed = finite_or_none(value)
+    return int(parsed) if parsed is not None else 0
+
+
+def _execution_quote_payload(row: dict[str, Any], *, entry_price_mode: str | None = None) -> dict[str, Any]:
+    bid = finite_or_none(row.get("bid_per_share"))
+    if bid is None:
+        bid = finite_or_none(row.get("bid"))
+    ask = finite_or_none(row.get("ask_per_share"))
+    if ask is None:
+        ask = finite_or_none(row.get("ask"))
+    mid = finite_or_none(row.get("mid_per_share"))
+    if mid is None:
+        mid = finite_or_none(row.get("mid"))
+    latest = finite_or_none(row.get("latest"))
+    if latest is None:
+        latest = finite_or_none(row.get("last_per_share"))
+    if latest is None:
+        latest = finite_or_none(row.get("last"))
+    spread = finite_or_none(row.get("spread_per_share"))
+    if spread is None and bid is not None and ask is not None:
+        spread = max(float(ask) - float(bid), 0.0)
+    spread_pct = finite_or_none(row.get("spread_pct_of_mid"))
+    if spread_pct is None and spread is not None and mid is not None and float(mid) > 0:
+        spread_pct = float(spread) / float(mid)
+    volume = _execution_int(row.get("volume"))
+    open_interest = _execution_int(row.get("open_interest"))
+    flags = _execution_quality_flag_set(row.get("quality_flags"))
+    invalid_quote = (
+        ask is None
+        or bid is None
+        or mid is None
+        or float(ask) <= 0
+        or float(bid) < 0
+        or float(mid) <= 0
+    )
+    zero_volume_flag = volume <= 0 or "zero_volume" in flags
+    zero_open_interest_flag = open_interest <= 0 or "zero_open_interest" in flags
+    stale_quote_flag = latest is None or float(latest) == 0.0 or bool({"stale_last", "latest_zero"} & flags)
+    wide_spread_flag = bool({"wide_spread", "very_wide_spread"} & flags) or (
+        spread_pct is not None and float(spread_pct) > 0.25
+    )
+    if invalid_quote or spread_pct is None or float(spread_pct) > 0.40 or open_interest < 5:
+        liquidity_bucket = "stale_or_wide"
+    elif float(spread_pct) <= 0.10 and open_interest >= 100 and volume >= 10:
+        liquidity_bucket = "liquid"
+    elif float(spread_pct) <= 0.20 and open_interest >= 25:
+        liquidity_bucket = "usable"
+    elif float(spread_pct) <= 0.40 or open_interest >= 5:
+        liquidity_bucket = "thin"
+    else:
+        liquidity_bucket = "stale_or_wide"
+
+    realistic_factor = 0.40 if spread_pct is not None and float(spread_pct) > 0.30 else 0.25
+    realistic_entry = (
+        float(mid) + realistic_factor * float(spread)
+        if mid is not None and spread is not None
+        else None
+    )
+    conservative_entry = float(ask) if ask is not None else None
+    expected_slippage = (
+        float(realistic_entry) - float(mid)
+        if realistic_entry is not None and mid is not None
+        else None
+    )
+    expected_slippage_pct = (
+        float(expected_slippage) / float(mid)
+        if expected_slippage is not None and mid is not None and float(mid) > 0
+        else None
+    )
+    requested_entry_mode = clean_string(entry_price_mode or row.get("entry_price_mode")).lower()
+    if liquidity_bucket == "stale_or_wide" or (spread_pct is not None and float(spread_pct) > 0.50):
+        fill_quality_bucket = "avoid_due_to_spread"
+        recommended_entry_mode = "avoid"
+    elif liquidity_bucket == "liquid":
+        fill_quality_bucket = "good_fill_likely"
+        recommended_entry_mode = "mid"
+    elif requested_entry_mode in {"ask", "ask_or_mid", "conservative", "conservative_ask"}:
+        fill_quality_bucket = "ask_is_conservative_but_expensive"
+        recommended_entry_mode = "ask"
+    elif liquidity_bucket == "usable":
+        fill_quality_bucket = "mid_possible_but_not_guaranteed"
+        recommended_entry_mode = "realistic"
+    else:
+        fill_quality_bucket = (
+            "ask_is_conservative_but_expensive"
+            if spread_pct is not None and float(spread_pct) > 0.30
+            else "use_realistic_entry"
+        )
+        recommended_entry_mode = "realistic"
+
+    if liquidity_bucket == "liquid":
+        exit_liquidity_risk = "low"
+    elif liquidity_bucket == "usable":
+        exit_liquidity_risk = "moderate"
+    elif liquidity_bucket == "thin":
+        exit_liquidity_risk = "high"
+    else:
+        exit_liquidity_risk = "very_high"
+
+    penalty = 0.0
+    if spread_pct is None:
+        penalty += 35.0
+    else:
+        penalty += min(max(float(spread_pct), 0.0) * 100.0, 70.0)
+    if zero_volume_flag:
+        penalty += 10.0
+    if zero_open_interest_flag:
+        penalty += 15.0
+    if stale_quote_flag:
+        penalty += 10.0
+    if wide_spread_flag:
+        penalty += 12.0
+    if liquidity_bucket == "stale_or_wide":
+        penalty += 20.0
+    elif liquidity_bucket == "thin":
+        penalty += 10.0
+    if recommended_entry_mode == "avoid":
+        penalty += 20.0
+    execution_penalty_score = round(min(max(penalty, 0.0), 100.0), 2)
+    if recommended_entry_mode == "avoid":
+        execution_verdict = "avoid_due_to_spread"
+        explanation = "Avoid or demand a materially better fill; spread, depth, or quote staleness makes execution risk dominant."
+    elif liquidity_bucket == "liquid":
+        execution_verdict = "execution_plausible"
+        explanation = "Bid/ask width and displayed depth look tradable enough for mid-based modeling."
+    elif liquidity_bucket == "usable":
+        execution_verdict = "mid_possible_but_not_guaranteed"
+        explanation = "Mid may be possible, but model the trade with realistic slippage before ranking it highly."
+    elif fill_quality_bucket == "ask_is_conservative_but_expensive":
+        execution_verdict = "ask_is_conservative_but_expensive"
+        explanation = "Use ask as a conservative stress case; the spread makes mid optimistic."
+    else:
+        execution_verdict = "use_realistic_entry"
+        explanation = "Use realistic entry with estimated slippage rather than treating mid as guaranteed."
+    multiplier = int(finite_or_none(row.get("contract_multiplier")) or CONTRACT_MULTIPLIER)
+    return {
+        "bid_per_share": round(float(bid), 4) if bid is not None else None,
+        "ask_per_share": round(float(ask), 4) if ask is not None else None,
+        "mid_per_share": round(float(mid), 4) if mid is not None else None,
+        "spread_per_share": round(float(spread), 4) if spread is not None else None,
+        "spread_pct_of_mid": round(float(spread_pct), 6) if spread_pct is not None else None,
+        "latest": round(float(latest), 4) if latest is not None else None,
+        "liquidity_bucket": liquidity_bucket,
+        "fill_quality_bucket": fill_quality_bucket,
+        "recommended_entry_mode": recommended_entry_mode,
+        "realistic_entry_per_share": round(float(realistic_entry), 4) if realistic_entry is not None else None,
+        "realistic_entry_per_contract": round(float(realistic_entry) * multiplier, 4) if realistic_entry is not None else None,
+        "conservative_entry_per_share": round(float(conservative_entry), 4) if conservative_entry is not None else None,
+        "conservative_entry_per_contract": round(float(conservative_entry) * multiplier, 4) if conservative_entry is not None else None,
+        "expected_slippage_per_share": round(float(expected_slippage), 4) if expected_slippage is not None else None,
+        "expected_slippage_pct_of_mid": round(float(expected_slippage_pct), 6) if expected_slippage_pct is not None else None,
+        "exit_liquidity_risk": exit_liquidity_risk,
+        "stale_quote_flag": bool(stale_quote_flag),
+        "wide_spread_flag": bool(wide_spread_flag),
+        "zero_volume_flag": bool(zero_volume_flag),
+        "zero_open_interest_flag": bool(zero_open_interest_flag),
+        "execution_penalty_score": execution_penalty_score,
+        "execution_verdict": execution_verdict,
+        "execution_concise_explanation": explanation,
+    }
+
+
+def _build_required_path_execution_realism(
+    *,
+    ticker: str,
+    candidate_rows: pd.DataFrame,
+    entry_price_mode: str,
+) -> pd.DataFrame:
+    if candidate_rows.empty:
+        return pd.DataFrame()
+    rows: list[dict[str, Any]] = []
+    for candidate in candidate_rows.to_dict("records"):
+        if clean_string(candidate.get("strategy_family")).lower() != "long_call":
+            continue
+        payload = _execution_quote_payload(candidate, entry_price_mode=entry_price_mode)
+        rows.append(
+            {
+                "ticker": clean_string(ticker).upper(),
+                "contract_label": clean_string(candidate.get("candidate_short_label"))
+                or _required_path_short_contract_label(candidate),
+                "candidate_slug": clean_string(candidate.get("candidate_slug")),
+                "strike": finite_or_none(candidate.get("primary_strike") or candidate.get("strike")),
+                "expiry": clean_string(candidate.get("expiry_date")),
+                "dte": int(finite_or_none(candidate.get("dte")) or 0) if finite_or_none(candidate.get("dte")) is not None else None,
+                "bid_per_share": payload.get("bid_per_share"),
+                "ask_per_share": payload.get("ask_per_share"),
+                "mid_per_share": payload.get("mid_per_share"),
+                "spread_per_share": payload.get("spread_per_share"),
+                "spread_pct_of_mid": payload.get("spread_pct_of_mid"),
+                "volume": _execution_int(candidate.get("volume")),
+                "open_interest": _execution_int(candidate.get("open_interest")),
+                "latest": payload.get("latest"),
+                "liquidity_bucket": payload.get("liquidity_bucket"),
+                "fill_quality_bucket": payload.get("fill_quality_bucket"),
+                "recommended_entry_mode": payload.get("recommended_entry_mode"),
+                "realistic_entry_per_share": payload.get("realistic_entry_per_share"),
+                "realistic_entry_per_contract": payload.get("realistic_entry_per_contract"),
+                "conservative_entry_per_share": payload.get("conservative_entry_per_share"),
+                "conservative_entry_per_contract": payload.get("conservative_entry_per_contract"),
+                "expected_slippage_per_share": payload.get("expected_slippage_per_share"),
+                "expected_slippage_pct_of_mid": payload.get("expected_slippage_pct_of_mid"),
+                "exit_liquidity_risk": payload.get("exit_liquidity_risk"),
+                "stale_quote_flag": payload.get("stale_quote_flag"),
+                "wide_spread_flag": payload.get("wide_spread_flag"),
+                "zero_volume_flag": payload.get("zero_volume_flag"),
+                "zero_open_interest_flag": payload.get("zero_open_interest_flag"),
+                "execution_penalty_score": payload.get("execution_penalty_score"),
+                "execution_verdict": payload.get("execution_verdict"),
+                "concise_explanation": payload.get("execution_concise_explanation"),
+            }
+        )
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows).sort_values(["dte", "strike", "contract_label"], na_position="last").reset_index(drop=True)
+
+
+def _refresh_candidate_execution_fields(candidate_rows: pd.DataFrame, *, entry_price_mode: str) -> pd.DataFrame:
+    if candidate_rows.empty or "strategy_family" not in candidate_rows.columns:
+        return candidate_rows.copy()
+    refreshed = candidate_rows.copy()
+    option_mask = ~refreshed["strategy_family"].astype(str).eq("long_stock")
+    for index, row in refreshed.loc[option_mask].iterrows():
+        payload = _execution_quote_payload(row.to_dict(), entry_price_mode=entry_price_mode)
+        for key, value in payload.items():
+            refreshed.at[index, key] = value
+    return refreshed
+
+
 def _build_candidate_row(
     *,
     candidate_slug: str,
@@ -833,7 +1078,7 @@ def _build_candidate_row(
         primary_strike=primary_strike,
         spot_price=float(chain.spot_price or chain.metadata.spot_price or 0.0),
     )
-    return {
+    row = {
         "candidate_slug": candidate_slug,
         "candidate_label": candidate_label,
         "strategy_family": strategy_family,
@@ -859,6 +1104,8 @@ def _build_candidate_row(
         "bid": finite_or_none(quote_meta.get("bid")),
         "ask": finite_or_none(quote_meta.get("ask")),
         "mid": finite_or_none(quote_meta.get("mid")),
+        "last_per_share": finite_or_none(quote_meta.get("last")),
+        "latest": finite_or_none(quote_meta.get("last")),
         "spread_pct_of_mid": finite_or_none(quote_meta.get("spread_pct_of_mid")),
         "implied_volatility": finite_or_none(quote_meta.get("implied_volatility") or (option_legs[0].base_iv if option_legs else None)),
         "open_interest": quote_meta.get("open_interest"),
@@ -901,6 +1148,9 @@ def _build_candidate_row(
         **fit,
         **sensitivity,
     }
+    if option_legs:
+        row.update(_execution_quote_payload(row, entry_price_mode=row.get("entry_price_mode")))
+    return row
 
 
 def _discover_candidates_for_chain(
@@ -6412,9 +6662,13 @@ def _build_required_path_markdowns(
             if not families.empty:
                 lead_family = families.sort_values(["clears_count", "min_required_move_pct"], ascending=[False, True], na_position="last").iloc[0]
                 family_note = f"; best family `{clean_string(lead_family.get('path_family'))}`"
+            execution_note = ""
+            execution_verdict = clean_string(row.get("execution_verdict"))
+            if execution_verdict and execution_verdict != "execution_plausible":
+                execution_note = f"; execution `{execution_verdict}`"
             top_lines.append(
                 f"{rank}. `{clean_string(row.get('contract_label'))}` `{float(row.get('threshold_multiple') or 0):.1f}x`: "
-                f"{move_text} required move, `{clean_string(row.get('verdict'))}`{family_note}."
+                f"{move_text} required move, `{clean_string(row.get('verdict'))}`{family_note}{execution_note}."
             )
     return "\n".join(lines), "\n".join(top_lines)
 
@@ -6506,9 +6760,226 @@ def _required_path_bucket_class(bucket: Any) -> str:
         "aggressive": "bucket-aggressive",
         "extreme": "bucket-extreme",
         "absurd": "bucket-absurd",
+        "plausible_history": "bucket-plausible",
+        "uncommon_but_seen": "bucket-aggressive",
+        "rare": "bucket-extreme",
+        "never_seen_in_sample": "bucket-absurd",
+        "insufficient_history": "bucket-muted",
         "unavailable": "bucket-muted",
         "invalid": "bucket-muted",
     }.get(normalized, "bucket-neutral")
+
+
+def _prepare_historical_price_frame(historical_prices: pd.DataFrame | None) -> pd.DataFrame:
+    if historical_prices is None or historical_prices.empty:
+        return pd.DataFrame(columns=["date", "close"])
+    frame = historical_prices.copy()
+    if "date" not in frame.columns or "close" not in frame.columns:
+        return pd.DataFrame(columns=["date", "close"])
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+    frame["close"] = pd.to_numeric(frame["close"], errors="coerce")
+    frame = frame.loc[frame["date"].notna() & frame["close"].notna() & (frame["close"] > 0)].copy()
+    if frame.empty:
+        return pd.DataFrame(columns=["date", "close"])
+    frame = frame.sort_values("date").drop_duplicates(subset=["date"], keep="last")
+    return frame[["date", "close"]].reset_index(drop=True)
+
+
+def _historical_forward_return_series(historical_prices: pd.DataFrame | None, window_days: int) -> pd.Series:
+    history = _prepare_historical_price_frame(historical_prices)
+    window = max(int(window_days or 0), 1)
+    if history.empty or len(history.index) <= window:
+        return pd.Series(dtype=float)
+    closes = pd.to_numeric(history["close"], errors="coerce")
+    returns = closes.shift(-window) / closes - 1.0
+    return returns.dropna().astype(float).reset_index(drop=True)
+
+
+def _historical_required_days(row: dict[str, Any]) -> int:
+    dte = int(finite_or_none(row.get("dte")) or 0)
+    snapshot = parse_date(row.get("snapshot_date"))
+    earliest = parse_date(row.get("earliest_valid_date"))
+    if snapshot and earliest:
+        days = max((earliest - snapshot).days, 0)
+        if days > 0:
+            return int(days)
+    terminal = parse_date(row.get("path_terminal_date") or row.get("option_expiry_date") or row.get("expiry"))
+    if snapshot and terminal:
+        days = max((terminal - snapshot).days, 0)
+        if days > 0:
+            return int(days)
+    return max(dte, 1)
+
+
+def _historical_windows_for_required_days(required_days: int, dte: int | None) -> list[int]:
+    windows = set(int(value) for value in REQUIRED_PATH_HISTORICAL_WINDOWS if int(value) > 0)
+    if required_days > 0:
+        windows.add(int(required_days))
+    if dte and int(dte) > 0:
+        windows.add(int(dte))
+    return sorted(windows)
+
+
+def _nearest_historical_window(required_days: int, dte: int | None) -> int:
+    windows = _historical_windows_for_required_days(required_days, dte)
+    if not windows:
+        return max(int(required_days or dte or 1), 1)
+    return min(windows, key=lambda value: (abs(int(value) - int(required_days or value)), int(value)))
+
+
+def _historical_hit_drawdown_median(
+    historical_prices: pd.DataFrame | None,
+    *,
+    window_days: int,
+    required_move_pct: float,
+    drawdown_days: int = REQUIRED_PATH_HISTORICAL_DRAWDOWN_DAYS,
+) -> float | None:
+    history = _prepare_historical_price_frame(historical_prices)
+    window = max(int(window_days or 0), 1)
+    if history.empty or len(history.index) <= window:
+        return None
+    closes = pd.to_numeric(history["close"], errors="coerce").reset_index(drop=True)
+    drawdowns: list[float] = []
+    max_start = len(closes.index) - window
+    for start_index in range(max_start):
+        start_close = finite_or_none(closes.iloc[start_index])
+        hit_close = finite_or_none(closes.iloc[start_index + window])
+        if start_close is None or hit_close is None or start_close <= 0:
+            continue
+        forward_return = float(hit_close) / float(start_close) - 1.0
+        if forward_return < float(required_move_pct):
+            continue
+        end_index = min(start_index + window + max(int(drawdown_days), 1), len(closes.index) - 1)
+        future = closes.iloc[start_index + window : end_index + 1].dropna()
+        if future.empty or hit_close <= 0:
+            continue
+        drawdowns.append(float(future.min()) / float(hit_close) - 1.0)
+    if not drawdowns:
+        return None
+    return round(float(np.median(drawdowns)), 6)
+
+
+def _historical_realism_bucket(*, sample_count: int, hit_count: int, hit_rate: float) -> str:
+    if int(sample_count) < REQUIRED_PATH_HISTORICAL_MIN_SAMPLE_COUNT:
+        return "insufficient_history"
+    if int(hit_count) <= 0:
+        return "never_seen_in_sample"
+    if float(hit_rate) >= 0.10:
+        return "plausible_history"
+    if float(hit_rate) >= 0.02:
+        return "uncommon_but_seen"
+    return "rare"
+
+
+def _historical_realism_verdict(bucket: str) -> str:
+    return {
+        "plausible_history": "historically_seen_often",
+        "uncommon_but_seen": "historically_uncommon_but_seen",
+        "rare": "historically_rare",
+        "never_seen_in_sample": "not_seen_in_available_history",
+        "insufficient_history": "insufficient_history",
+    }.get(clean_string(bucket), "insufficient_history")
+
+
+def _build_required_path_historical_realism(
+    *,
+    ticker: str,
+    summary: pd.DataFrame,
+    historical_prices: pd.DataFrame | None,
+) -> pd.DataFrame:
+    if summary is None or summary.empty:
+        return pd.DataFrame()
+    history = _prepare_historical_price_frame(historical_prices)
+    rows: list[dict[str, Any]] = []
+    for raw_row in summary.to_dict("records"):
+        required_move = finite_or_none(raw_row.get("required_move_pct"))
+        required_days = _historical_required_days(raw_row)
+        dte_value = finite_or_none(raw_row.get("dte"))
+        dte = int(dte_value) if dte_value is not None else None
+        window_days = _nearest_historical_window(required_days, dte)
+        row = {
+            "ticker": clean_string(raw_row.get("ticker")) or clean_string(ticker).upper(),
+            "contract_label": clean_string(raw_row.get("contract_label")),
+            "strike": finite_or_none(raw_row.get("strike")),
+            "expiry": clean_string(raw_row.get("expiry") or raw_row.get("option_expiry_date")),
+            "dte": int(dte) if dte is not None else None,
+            "threshold_multiple": finite_or_none(raw_row.get("threshold_multiple")),
+            "required_move_pct": required_move,
+            "required_terminal_stock_price": finite_or_none(raw_row.get("required_terminal_stock_price")),
+            "required_days_to_clear": int(required_days),
+            "historical_window_days": int(window_days),
+            "historical_sample_count": 0,
+            "historical_forward_return_p50": None,
+            "historical_forward_return_p75": None,
+            "historical_forward_return_p90": None,
+            "historical_forward_return_p95": None,
+            "historical_forward_return_p99": None,
+            "historical_max_forward_return": None,
+            "historical_hit_count": 0,
+            "historical_hit_rate": None,
+            "historical_max_drawdown_after_hit_median": None,
+            "historical_realism_bucket": "insufficient_history",
+            "historical_verdict": "insufficient_history",
+            "concise_explanation": "Historical realism is unavailable because there is not enough local price history.",
+        }
+        returns = _historical_forward_return_series(history, window_days)
+        sample_count = int(len(returns.index))
+        if required_move is None or sample_count < REQUIRED_PATH_HISTORICAL_MIN_SAMPLE_COUNT:
+            row["historical_sample_count"] = sample_count
+            rows.append(row)
+            continue
+        hit_mask = returns >= float(required_move)
+        hit_count = int(hit_mask.sum())
+        hit_rate = float(hit_count) / float(sample_count) if sample_count else 0.0
+        max_forward = finite_or_none(returns.max())
+        bucket = _historical_realism_bucket(
+            sample_count=sample_count,
+            hit_count=hit_count,
+            hit_rate=hit_rate,
+        )
+        verdict = _historical_realism_verdict(bucket)
+        exceeds_max = max_forward is not None and float(required_move) > float(max_forward)
+        if bucket == "plausible_history":
+            explanation = (
+                f"The required {float(required_move) * 100:.1f}% move appeared in {hit_rate * 100:.1f}% "
+                f"of comparable {window_days}-trading-day windows in available price history."
+            )
+        elif bucket == "never_seen_in_sample":
+            explanation = (
+                f"The required {float(required_move) * 100:.1f}% move was never seen in comparable "
+                f"{window_days}-trading-day windows in available price history."
+            )
+        elif bucket == "uncommon_but_seen":
+            explanation = (
+                f"The required {float(required_move) * 100:.1f}% move was uncommon but seen in available price history."
+            )
+        else:
+            explanation = f"The required {float(required_move) * 100:.1f}% move was rare in available price history."
+        if exceeds_max:
+            explanation += " It exceeds the maximum forward move in the sample."
+        row.update(
+            {
+                "historical_sample_count": sample_count,
+                "historical_forward_return_p50": round(float(returns.quantile(0.50)), 6),
+                "historical_forward_return_p75": round(float(returns.quantile(0.75)), 6),
+                "historical_forward_return_p90": round(float(returns.quantile(0.90)), 6),
+                "historical_forward_return_p95": round(float(returns.quantile(0.95)), 6),
+                "historical_forward_return_p99": round(float(returns.quantile(0.99)), 6),
+                "historical_max_forward_return": round(float(max_forward), 6) if max_forward is not None else None,
+                "historical_hit_count": hit_count,
+                "historical_hit_rate": round(hit_rate, 6),
+                "historical_max_drawdown_after_hit_median": _historical_hit_drawdown_median(
+                    history,
+                    window_days=window_days,
+                    required_move_pct=float(required_move),
+                ),
+                "historical_realism_bucket": bucket,
+                "historical_verdict": verdict,
+                "concise_explanation": explanation,
+            }
+        )
+        rows.append(row)
+    return pd.DataFrame(rows)
 
 
 def _required_path_solve_row(
@@ -6687,6 +7158,386 @@ def _required_path_best_family_map(family_summary: pd.DataFrame) -> dict[tuple[s
     return mapping
 
 
+REQUIRED_PATH_RANKING_BUCKET_SCORES = {
+    "plausible": 30.0,
+    "aggressive": 15.0,
+    "extreme": -10.0,
+    "absurd": -30.0,
+    "unavailable": -50.0,
+    "unsolved": -50.0,
+    "invalid": -50.0,
+}
+
+REQUIRED_PATH_RANKING_HISTORICAL_SCORES = {
+    "plausible_history": 20.0,
+    "uncommon_but_seen": 5.0,
+    "rare": -10.0,
+    "never_seen_in_sample": -25.0,
+    "insufficient_history": -5.0,
+}
+
+REQUIRED_PATH_RANKING_LIQUIDITY_SCORES = {
+    "liquid": 0.0,
+    "usable": -5.0,
+    "thin": -15.0,
+    "stale_or_wide": -35.0,
+}
+
+
+def _ranking_bucket_score(bucket: Any) -> float:
+    text = clean_string(bucket)
+    if not text:
+        return -50.0
+    if text.startswith("solved"):
+        return 0.0
+    return REQUIRED_PATH_RANKING_BUCKET_SCORES.get(text, -50.0)
+
+
+def _ranking_historical_score(bucket: Any) -> float:
+    return REQUIRED_PATH_RANKING_HISTORICAL_SCORES.get(clean_string(bucket), -5.0)
+
+
+def _threshold_row(frame: pd.DataFrame, threshold: float) -> dict[str, Any]:
+    if frame.empty:
+        return {}
+    threshold_values = pd.to_numeric(frame.get("threshold_multiple"), errors="coerce")
+    subset = frame.loc[threshold_values.eq(float(threshold))]
+    if subset.empty:
+        return {}
+    return subset.iloc[0].to_dict()
+
+
+def _first_non_empty(*values: Any) -> Any:
+    for value in values:
+        if value is None:
+            continue
+        if isinstance(value, float) and pd.isna(value):
+            continue
+        if clean_string(value) if not isinstance(value, (int, float, bool)) else True:
+            return value
+    return None
+
+
+def _candidate_key_group(frame: pd.DataFrame, contract_label: str) -> pd.DataFrame:
+    if frame is None or frame.empty or "contract_label" not in frame.columns:
+        return pd.DataFrame()
+    return frame.loc[frame["contract_label"].astype(str).eq(clean_string(contract_label))].copy()
+
+
+def _required_path_sensitivity_score(
+    frame: pd.DataFrame,
+    *,
+    contract_label: str,
+    threshold: float = 1.5,
+    shock_column: str,
+    adverse_shocks: set[float] | None = None,
+) -> tuple[float, str]:
+    group = _candidate_key_group(frame, contract_label)
+    if group.empty or shock_column not in group.columns:
+        return -5.0, "missing"
+    threshold_values = pd.to_numeric(group.get("threshold_multiple"), errors="coerce")
+    group = group.loc[threshold_values.eq(float(threshold))].copy()
+    if group.empty:
+        return -5.0, "missing"
+    group["shock_numeric"] = pd.to_numeric(group.get(shock_column), errors="coerce")
+    group["move_numeric"] = pd.to_numeric(group.get("required_move_pct"), errors="coerce")
+    base_values = group.loc[group["shock_numeric"].abs().le(1e-9), "move_numeric"].dropna()
+    if base_values.empty:
+        return -5.0, "missing"
+    base = float(base_values.min())
+    if adverse_shocks:
+        adverse = group.loc[group["shock_numeric"].round(6).isin({round(value, 6) for value in adverse_shocks}), "move_numeric"].dropna()
+    else:
+        adverse = group["move_numeric"].dropna()
+    if adverse.empty:
+        return -5.0, "missing"
+    degradation = max(0.0, float(adverse.max()) - base)
+    if degradation <= 0.05:
+        return 8.0, "stable"
+    if degradation <= 0.15:
+        return 0.0, "moderate"
+    if degradation <= 0.30:
+        return -8.0, "fragile"
+    return -15.0, "very_fragile"
+
+
+def _required_path_matrix_fragility_score(frame: pd.DataFrame, *, contract_label: str) -> tuple[float, str]:
+    group = _candidate_key_group(frame, contract_label)
+    if group.empty:
+        return -5.0, "missing"
+    moves = pd.to_numeric(group.get("required_move_pct"), errors="coerce").dropna()
+    if moves.empty:
+        return -5.0, "missing"
+    span = float(moves.max()) - float(moves.min())
+    if span <= 0.10:
+        return 5.0, "stable"
+    if span <= 0.25:
+        return 0.0, "moderate"
+    if span <= 0.50:
+        return -8.0, "fragile"
+    return -15.0, "very_fragile"
+
+
+def _required_path_sell_hold_score(interpretation: str) -> float:
+    text = clean_string(interpretation).lower()
+    if text == "hold acceptable":
+        return 8.0
+    if text == "sell early path":
+        return 3.0
+    if text == "needs continued stock drift":
+        return -5.0
+    if text == "theta/iv risk after spike":
+        return -8.0
+    if text == "stock cleaner":
+        return -10.0
+    return -2.0
+
+
+def _best_sell_hold_row(sell_hold: pd.DataFrame, contract_label: str) -> dict[str, Any]:
+    group = _candidate_key_group(sell_hold, contract_label)
+    if group.empty:
+        return {}
+    working = group.copy()
+    working["peak_numeric"] = pd.to_numeric(working.get("peak_option_return_pct"), errors="coerce")
+    working["threshold_numeric"] = pd.to_numeric(working.get("threshold_multiple"), errors="coerce")
+    return working.sort_values(["peak_numeric", "threshold_numeric"], ascending=[False, True], na_position="last").iloc[0].to_dict()
+
+
+def _ranking_final_verdict(
+    *,
+    has_missing_required_data: bool,
+    severe_execution: bool,
+    bucket_15: str,
+    bucket_20: str,
+    required_move_15: float | None,
+    historical_bucket: str,
+    historical_hit_rate_15: float | None,
+    total_score: float,
+) -> str:
+    if has_missing_required_data:
+        return "Needs data review"
+    if severe_execution:
+        return "Possible but execution-sensitive" if total_score >= 78.0 and bucket_15 in {"plausible", "aggressive"} else "Too wide / execution risk"
+    if bucket_15 == "absurd" or (required_move_15 is not None and float(required_move_15) > 2.50):
+        return "Avoid" if total_score < 35.0 else "Stock cleaner"
+    if bucket_15 == "extreme":
+        if clean_string(historical_bucket) == "never_seen_in_sample" or (historical_hit_rate_15 is not None and float(historical_hit_rate_15) <= 0.0):
+            return "Stock cleaner"
+        return "Requires aggressive move"
+    if clean_string(historical_bucket) == "never_seen_in_sample" and bucket_15 in {"aggressive", "extreme", "absurd"}:
+        return "Historically rare"
+    if total_score >= 75.0 and bucket_15 in {"plausible", "aggressive"} and clean_string(historical_bucket) not in {"rare", "never_seen_in_sample"}:
+        return "Worth deeper review"
+    if total_score >= 55.0:
+        return "Requires aggressive move" if bucket_20 in {"aggressive", "extreme", "absurd"} else "Possible but execution-sensitive"
+    if clean_string(historical_bucket) in {"rare", "never_seen_in_sample"}:
+        return "Historically rare"
+    return "Avoid" if total_score < 35.0 else "Stock cleaner"
+
+
+def _ranking_top_risk(
+    *,
+    has_missing_required_data: bool,
+    severe_execution: bool,
+    bucket_15: str,
+    historical_bucket: str,
+    entry_label: str,
+    iv_label: str,
+    matrix_label: str,
+    sell_hold_interpretation: str,
+) -> str:
+    if has_missing_required_data:
+        return "data review"
+    if severe_execution:
+        return "execution risk"
+    if bucket_15 in {"extreme", "absurd"}:
+        return "required stock move"
+    if clean_string(historical_bucket) in {"rare", "never_seen_in_sample"}:
+        return "historical rarity"
+    if entry_label in {"fragile", "very_fragile"}:
+        return "entry premium sensitivity"
+    if iv_label in {"fragile", "very_fragile"} or matrix_label in {"fragile", "very_fragile"}:
+        return "IV sensitivity"
+    if clean_string(sell_hold_interpretation).lower() in {"theta/iv risk after spike", "needs continued stock drift"}:
+        return "sell/hold pressure"
+    return "balanced"
+
+
+def _ranking_reason(final_verdict: str, *, top_risk: str, move_15: float | None, historical_hit_rate_15: float | None) -> str:
+    move_text = _required_path_display_value(move_15, kind="pct1")
+    history_text = _required_path_display_value(historical_hit_rate_15, kind="pct1")
+    if final_verdict == "Worth deeper review":
+        return f"1.5x required move is {move_text}, historical hit read is {history_text}, and no severe execution blocker is present."
+    if final_verdict == "Too wide / execution risk":
+        return "Execution risk dominates the theoretical required-path read; use realistic/ask analysis or avoid."
+    if final_verdict in {"Stock cleaner", "Avoid"}:
+        return f"Required move is {move_text} and main risk is {top_risk}; stock is cleaner unless that burden is credible."
+    if final_verdict == "Needs data review":
+        return "Required-path or market inputs are incomplete, so the candidate should not be ranked as attractive."
+    if final_verdict == "Historically rare":
+        return f"The required move is {move_text}, but similar windows are rare or absent in available price history."
+    return f"Candidate remains possible, but main risk is {top_risk}; inspect required-path chart and workbook sensitivities."
+
+
+def _build_required_path_candidate_ranking(
+    *,
+    ticker: str,
+    summary: pd.DataFrame,
+    family_summary: pd.DataFrame,
+    entry_sensitivity: pd.DataFrame,
+    iv_sensitivity: pd.DataFrame,
+    entry_iv_matrix: pd.DataFrame,
+    sell_hold: pd.DataFrame,
+    execution_realism: pd.DataFrame,
+    historical_realism: pd.DataFrame,
+) -> pd.DataFrame:
+    if summary is None or summary.empty:
+        return pd.DataFrame()
+    rows: list[dict[str, Any]] = []
+    working = summary.copy()
+    labels = [label for label in working.get("contract_label", pd.Series(dtype=str)).astype(str).dropna().unique() if clean_string(label)]
+    for contract_label in labels:
+        group = _candidate_key_group(working, contract_label)
+        if group.empty:
+            continue
+        row_15 = _threshold_row(group, 1.5)
+        row_20 = _threshold_row(group, 2.0)
+        identity = row_15 or row_20 or group.iloc[0].to_dict()
+        execution_group = _candidate_key_group(execution_realism, contract_label)
+        execution_row = execution_group.iloc[0].to_dict() if not execution_group.empty else {}
+        historical_group = _candidate_key_group(historical_realism, contract_label)
+        hist_15 = _threshold_row(historical_group, 1.5)
+        hist_20 = _threshold_row(historical_group, 2.0)
+        move_15 = finite_or_none(row_15.get("required_move_pct"))
+        move_20 = finite_or_none(row_20.get("required_move_pct"))
+        bucket_15 = clean_string(row_15.get("realism_bucket")) or "unavailable"
+        bucket_20 = clean_string(row_20.get("realism_bucket")) or "unavailable"
+        has_missing_required_data = move_15 is None or not row_15
+
+        required_path_score = round(_ranking_bucket_score(bucket_15) * 0.60 + _ranking_bucket_score(bucket_20) * 0.40, 2)
+        liquidity_bucket = clean_string(_first_non_empty(execution_row.get("liquidity_bucket"), identity.get("liquidity_bucket"))) or "thin"
+        recommended_entry = clean_string(_first_non_empty(execution_row.get("recommended_entry_mode"), identity.get("recommended_entry_mode"))) or "realistic"
+        execution_verdict = clean_string(_first_non_empty(execution_row.get("execution_verdict"), identity.get("execution_verdict"))) or "execution_review"
+        execution_penalty = finite_or_none(_first_non_empty(execution_row.get("execution_penalty_score"), identity.get("execution_penalty_score"))) or 0.0
+        execution_score = REQUIRED_PATH_RANKING_LIQUIDITY_SCORES.get(liquidity_bucket, -15.0) - min(float(execution_penalty) / 6.0, 18.0)
+        severe_execution = liquidity_bucket == "stale_or_wide" or recommended_entry == "avoid" or execution_verdict == "avoid_due_to_spread" or float(execution_penalty) >= 70.0
+
+        entry_score, entry_label = _required_path_sensitivity_score(
+            entry_sensitivity,
+            contract_label=contract_label,
+            threshold=1.5,
+            shock_column="entry_shift_pct",
+            adverse_shocks={0.25, 0.50, 1.0},
+        )
+        iv_score, iv_label = _required_path_sensitivity_score(
+            iv_sensitivity,
+            contract_label=contract_label,
+            threshold=1.5,
+            shock_column="iv_shift_vol_points",
+            adverse_shocks={-0.25, -0.50, 0.25, 0.50},
+        )
+        matrix_score, matrix_label = _required_path_matrix_fragility_score(entry_iv_matrix, contract_label=contract_label)
+
+        sell_hold_row = _best_sell_hold_row(sell_hold, contract_label)
+        sell_hold_interpretation = clean_string(sell_hold_row.get("interpretation")) or "n/a"
+        sell_hold_score = _required_path_sell_hold_score(sell_hold_interpretation)
+
+        hist_bucket_15 = clean_string(hist_15.get("historical_realism_bucket")) or "insufficient_history"
+        hist_bucket_20 = clean_string(hist_20.get("historical_realism_bucket")) or hist_bucket_15
+        hist_score_15 = _ranking_historical_score(hist_bucket_15)
+        hist_score_20 = _ranking_historical_score(hist_bucket_20)
+        historical_score = round(hist_score_15 * 0.60 + hist_score_20 * 0.40, 2)
+        historical_bucket = hist_bucket_15 if hist_score_15 <= hist_score_20 else hist_bucket_20
+        historical_verdict = clean_string((hist_15 if hist_score_15 <= hist_score_20 else hist_20).get("historical_verdict")) or "insufficient_history"
+        historical_hit_15 = finite_or_none(hist_15.get("historical_hit_rate"))
+        historical_hit_20 = finite_or_none(hist_20.get("historical_hit_rate"))
+
+        total_score = 50.0 + required_path_score + execution_score + historical_score + entry_score + iv_score + matrix_score + sell_hold_score
+        total_score = round(max(0.0, min(100.0, total_score)), 2)
+        final_verdict = _ranking_final_verdict(
+            has_missing_required_data=has_missing_required_data,
+            severe_execution=severe_execution,
+            bucket_15=bucket_15,
+            bucket_20=bucket_20,
+            required_move_15=move_15,
+            historical_bucket=historical_bucket,
+            historical_hit_rate_15=historical_hit_15,
+            total_score=total_score,
+        )
+        top_risk = _ranking_top_risk(
+            has_missing_required_data=has_missing_required_data,
+            severe_execution=severe_execution,
+            bucket_15=bucket_15,
+            historical_bucket=historical_bucket,
+            entry_label=entry_label,
+            iv_label=iv_label,
+            matrix_label=matrix_label,
+            sell_hold_interpretation=sell_hold_interpretation,
+        )
+        rows.append(
+            {
+                "ticker": clean_string(_first_non_empty(identity.get("ticker"), ticker)).upper(),
+                "contract_label": contract_label,
+                "strike": finite_or_none(identity.get("strike")),
+                "expiry": clean_string(identity.get("expiry") or identity.get("option_expiry_date")),
+                "dte": int(finite_or_none(identity.get("dte")) or 0) if finite_or_none(identity.get("dte")) is not None else None,
+                "bid_per_share": finite_or_none(_first_non_empty(identity.get("bid_per_share"), identity.get("bid"), execution_row.get("bid_per_share"))),
+                "ask_per_share": finite_or_none(_first_non_empty(identity.get("ask_per_share"), identity.get("ask"), execution_row.get("ask_per_share"))),
+                "mid_per_share": finite_or_none(_first_non_empty(identity.get("mid_per_share"), identity.get("mid"), execution_row.get("mid_per_share"))),
+                "spread_pct_of_mid": finite_or_none(_first_non_empty(identity.get("spread_pct_of_mid"), execution_row.get("spread_pct_of_mid"))),
+                "volume": finite_or_none(_first_non_empty(identity.get("volume"), execution_row.get("volume"))),
+                "open_interest": finite_or_none(_first_non_empty(identity.get("open_interest"), execution_row.get("open_interest"))),
+                "implied_volatility": finite_or_none(_first_non_empty(identity.get("implied_volatility"), identity.get("entry_iv"))),
+                "iv_rank": finite_or_none(identity.get("iv_rank")),
+                "iv_percentile": finite_or_none(identity.get("iv_percentile")),
+                "required_move_1_5x": move_15,
+                "required_move_2_0x": move_20,
+                "best_path_family_1_5x": _best_family_for_display(family_summary, contract_label, 1.5),
+                "best_path_family_2_0x": _best_family_for_display(family_summary, contract_label, 2.0),
+                "realism_bucket_1_5x": bucket_15,
+                "realism_bucket_2_0x": bucket_20,
+                "required_path_score": required_path_score,
+                "liquidity_bucket": liquidity_bucket,
+                "recommended_entry_mode": recommended_entry,
+                "execution_penalty_score": round(float(execution_penalty), 4),
+                "execution_verdict": execution_verdict,
+                "entry_sensitivity_score": round(float(entry_score), 2),
+                "iv_sensitivity_score": round(float(iv_score), 2),
+                "matrix_fragility_score": round(float(matrix_score), 2),
+                "peak_option_return_pct": finite_or_none(sell_hold_row.get("peak_option_return_pct")),
+                "peak_date": clean_string(sell_hold_row.get("peak_date")) or None,
+                "expiry_option_return_pct": finite_or_none(sell_hold_row.get("expiry_option_return_pct")),
+                "sell_hold_interpretation": sell_hold_interpretation,
+                "historical_hit_rate_1_5x": historical_hit_15,
+                "historical_hit_rate_2_0x": historical_hit_20,
+                "historical_realism_bucket": historical_bucket,
+                "historical_verdict": historical_verdict,
+                "total_score": total_score,
+                "final_verdict": final_verdict,
+                "concise_reason": _ranking_reason(
+                    final_verdict,
+                    top_risk=top_risk,
+                    move_15=move_15,
+                    historical_hit_rate_15=historical_hit_15,
+                ),
+                "top_risk": top_risk,
+            }
+        )
+    if not rows:
+        return pd.DataFrame()
+    ranking = pd.DataFrame(rows)
+    ranking["sort_move"] = pd.to_numeric(ranking.get("required_move_1_5x"), errors="coerce")
+    ranking["sort_dte"] = pd.to_numeric(ranking.get("dte"), errors="coerce")
+    ranking = ranking.sort_values(
+        ["total_score", "sort_move", "sort_dte", "contract_label"],
+        ascending=[False, True, True, True],
+        na_position="last",
+        kind="mergesort",
+    ).drop(columns=["sort_move", "sort_dte"])
+    ranking.insert(0, "rank", range(1, len(ranking.index) + 1))
+    return ranking.reset_index(drop=True)
+
+
 def _build_required_path_tables_markdown(*, ticker: str) -> str:
     return "\n".join(
         [
@@ -6694,7 +7545,7 @@ def _build_required_path_tables_markdown(*, ticker: str) -> str:
             "",
             "## What to open first",
             "",
-            "Open `required_path_tables.html` after the overview chart and summary. It is the spreadsheet-style companion for comparing calls, required moves, entry risk, IV risk, and sell/hold pressure.",
+            "Open Candidate Ranking first, then Required Move Summary, then charts. `required_path_tables.html` is the spreadsheet-style companion for comparing calls, required moves, execution realism, entry risk, IV risk, historical realism, and sell/hold pressure.",
             "",
             "## How to read the tables",
             "",
@@ -6702,6 +7553,8 @@ def _build_required_path_tables_markdown(*, ticker: str) -> str:
             "- Required move tables show what each call needs before the option beats stock ownership.",
             "- Bid/Ask/Mid are per-share option quotes.",
             "- Entry premium is per-contract in required-path calculations.",
+            "- Mid is model base only; realistic entry includes estimated slippage, ask is conservative, and bid is conservative exit/liquidation.",
+            "- Historical realism is descriptive, not a probability model. It asks whether the required move has occurred in similar historical windows.",
             "- Entry premium sensitivity shows fill-price risk.",
             "- IV sensitivity shows vol risk; use it after the stock-path requirement is understood.",
             "- Sell / hold pressure shows whether a modeled spike is better sold early or can be held.",
@@ -6730,12 +7583,146 @@ def _html_section(title: str, note: str, table_html: str) -> str:
     )
 
 
+def _required_path_candidate_ranking_html(frame: pd.DataFrame) -> str:
+    if frame.empty:
+        return "<table><tbody><tr><td>n/a</td></tr></tbody></table>"
+    rows = []
+    working = frame.copy()
+    if "rank" in working.columns:
+        working["rank_numeric"] = pd.to_numeric(working.get("rank"), errors="coerce")
+        working = working.sort_values(["rank_numeric", "contract_label"], na_position="last")
+    for row in working.to_dict("records"):
+        verdict = clean_string(row.get("final_verdict"))
+        risk_class = "execution-high-risk" if verdict in {"Too wide / execution risk", "Avoid", "Stock cleaner", "Needs data review"} else ""
+        rows.append(
+            f"<tr class=\"{escape(risk_class)}\">"
+            + _html_cell(row.get("rank"))
+            + _html_cell(row.get("contract_label"), css_class="label")
+            + _html_cell(row.get("mid_per_share"), kind="currency")
+            + _html_cell(row.get("spread_pct_of_mid"), kind="pct1")
+            + _html_cell(row.get("open_interest"))
+            + _html_cell(row.get("implied_volatility"), kind="iv")
+            + _html_cell(row.get("required_move_1_5x"), kind="pct1")
+            + _html_cell(row.get("required_move_2_0x"), kind="pct1")
+            + _html_cell(row.get("historical_hit_rate_1_5x"), kind="pct1")
+            + _html_cell(row.get("liquidity_bucket"))
+            + _html_cell(row.get("entry_sensitivity_score"))
+            + _html_cell(row.get("iv_sensitivity_score"))
+            + _html_cell(row.get("sell_hold_interpretation"))
+            + _html_cell(row.get("final_verdict"))
+            + _html_cell(row.get("concise_reason"), css_class="note")
+            + "</tr>"
+        )
+    headers = [
+        "Rank",
+        "Contract",
+        "Mid",
+        "Spread %",
+        "OI",
+        "IV",
+        "Req Move 1.5x",
+        "Req Move 2.0x",
+        "Historical Hit 1.5x",
+        "Liquidity",
+        "Entry Risk",
+        "IV Risk",
+        "Sell/Hold",
+        "Final Verdict",
+        "Reason",
+    ]
+    return "<table><thead><tr>" + "".join(_html_header(label) for label in headers) + "</tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
+
+
+def _required_path_execution_html(frame: pd.DataFrame) -> str:
+    if frame.empty:
+        return "<table><tbody><tr><td>n/a</td></tr></tbody></table>"
+    rows = []
+    for row in frame.sort_values(["dte", "strike", "contract_label"], na_position="last").to_dict("records"):
+        risk_class = "execution-high-risk" if clean_string(row.get("recommended_entry_mode")) == "avoid" else ""
+        rows.append(
+            f"<tr class=\"{escape(risk_class)}\">"
+            + _html_cell(row.get("contract_label"), css_class="label")
+            + _html_cell(row.get("bid_per_share"), kind="currency")
+            + _html_cell(row.get("ask_per_share"), kind="currency")
+            + _html_cell(row.get("mid_per_share"), kind="currency")
+            + _html_cell(row.get("spread_pct_of_mid"), kind="pct1")
+            + _html_cell(row.get("volume"))
+            + _html_cell(row.get("open_interest"))
+            + _html_cell(row.get("liquidity_bucket"))
+            + _html_cell(row.get("recommended_entry_mode"))
+            + _html_cell(row.get("realistic_entry_per_share"), kind="currency")
+            + _html_cell(row.get("execution_verdict"))
+            + _html_cell(row.get("concise_explanation"), css_class="note")
+            + "</tr>"
+        )
+    headers = [
+        "Contract",
+        "Bid",
+        "Ask",
+        "Mid",
+        "Spread %",
+        "Volume",
+        "Open Int",
+        "Liquidity",
+        "Recommended Entry",
+        "Realistic Entry",
+        "Execution Verdict",
+        "Notes",
+    ]
+    return "<table><thead><tr>" + "".join(_html_header(label) for label in headers) + "</tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
+
+
+def _required_path_historical_realism_html(frame: pd.DataFrame) -> str:
+    if frame.empty:
+        return "<table><tbody><tr><td>n/a</td></tr></tbody></table>"
+    rows = []
+    working = frame.copy()
+    for column in ("dte", "strike", "threshold_multiple"):
+        if column in working.columns:
+            working[column] = pd.to_numeric(working[column], errors="coerce")
+    for row in working.sort_values(["dte", "strike", "contract_label", "threshold_multiple"], na_position="last").to_dict("records"):
+        rows.append(
+            "<tr>"
+            + _html_cell(row.get("contract_label"), css_class="label")
+            + _html_cell(row.get("threshold_multiple"), kind="multiple")
+            + _html_cell(row.get("required_move_pct"), kind="pct1")
+            + _html_cell(row.get("required_days_to_clear"))
+            + _html_cell(row.get("historical_window_days"))
+            + _html_cell(row.get("historical_hit_rate"), kind="pct1")
+            + _html_cell(row.get("historical_forward_return_p90"), kind="pct1")
+            + _html_cell(row.get("historical_forward_return_p95"), kind="pct1")
+            + _html_cell(row.get("historical_max_forward_return"), kind="pct1")
+            + _html_cell(row.get("historical_realism_bucket"), css_class=_required_path_bucket_class(row.get("historical_realism_bucket")))
+            + _html_cell(row.get("historical_verdict"))
+            + _html_cell(row.get("concise_explanation"), css_class="note")
+            + "</tr>"
+        )
+    headers = [
+        "Contract",
+        "Threshold",
+        "Required Move",
+        "Required Days",
+        "Historical Window",
+        "Hit Rate",
+        "P90 Move",
+        "P95 Move",
+        "Max Seen",
+        "Realism Bucket",
+        "Verdict",
+        "Note",
+    ]
+    return "<table><thead><tr>" + "".join(_html_header(label) for label in headers) + "</tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
+
+
 def _build_required_path_tables_html(
     *,
     ticker: str,
     summary: pd.DataFrame,
     paths: pd.DataFrame,
     family_summary: pd.DataFrame,
+    candidate_ranking: pd.DataFrame,
+    execution_realism: pd.DataFrame,
+    historical_realism: pd.DataFrame,
     entry_sensitivity: pd.DataFrame,
     iv_sensitivity: pd.DataFrame,
     entry_iv_matrix: pd.DataFrame,
@@ -6744,7 +7731,9 @@ def _build_required_path_tables_html(
 ) -> str:
     note = (
         "1.5x / 2.0x are relative to stock return, not absolute option return. "
-        "Bid/Ask/Mid are per-share option quotes. Entry premium is per-contract in required-path calculations."
+        "Bid/Ask/Mid are per-share option quotes. Entry premium is per-contract in required-path calculations. "
+        "Mid is model base only. Realistic entry includes estimated slippage. Ask is conservative. Bid is conservative exit/liquidation. "
+        "Historical realism is descriptive, not a probability model."
     )
     css = """
 body { font-family: Arial, Helvetica, sans-serif; background: #ffffff; color: #1f2933; margin: 16px; }
@@ -6766,9 +7755,18 @@ tbody tr:nth-child(even) td.label { background: #FAFCFE; }
 .bucket-absurd { background: #E5E7EB; font-weight: 800; }
 .bucket-muted { background: #EEF2F6; color: #4B5563; font-weight: 700; }
 .bucket-neutral { background: #FFFFFF; }
+tr.execution-high-risk td { background: #ECEFF3; font-weight: 700; }
+tr.execution-high-risk td.label { background: #ECEFF3; }
 """.strip()
 
     sections: list[str] = []
+    sections.append(
+        _html_section(
+            "Candidate ranking",
+            "Open this first: one deterministic decision table combining required moves, execution realism, sensitivity, sell/hold pressure, and historical realism.",
+            _required_path_candidate_ranking_html(candidate_ranking),
+        )
+    )
     if not summary.empty:
         base = summary.sort_values(["dte", "strike", "threshold_multiple"], na_position="last").drop_duplicates("contract_label")
         rows = []
@@ -6901,6 +7899,20 @@ tbody tr:nth-child(even) td.label { background: #FAFCFE; }
         )
         sections.append(_html_section("Required move summary", "What each call needs to beat stock by the configured relative hurdle.", table))
 
+    sections.append(
+        _html_section(
+            "Execution realism",
+            "Mid is model base only. Realistic entry includes estimated slippage. Ask is conservative. Bid is conservative exit/liquidation.",
+            _required_path_execution_html(execution_realism),
+        )
+    )
+    sections.append(
+        _html_section(
+            "Historical realism",
+            "Historical realism is descriptive, not a probability model. It shows historical frequency in available price history, not a forecast probability.",
+            _required_path_historical_realism_html(historical_realism),
+        )
+    )
     sections.append(_html_section("Path family comparison", "Shows whether the option works across path forms or only one narrow timing shape.", _required_path_family_comparison_html(family_summary)))
     sections.append(_html_section("Entry premium sensitivity", "Lower entry premium can dramatically reduce the required stock move. Expensive fills can turn a plausible call into an extreme one.", _required_path_sensitivity_html(entry_sensitivity, shock_column="entry_shift_pct", shock_kind="pct1", title_prefix="Entry")))
     sections.append(_html_section("IV sensitivity", "IV is secondary to stock path, but can materially affect longer-dated or near-the-money calls.", _required_path_sensitivity_html(iv_sensitivity, shock_column="iv_shift_vol_points", shock_kind="vol_points", title_prefix="IV")))
@@ -7100,6 +8112,7 @@ def _build_long_call_required_path_outputs(
     strong_outperformance_multiple: float,
     minimum_edge_stock_return_pct: float,
     entry_price_mode: str,
+    historical_prices: pd.DataFrame | None = None,
 ) -> dict[str, Any]:
     thresholds = [float(minimum_outperformance_multiple), float(strong_outperformance_multiple)]
     normalized_entry_mode = clean_string(entry_price_mode).lower() or "conservative_mid_plus_slippage"
@@ -7120,6 +8133,9 @@ def _build_long_call_required_path_outputs(
             "required_path_iv_sensitivity": pd.DataFrame(),
             "required_path_entry_iv_matrix": pd.DataFrame(),
             "required_path_sell_hold_summary": pd.DataFrame(),
+            "required_path_execution_realism": pd.DataFrame(),
+            "required_path_historical_realism": pd.DataFrame(),
+            "required_path_candidate_ranking": pd.DataFrame(),
             "required_path_summary_markdown": "",
             "required_path_exit_ladder_markdown": "",
             "required_path_tables_markdown": "",
@@ -7141,6 +8157,9 @@ def _build_long_call_required_path_outputs(
             "required_path_iv_sensitivity": pd.DataFrame(),
             "required_path_entry_iv_matrix": pd.DataFrame(),
             "required_path_sell_hold_summary": pd.DataFrame(),
+            "required_path_execution_realism": pd.DataFrame(),
+            "required_path_historical_realism": pd.DataFrame(),
+            "required_path_candidate_ranking": pd.DataFrame(),
             "required_path_summary_markdown": "",
             "required_path_exit_ladder_markdown": "",
             "required_path_tables_markdown": "",
@@ -7148,6 +8167,15 @@ def _build_long_call_required_path_outputs(
             "top_required_path_candidates_markdown": "",
         }
     long_calls = _sort_candidate_priority(long_calls).reset_index(drop=True)
+    execution_realism = _build_required_path_execution_realism(
+        ticker=ticker,
+        candidate_rows=long_calls,
+        entry_price_mode=normalized_entry_mode,
+    )
+    execution_by_slug = {
+        clean_string(row.get("candidate_slug")): row
+        for row in execution_realism.to_dict("records")
+    } if not execution_realism.empty else {}
     minimum_stock_return_floor_pct = float(minimum_edge_stock_return_pct)
     summary_rows: list[dict[str, Any]] = []
     path_rows: list[dict[str, Any]] = []
@@ -7160,6 +8188,7 @@ def _build_long_call_required_path_outputs(
 
     for candidate_order, candidate in enumerate(long_calls.to_dict("records"), start=1):
         candidate_slug = clean_string(candidate.get("candidate_slug"))
+        execution_row = execution_by_slug.get(candidate_slug, {})
         spec = spec_lookup.get(candidate_slug)
         if spec is None:
             continue
@@ -7734,6 +8763,11 @@ def _build_long_call_required_path_outputs(
                     "open_interest": candidate.get("open_interest"),
                     "volume": candidate.get("volume"),
                     "quality_flags": clean_string(candidate.get("quality_flags")) or None,
+                    "liquidity_bucket": clean_string(execution_row.get("liquidity_bucket") or candidate.get("liquidity_bucket")) or None,
+                    "fill_quality_bucket": clean_string(execution_row.get("fill_quality_bucket") or candidate.get("fill_quality_bucket")) or None,
+                    "recommended_entry_mode": clean_string(execution_row.get("recommended_entry_mode") or candidate.get("recommended_entry_mode")) or None,
+                    "execution_penalty_score": finite_or_none(execution_row.get("execution_penalty_score") or candidate.get("execution_penalty_score")),
+                    "execution_verdict": clean_string(execution_row.get("execution_verdict") or candidate.get("execution_verdict")) or None,
                     "entry_spot": round(float(entry_spot), 4),
                     "snapshot_date": snapshot_date.isoformat(),
                     "analysis_horizon_date": target_date.isoformat(),
@@ -7774,6 +8808,22 @@ def _build_long_call_required_path_outputs(
         paths=by_option,
         peaks=peak_summary,
     )
+    historical_realism = _build_required_path_historical_realism(
+        ticker=ticker,
+        summary=summary,
+        historical_prices=historical_prices,
+    )
+    candidate_ranking = _build_required_path_candidate_ranking(
+        ticker=ticker,
+        summary=summary,
+        family_summary=family_summary,
+        entry_sensitivity=entry_sensitivity,
+        iv_sensitivity=iv_sensitivity,
+        entry_iv_matrix=entry_iv_matrix,
+        sell_hold=sell_hold_summary,
+        execution_realism=execution_realism,
+        historical_realism=historical_realism,
+    )
     summary_md, top_md = _build_required_path_markdowns(
         ticker=ticker,
         summary=summary,
@@ -7789,6 +8839,9 @@ def _build_long_call_required_path_outputs(
         summary=summary,
         paths=by_option,
         family_summary=family_summary,
+        candidate_ranking=candidate_ranking,
+        execution_realism=execution_realism,
+        historical_realism=historical_realism,
         entry_sensitivity=entry_sensitivity,
         iv_sensitivity=iv_sensitivity,
         entry_iv_matrix=entry_iv_matrix,
@@ -7805,6 +8858,9 @@ def _build_long_call_required_path_outputs(
         "required_path_iv_sensitivity": iv_sensitivity,
         "required_path_entry_iv_matrix": entry_iv_matrix,
         "required_path_sell_hold_summary": sell_hold_summary,
+        "required_path_execution_realism": execution_realism,
+        "required_path_historical_realism": historical_realism,
+        "required_path_candidate_ranking": candidate_ranking,
         "required_path_summary_markdown": summary_md,
         "required_path_exit_ladder_markdown": exit_ladder_md,
         "required_path_tables_markdown": tables_md,
@@ -9841,6 +10897,10 @@ def _selector_warning(row: pd.Series) -> str:
         return "Target date extends past expiry, so this family is being judged on an expiry-clamped estimate with a weaker timing fit."
     if clean_string(row.get("horizon_fit_label")) == "weak timing match":
         return "Timing fit is weak here because the modeled holding period is shorter than the requested thesis horizon."
+    if clean_string(row.get("recommended_entry_mode")).lower() == "avoid":
+        return "Execution risk is severe: avoid_due_to_spread unless a much better fill is available."
+    if float(finite_or_none(row.get("execution_penalty_score")) or 0.0) >= 50.0:
+        return "Execution risk is material; use realistic or ask-based entry before treating the path score as tradable."
     if not bool(row.get("fully_implementable_with_budget", False)):
         return "Needs more than the normalized comparison budget for a whole-unit implementation."
     if finite_or_none(row.get("iv_down_value_change")) is not None and float(row.get("iv_down_value_change")) < -50:
@@ -9875,6 +10935,11 @@ def _selector_score(
     availability_penalty = 0.0 if bool(row.get("available", True)) else -1_000_000.0
     budget_penalty = -125.0 if not bool(row.get("fully_implementable_with_budget", False)) else 0.0
     coverage_penalty = -40.0 if clean_string(row.get("selection_scope")) == "nearby_snapshot_fallback" else 0.0
+    execution_penalty = 0.0
+    if family != "long_stock":
+        execution_penalty = -4.0 * float(finite_or_none(row.get("execution_penalty_score")) or 0.0)
+        if clean_string(row.get("recommended_entry_mode")).lower() == "avoid":
+            execution_penalty -= 500.0
     horizon_penalty = 0.0
     if bool(row.get("target_beyond_expiry")):
         horizon_penalty -= 325.0
@@ -9892,7 +10957,7 @@ def _selector_score(
         "highest_convexity": convexity_score * 400.0 + return_pct * 600.0 + iv_up_change * 0.35,
     }
     base_score = score_map.get(clean_string(objective_mode).lower(), score_map[DEFAULT_OBJECTIVE_MODE])
-    score = base_score + availability_penalty + budget_penalty + coverage_penalty + horizon_penalty + max_loss * downside_bias
+    score = base_score + availability_penalty + budget_penalty + coverage_penalty + execution_penalty + horizon_penalty + max_loss * downside_bias
     if capped_upside:
         score -= 25.0
     if family == "long_stock":
@@ -10764,6 +11829,7 @@ def _build_contract_selection_core(
         data_root=data_root,
         expiry_selection_mode=expiry_selection_mode,
     )
+    historical_prices = load_price_history(ticker_label, data_root)
     loaded_chains = [
         (
             item.scope,
@@ -10845,6 +11911,10 @@ def _build_contract_selection_core(
         candidates = pd.concat([stock_rows, candidates.loc[candidates["strategy_family"] != "long_stock"]], ignore_index=True)
     spec_map = {clean_string(spec["candidate_slug"]): spec for spec in candidate_specs}
     candidates = candidates.loc[candidates["candidate_slug"].isin(spec_map.keys())].copy()
+    candidates = _refresh_candidate_execution_fields(
+        candidates,
+        entry_price_mode=clean_string(entry_price_mode).lower(),
+    )
     candidates["robustness_score"] = (
         pd.to_numeric(candidates["difference_vs_stock"], errors="coerce").fillna(0.0)
         - pd.to_numeric(candidates["max_loss"], errors="coerce").fillna(0.0) * 0.01
@@ -11292,6 +12362,7 @@ def _build_contract_selection_core(
         strong_outperformance_multiple=float(strong_outperformance_multiple),
         minimum_edge_stock_return_pct=float(minimum_edge_stock_return_pct),
         entry_price_mode=clean_string(entry_price_mode).lower(),
+        historical_prices=historical_prices,
     )
     compare_vs_stock = candidates[
         [
@@ -11586,6 +12657,9 @@ def _build_contract_selection_core(
         required_path_iv_sensitivity=required_path_engine_outputs["required_path_iv_sensitivity"],
         required_path_entry_iv_matrix=required_path_engine_outputs["required_path_entry_iv_matrix"],
         required_path_sell_hold_summary=required_path_engine_outputs["required_path_sell_hold_summary"],
+        required_path_execution_realism=required_path_engine_outputs["required_path_execution_realism"],
+        required_path_historical_realism=required_path_engine_outputs["required_path_historical_realism"],
+        required_path_candidate_ranking=required_path_engine_outputs["required_path_candidate_ranking"],
         required_path_summary_markdown=required_path_engine_outputs["required_path_summary_markdown"],
         required_path_exit_ladder_markdown=required_path_engine_outputs["required_path_exit_ladder_markdown"],
         required_path_tables_markdown=required_path_engine_outputs["required_path_tables_markdown"],

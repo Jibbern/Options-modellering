@@ -251,6 +251,260 @@ def test_required_path_realism_bucket_uses_decimal_return_units():
     assert _required_path_realism_bucket(3.00, "solved_absurd_range") == "absurd"
 
 
+def test_historical_forward_return_stats_and_buckets():
+    history = pd.DataFrame(
+        {
+            "ticker": ["GPRE"] * 9,
+            "date": pd.date_range("2026-01-01", periods=9, freq="D"),
+            "close": [100.0, 105.0, 110.0, 115.0, 120.0, 130.0, 140.0, 150.0, 160.0],
+        }
+    )
+
+    returns = contract_selection_module._historical_forward_return_series(history, 2)
+    assert [round(value, 4) for value in returns.iloc[:3].tolist()] == [0.10, 0.0952, 0.0909]
+
+    summary = pd.DataFrame(
+        [
+            {
+                "ticker": "GPRE",
+                "contract_label": "15C Dec-26",
+                "strike": 15.0,
+                "expiry": "2026-12-18",
+                "dte": 250,
+                "threshold_multiple": 1.5,
+                "required_move_pct": 0.08,
+                "required_terminal_stock_price": 10.8,
+                "earliest_valid_date": "2026-01-03",
+                "snapshot_date": "2026-01-01",
+            },
+            {
+                "ticker": "GPRE",
+                "contract_label": "25C Dec-26",
+                "strike": 25.0,
+                "expiry": "2026-12-18",
+                "dte": 250,
+                "threshold_multiple": 2.0,
+                "required_move_pct": 5.00,
+                "required_terminal_stock_price": 60.0,
+                "earliest_valid_date": "2026-01-03",
+                "snapshot_date": "2026-01-01",
+            },
+        ]
+    )
+
+    realism = contract_selection_module._build_required_path_historical_realism(
+        ticker="GPRE",
+        summary=summary,
+        historical_prices=history,
+    )
+    plausible = realism.loc[realism["contract_label"].eq("15C Dec-26")].iloc[0]
+    never_seen = realism.loc[realism["contract_label"].eq("25C Dec-26")].iloc[0]
+
+    assert plausible["historical_realism_bucket"] == "plausible_history"
+    assert float(plausible["historical_hit_rate"]) >= 0.10
+    assert never_seen["historical_realism_bucket"] == "never_seen_in_sample"
+    assert float(never_seen["historical_hit_rate"]) == 0.0
+    assert "available price history" in plausible["concise_explanation"]
+
+    insufficient = contract_selection_module._build_required_path_historical_realism(
+        ticker="GPRE",
+        summary=summary.head(1),
+        historical_prices=history.head(3),
+    )
+    assert insufficient["historical_realism_bucket"].iloc[0] == "insufficient_history"
+
+
+def test_required_path_candidate_ranking_combines_risk_layers():
+    summary = pd.DataFrame(
+        [
+            {
+                "ticker": "GPRE",
+                "contract_label": "15C Dec-26",
+                "strike": 15.0,
+                "expiry": "2026-12-18",
+                "dte": 227,
+                "threshold_multiple": 1.5,
+                "required_move_pct": 0.30,
+                "realism_bucket": "plausible",
+                "bid_per_share": 3.00,
+                "ask_per_share": 3.40,
+                "mid_per_share": 3.20,
+                "spread_pct_of_mid": 0.125,
+                "volume": 20,
+                "open_interest": 150,
+                "implied_volatility": 0.70,
+                "iv_rank": 0.45,
+                "iv_percentile": 0.60,
+                "liquidity_bucket": "usable",
+                "recommended_entry_mode": "realistic",
+                "execution_penalty_score": 18.0,
+                "execution_verdict": "mid_possible_but_not_guaranteed",
+            },
+            {
+                "ticker": "GPRE",
+                "contract_label": "15C Dec-26",
+                "strike": 15.0,
+                "expiry": "2026-12-18",
+                "dte": 227,
+                "threshold_multiple": 2.0,
+                "required_move_pct": 0.42,
+                "realism_bucket": "aggressive",
+            },
+            {
+                "ticker": "GPRE",
+                "contract_label": "20C Dec-26",
+                "strike": 20.0,
+                "expiry": "2026-12-18",
+                "dte": 227,
+                "threshold_multiple": 1.5,
+                "required_move_pct": 0.28,
+                "realism_bucket": "plausible",
+                "bid_per_share": 0.20,
+                "ask_per_share": 1.00,
+                "mid_per_share": 0.60,
+                "spread_pct_of_mid": 1.333,
+                "volume": 0,
+                "open_interest": 0,
+                "implied_volatility": 0.98,
+                "liquidity_bucket": "stale_or_wide",
+                "recommended_entry_mode": "avoid",
+                "execution_penalty_score": 92.0,
+                "execution_verdict": "avoid_due_to_spread",
+            },
+            {
+                "ticker": "GPRE",
+                "contract_label": "20C Dec-26",
+                "strike": 20.0,
+                "expiry": "2026-12-18",
+                "dte": 227,
+                "threshold_multiple": 2.0,
+                "required_move_pct": 0.36,
+                "realism_bucket": "plausible",
+            },
+            {
+                "ticker": "GPRE",
+                "contract_label": "30C Jan-28",
+                "strike": 30.0,
+                "expiry": "2028-01-21",
+                "dte": 626,
+                "threshold_multiple": 1.5,
+                "required_move_pct": 3.20,
+                "realism_bucket": "absurd",
+                "bid_per_share": 1.00,
+                "ask_per_share": 1.20,
+                "mid_per_share": 1.10,
+                "spread_pct_of_mid": 0.18,
+                "volume": 10,
+                "open_interest": 100,
+                "implied_volatility": 0.80,
+                "liquidity_bucket": "usable",
+                "recommended_entry_mode": "realistic",
+                "execution_penalty_score": 8.0,
+                "execution_verdict": "mid_possible_but_not_guaranteed",
+            },
+            {
+                "ticker": "GPRE",
+                "contract_label": "30C Jan-28",
+                "strike": 30.0,
+                "expiry": "2028-01-21",
+                "dte": 626,
+                "threshold_multiple": 2.0,
+                "required_move_pct": 4.20,
+                "realism_bucket": "absurd",
+            },
+            {
+                "ticker": "GPRE",
+                "contract_label": "25C Dec-26",
+                "strike": 25.0,
+                "expiry": "2026-12-18",
+                "dte": 227,
+                "threshold_multiple": 1.5,
+                "required_move_pct": None,
+                "realism_bucket": "unavailable",
+            },
+        ]
+    )
+    family_summary = pd.DataFrame(
+        [
+            {"contract_label": "15C Dec-26", "threshold_multiple": 1.5, "path_family": "fast_breakout", "clears_count": 20, "min_required_move_pct": 0.30},
+            {"contract_label": "15C Dec-26", "threshold_multiple": 2.0, "path_family": "slow_grind", "clears_count": 18, "min_required_move_pct": 0.42},
+            {"contract_label": "20C Dec-26", "threshold_multiple": 1.5, "path_family": "fast_breakout", "clears_count": 16, "min_required_move_pct": 0.28},
+            {"contract_label": "20C Dec-26", "threshold_multiple": 2.0, "path_family": "fast_breakout", "clears_count": 14, "min_required_move_pct": 0.36},
+            {"contract_label": "30C Jan-28", "threshold_multiple": 1.5, "path_family": "violent_absurd", "clears_count": 2, "min_required_move_pct": 3.20},
+            {"contract_label": "30C Jan-28", "threshold_multiple": 2.0, "path_family": "violent_absurd", "clears_count": 1, "min_required_move_pct": 4.20},
+        ]
+    )
+    entry_sensitivity = pd.DataFrame(
+        [
+            {"contract_label": "15C Dec-26", "threshold_multiple": 1.5, "entry_shift_pct": 0.0, "required_move_pct": 0.30},
+            {"contract_label": "15C Dec-26", "threshold_multiple": 1.5, "entry_shift_pct": 0.25, "required_move_pct": 0.34},
+            {"contract_label": "20C Dec-26", "threshold_multiple": 1.5, "entry_shift_pct": 0.0, "required_move_pct": 0.28},
+            {"contract_label": "20C Dec-26", "threshold_multiple": 1.5, "entry_shift_pct": 0.25, "required_move_pct": 0.50},
+        ]
+    )
+    iv_sensitivity = pd.DataFrame(
+        [
+            {"contract_label": "15C Dec-26", "threshold_multiple": 1.5, "iv_shift_vol_points": -0.25, "required_move_pct": 0.35},
+            {"contract_label": "15C Dec-26", "threshold_multiple": 1.5, "iv_shift_vol_points": 0.0, "required_move_pct": 0.30},
+            {"contract_label": "15C Dec-26", "threshold_multiple": 1.5, "iv_shift_vol_points": 0.25, "required_move_pct": 0.28},
+            {"contract_label": "20C Dec-26", "threshold_multiple": 1.5, "iv_shift_vol_points": -0.25, "required_move_pct": 0.60},
+            {"contract_label": "20C Dec-26", "threshold_multiple": 1.5, "iv_shift_vol_points": 0.0, "required_move_pct": 0.28},
+            {"contract_label": "20C Dec-26", "threshold_multiple": 1.5, "iv_shift_vol_points": 0.25, "required_move_pct": 0.20},
+        ]
+    )
+    entry_iv_matrix = pd.DataFrame(
+        [
+            {"contract_label": "15C Dec-26", "threshold_multiple": 1.5, "entry_shift_pct": 0.0, "iv_shift_vol_points": 0.0, "required_move_pct": 0.30},
+            {"contract_label": "15C Dec-26", "threshold_multiple": 1.5, "entry_shift_pct": 0.25, "iv_shift_vol_points": 0.25, "required_move_pct": 0.32},
+            {"contract_label": "20C Dec-26", "threshold_multiple": 1.5, "entry_shift_pct": 0.25, "iv_shift_vol_points": -0.25, "required_move_pct": 0.80},
+            {"contract_label": "20C Dec-26", "threshold_multiple": 1.5, "entry_shift_pct": 0.0, "iv_shift_vol_points": 0.0, "required_move_pct": 0.28},
+        ]
+    )
+    sell_hold = pd.DataFrame(
+        [
+            {"contract_label": "15C Dec-26", "peak_option_return_pct": 1.20, "peak_date": "2026-06-01", "expiry_option_return_pct": 1.10, "interpretation": "Hold acceptable"},
+            {"contract_label": "20C Dec-26", "peak_option_return_pct": 0.80, "peak_date": "2026-05-12", "expiry_option_return_pct": 0.10, "interpretation": "Sell early path"},
+            {"contract_label": "30C Jan-28", "peak_option_return_pct": 2.00, "peak_date": "2026-07-01", "expiry_option_return_pct": -0.40, "interpretation": "Theta/IV risk after spike"},
+        ]
+    )
+    historical = pd.DataFrame(
+        [
+            {"contract_label": "15C Dec-26", "threshold_multiple": 1.5, "historical_hit_rate": 0.12, "historical_realism_bucket": "plausible_history", "historical_verdict": "historically_seen_often"},
+            {"contract_label": "15C Dec-26", "threshold_multiple": 2.0, "historical_hit_rate": 0.04, "historical_realism_bucket": "uncommon_but_seen", "historical_verdict": "historically_uncommon_but_seen"},
+            {"contract_label": "20C Dec-26", "threshold_multiple": 1.5, "historical_hit_rate": 0.00, "historical_realism_bucket": "never_seen_in_sample", "historical_verdict": "not_seen_in_available_history"},
+            {"contract_label": "20C Dec-26", "threshold_multiple": 2.0, "historical_hit_rate": 0.00, "historical_realism_bucket": "never_seen_in_sample", "historical_verdict": "not_seen_in_available_history"},
+            {"contract_label": "30C Jan-28", "threshold_multiple": 1.5, "historical_hit_rate": 0.00, "historical_realism_bucket": "never_seen_in_sample", "historical_verdict": "not_seen_in_available_history"},
+        ]
+    )
+
+    ranking = contract_selection_module._build_required_path_candidate_ranking(
+        ticker="GPRE",
+        summary=summary,
+        family_summary=family_summary,
+        entry_sensitivity=entry_sensitivity,
+        iv_sensitivity=iv_sensitivity,
+        entry_iv_matrix=entry_iv_matrix,
+        sell_hold=sell_hold,
+        execution_realism=pd.DataFrame(),
+        historical_realism=historical,
+    )
+
+    good = ranking.loc[ranking["contract_label"].eq("15C Dec-26")].iloc[0]
+    severe_execution = ranking.loc[ranking["contract_label"].eq("20C Dec-26")].iloc[0]
+    absurd = ranking.loc[ranking["contract_label"].eq("30C Jan-28")].iloc[0]
+    missing = ranking.loc[ranking["contract_label"].eq("25C Dec-26")].iloc[0]
+
+    assert list(ranking.sort_values("rank")["rank"]) == list(range(1, len(ranking.index) + 1))
+    assert good["final_verdict"] == "Worth deeper review"
+    assert severe_execution["final_verdict"] != "Worth deeper review"
+    assert severe_execution["final_verdict"] == "Too wide / execution risk"
+    assert severe_execution["historical_realism_bucket"] == "never_seen_in_sample"
+    assert float(severe_execution["total_score"]) < float(good["total_score"])
+    assert absurd["final_verdict"] in {"Stock cleaner", "Avoid"}
+    assert missing["final_verdict"] == "Needs data review"
+    assert "execution" in severe_execution["top_risk"].lower()
+
+
 def _fake_long_call_spec(*, candidate_slug: str, strike: float, premium: float, expiry: str = "2026-04-17") -> dict:
     position = SimpleNamespace(
         initial_outlay=float(premium),
@@ -316,6 +570,13 @@ def test_long_call_required_path_engine_uses_contract_strike_and_numeric_paths(m
         strong_outperformance_multiple=2.0,
         minimum_edge_stock_return_pct=0.05,
         entry_price_mode="mid",
+        historical_prices=pd.DataFrame(
+            {
+                "ticker": ["GPRE"] * 120,
+                "date": pd.date_range("2025-01-01", periods=120, freq="D"),
+                "close": [10.0 + (index % 30) * 0.12 + index * 0.01 for index in range(120)],
+            }
+        ),
     )
 
     summary = outputs["required_path_core_summary"]
@@ -367,6 +628,13 @@ def test_long_call_required_path_engine_writes_absurd_numeric_moves(monkeypatch)
         strong_outperformance_multiple=2.0,
         minimum_edge_stock_return_pct=0.05,
         entry_price_mode="mid",
+        historical_prices=pd.DataFrame(
+            {
+                "ticker": ["GPRE"] * 120,
+                "date": pd.date_range("2025-01-01", periods=120, freq="D"),
+                "close": [10.0 + (index % 30) * 0.12 + index * 0.01 for index in range(120)],
+            }
+        ),
     )
 
     summary = outputs["required_path_core_summary"]
@@ -414,6 +682,13 @@ def test_long_call_required_path_engine_clamps_path_dates_to_option_expiry(monke
         strong_outperformance_multiple=2.0,
         minimum_edge_stock_return_pct=0.05,
         entry_price_mode="mid",
+        historical_prices=pd.DataFrame(
+            {
+                "ticker": ["GPRE"] * 120,
+                "date": pd.date_range("2025-01-01", periods=120, freq="D"),
+                "close": [10.0 + (index % 30) * 0.12 + index * 0.01 for index in range(120)],
+            }
+        ),
     )
 
     paths = outputs["required_paths_by_option"]
@@ -455,6 +730,13 @@ def test_long_call_required_path_engine_writes_smooth_marker_rows_and_peak_summa
         strong_outperformance_multiple=2.0,
         minimum_edge_stock_return_pct=0.05,
         entry_price_mode="mid",
+        historical_prices=pd.DataFrame(
+            {
+                "ticker": ["GPRE"] * 120,
+                "date": pd.date_range("2025-01-01", periods=120, freq="D"),
+                "close": [10.0 + (index % 30) * 0.12 + index * 0.01 for index in range(120)],
+            }
+        ),
     )
 
     paths = outputs["required_paths_by_option"]
@@ -464,6 +746,9 @@ def test_long_call_required_path_engine_writes_smooth_marker_rows_and_peak_summa
     iv_sensitivity = outputs["required_path_iv_sensitivity"]
     entry_iv_matrix = outputs["required_path_entry_iv_matrix"]
     sell_hold = outputs["required_path_sell_hold_summary"]
+    execution = outputs["required_path_execution_realism"]
+    historical_realism = outputs["required_path_historical_realism"]
+    candidate_ranking = outputs["required_path_candidate_ranking"]
     tables_html = outputs["required_path_tables_html"]
     tables_md = outputs["required_path_tables_markdown"]
     sample_path = paths.loc[
@@ -633,10 +918,45 @@ def test_long_call_required_path_engine_writes_smooth_marker_rows_and_peak_summa
         "interpretation",
     } <= set(sell_hold.columns)
     assert set(sell_hold["interpretation"].astype(str)) - {""}
+    assert not execution.empty
+    assert {
+        "liquidity_bucket",
+        "fill_quality_bucket",
+        "recommended_entry_mode",
+        "realistic_entry_per_share",
+        "execution_penalty_score",
+        "execution_verdict",
+    } <= set(execution.columns)
+    assert not historical_realism.empty
+    assert {
+        "historical_window_days",
+        "historical_hit_rate",
+        "historical_forward_return_p90",
+        "historical_forward_return_p95",
+        "historical_max_forward_return",
+        "historical_realism_bucket",
+        "historical_verdict",
+    } <= set(historical_realism.columns)
+    assert not candidate_ranking.empty
+    assert {
+        "rank",
+        "required_move_1_5x",
+        "required_move_2_0x",
+        "required_path_score",
+        "execution_penalty_score",
+        "historical_hit_rate_1_5x",
+        "total_score",
+        "final_verdict",
+        "concise_reason",
+        "top_risk",
+    } <= set(candidate_ranking.columns)
 
     for section in [
+        "Candidate ranking",
         "Contract inputs",
         "Required move summary",
+        "Execution realism",
+        "Historical realism",
         "Path family comparison",
         "Entry premium sensitivity",
         "IV sensitivity",
@@ -645,10 +965,13 @@ def test_long_call_required_path_engine_writes_smooth_marker_rows_and_peak_summa
         "Absolute option-return exit ladder",
     ]:
         assert section in tables_html
+    assert tables_html.index("Candidate ranking") < tables_html.index("Contract inputs")
     assert "1.5x / 2.0x are relative to stock return, not absolute option return." in tables_html
+    assert "Historical realism is descriptive, not a probability model." in tables_html
     assert "NaN" not in tables_html
     assert "How to read the tables" in tables_md
     assert "relative to stock return" in tables_md
+    assert "Historical realism is descriptive, not a probability model." in tables_md
 
 
 def test_long_call_required_path_solver_marks_unsolved_only_after_extreme_search(monkeypatch):
@@ -1573,6 +1896,9 @@ def test_contract_selection_analysis_builds_candidates_path_cases_and_selector_o
     assert not result.required_path_iv_sensitivity.empty
     assert not result.required_path_entry_iv_matrix.empty
     assert not result.required_path_sell_hold_summary.empty
+    assert not result.required_path_execution_realism.empty
+    assert not result.required_path_historical_realism.empty
+    assert not result.required_path_candidate_ranking.empty
     assert {
         "entry_shift_pct",
         "adjusted_entry_premium",
@@ -1603,9 +1929,40 @@ def test_contract_selection_analysis_builds_candidates_path_cases_and_selector_o
         "decay_from_peak_to_expiry_pct",
         "interpretation",
     } <= set(result.required_path_sell_hold_summary.columns)
+    assert {
+        "liquidity_bucket",
+        "fill_quality_bucket",
+        "recommended_entry_mode",
+        "execution_penalty_score",
+        "execution_verdict",
+    } <= set(result.required_path_execution_realism.columns)
+    assert {
+        "historical_window_days",
+        "historical_sample_count",
+        "historical_hit_rate",
+        "historical_forward_return_p90",
+        "historical_forward_return_p95",
+        "historical_max_forward_return",
+        "historical_realism_bucket",
+        "historical_verdict",
+    } <= set(result.required_path_historical_realism.columns)
+    assert {
+        "rank",
+        "required_move_1_5x",
+        "required_move_2_0x",
+        "historical_hit_rate_1_5x",
+        "execution_penalty_score",
+        "final_verdict",
+        "concise_reason",
+        "top_risk",
+    } <= set(result.required_path_candidate_ranking.columns)
+    assert "Candidate ranking" in result.required_path_tables_html
     assert "Contract inputs" in result.required_path_tables_html
     assert "Required move summary" in result.required_path_tables_html
+    assert "Execution realism" in result.required_path_tables_html
+    assert "Historical realism" in result.required_path_tables_html
     assert "1.5x / 2.0x are relative to stock return, not absolute option return." in result.required_path_tables_html
+    assert "Historical realism is descriptive, not a probability model." in result.required_path_tables_html
     assert "NaN" not in result.required_path_tables_html
     assert "How to read the tables" in result.required_path_tables_markdown
     assert set(result.required_path_core_summary["threshold_multiple"]) == {1.5, 2.0}

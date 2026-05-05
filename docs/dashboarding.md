@@ -59,7 +59,7 @@ When mirrored, the library is rebuilt from `published_manifest.json` files only.
 For contract-selection, the curated `latest/` view is grouped for decision reading:
 
 - `00_core_view/`: the required-path engine first: overview, summary table, summary Markdown, spreadsheet-style required-path workbook, and top required-path candidates
-- `01_option_required_paths/`: per-option required-path charts plus path-level, family-level, peak/best-exit, exit-ladder, entry-premium sensitivity, IV sensitivity, entry x IV matrix, and sell/hold required-path tables
+- `01_option_required_paths/`: candidate ranking, per-option required-path charts plus path-level, family-level, peak/best-exit, exit-ladder, execution-realism, historical-realism, entry-premium sensitivity, IV sensitivity, entry x IV matrix, and sell/hold required-path tables
 - `99_secondary_or_debug/`: supporting Markdown and CSV diagnostics only; old fixed-target, single-option, gallery, and path-pack charts are intentionally not promoted into `model_outputs`
 
 ## Page roles
@@ -79,6 +79,7 @@ The primary published reading order is:
 
 - Decision Snapshot
 - Required-Path Engine
+- Required Path Tables workbook, with Candidate Ranking first and execution realism plus historical realism before sensitivity checks
 - Per-Option Required Paths
 - Chain Overview / Compare Options
 - Market Context / Trust Summary
@@ -91,6 +92,7 @@ That means the main contract-selection page is readable on its own from the froz
 The contract-selection bundle is the canonical source for:
 
 - required-path artifacts that solve backwards from long-call outperformance versus owning stock by 1.5x and 2.0x, where those hurdles mean option return is at least 1.5 or 2.0 times stock return over the same holding period
+- candidate ranking artifacts that combine required-path burden, execution realism, entry/IV sensitivity, sell/hold pressure, and historical realism into one deterministic decision table
 - per-option required-path charts whose main horizon is option expiry; shorter analysis horizons are displayed as reference context rather than truncating the required stock path
 - action-board buckets, watchlist triggers, action-score breakdowns, and stock-preference reads
 - entry-justification reads describing what the stock has to do, how quickly, how much IV support matters, and when stock still remains cleaner
@@ -126,6 +128,7 @@ That means published visuals inherit their quality directly from the saved bundl
 - summary tables that are pre-rounded and column-ordered for readability
 - risk-free and source-snapshot provenance that was already resolved and frozen during analysis
 - imported quote metadata such as Barchart bid/ask/mid, spread, IV, volume, open interest, liquidity bucket, and quality flags when those columns exist in the frozen bundle
+- execution-realism artifacts such as recommended entry mode, realistic-entry slippage, fill quality, exit-liquidity risk, and execution penalty score when those columns exist in the frozen bundle
 - spot / expiry trust language that was already resolved and frozen during analysis
 
 Contract-selection publish pages no longer depend on legacy selection heatmap/slice tables. They link and render the bundle-written path/simulation artifacts instead.

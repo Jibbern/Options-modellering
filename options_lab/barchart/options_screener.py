@@ -219,13 +219,19 @@ def _liquidity_bucket(row: dict[str, Any]) -> str:
     spread_pct = row.get("spread_pct_of_mid")
     oi = int(row.get("open_interest") or 0)
     volume = int(row.get("volume") or 0)
-    if {"missing_bid", "missing_ask", "missing_mid", "very_wide_spread", "invalid_iv"} & flags:
+    bid = _parse_decimal(row.get("bid"))
+    ask = _parse_decimal(row.get("ask"))
+    if {"missing_bid", "missing_ask", "missing_mid", "invalid_iv"} & flags:
         return "stale_or_wide"
-    if spread_pct is not None and float(spread_pct) <= 0.10 and (oi >= 500 or volume >= 100):
+    if ask is None or float(ask) <= 0 or bid is None or float(bid) < 0:
+        return "stale_or_wide"
+    if spread_pct is None or float(spread_pct) > 0.40 or oi < 5:
+        return "stale_or_wide"
+    if float(spread_pct) <= 0.10 and oi >= 100 and volume >= 10:
         return "liquid"
-    if spread_pct is not None and float(spread_pct) <= 0.25 and oi > 0:
+    if float(spread_pct) <= 0.20 and oi >= 25:
         return "usable"
-    if oi > 0:
+    if float(spread_pct) <= 0.40 or oi >= 5:
         return "thin"
     return "stale_or_wide"
 

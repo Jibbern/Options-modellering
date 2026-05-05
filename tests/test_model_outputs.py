@@ -342,8 +342,10 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
         "\n".join(
             [
                 "<!doctype html><html><body>",
+                '<div class="section-title">Candidate ranking</div>',
                 '<div class="section-title">Contract inputs</div>',
                 '<div class="section-title">Required move summary</div>',
+                '<div class="section-title">Execution realism</div>',
                 '<div class="section-title">Path family comparison</div>',
                 '<div class="section-title">Entry premium sensitivity</div>',
                 '<div class="section-title">IV sensitivity</div>',
@@ -1534,6 +1536,11 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
                 "status": "solved",
                 "verdict": "requires_extreme_move",
                 "concise_explanation": "Requires an extreme stock move; stock may be cleaner.",
+                "liquidity_bucket": "usable",
+                "fill_quality_bucket": "mid_possible_but_not_guaranteed",
+                "recommended_entry_mode": "realistic",
+                "execution_penalty_score": "18.0",
+                "execution_verdict": "mid_possible_but_not_guaranteed",
             },
             {
                 "ticker": "GPRE",
@@ -1566,6 +1573,11 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
                 "status": "solved",
                 "verdict": "stock_cleaner",
                 "concise_explanation": "Requires an unrealistic move under current assumptions.",
+                "liquidity_bucket": "usable",
+                "fill_quality_bucket": "mid_possible_but_not_guaranteed",
+                "recommended_entry_mode": "realistic",
+                "execution_penalty_score": "18.0",
+                "execution_verdict": "mid_possible_but_not_guaranteed",
             },
         ],
         "required_paths_by_option.csv": [
@@ -1765,6 +1777,112 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
                 "expiry_option_return_pct": "1.50",
                 "decay_from_peak_to_expiry_pct": "0.28",
                 "interpretation": "Hold acceptable",
+            }
+        ],
+        "required_path_execution_realism.csv": [
+            {
+                "ticker": "GPRE",
+                "contract_label": "15C Dec-26",
+                "strike": "15.0",
+                "expiry": "2026-12-18",
+                "dte": "250",
+                "bid_per_share": "3.00",
+                "ask_per_share": "3.40",
+                "mid_per_share": "3.20",
+                "spread_per_share": "0.40",
+                "spread_pct_of_mid": "0.125",
+                "volume": "12",
+                "open_interest": "80",
+                "latest": "3.10",
+                "liquidity_bucket": "usable",
+                "fill_quality_bucket": "mid_possible_but_not_guaranteed",
+                "recommended_entry_mode": "realistic",
+                "realistic_entry_per_share": "3.30",
+                "realistic_entry_per_contract": "330.0",
+                "conservative_entry_per_share": "3.40",
+                "conservative_entry_per_contract": "340.0",
+                "expected_slippage_per_share": "0.10",
+                "expected_slippage_pct_of_mid": "0.03125",
+                "exit_liquidity_risk": "moderate",
+                "stale_quote_flag": "False",
+                "wide_spread_flag": "False",
+                "zero_volume_flag": "False",
+                "zero_open_interest_flag": "False",
+                "execution_penalty_score": "18.0",
+                "execution_verdict": "mid_possible_but_not_guaranteed",
+                "concise_explanation": "Model with realistic slippage.",
+            }
+        ],
+        "required_path_candidate_ranking.csv": [
+            {
+                "rank": "1",
+                "ticker": "GPRE",
+                "contract_label": "15C Dec-26",
+                "strike": "15.0",
+                "expiry": "2026-12-18",
+                "dte": "250",
+                "bid_per_share": "3.00",
+                "ask_per_share": "3.40",
+                "mid_per_share": "3.20",
+                "spread_pct_of_mid": "0.125",
+                "volume": "12",
+                "open_interest": "80",
+                "implied_volatility": "0.70",
+                "iv_rank": "0.45",
+                "iv_percentile": "0.60",
+                "required_move_1_5x": "1.23",
+                "required_move_2_0x": "1.65",
+                "best_path_family_1_5x": "fast_breakout",
+                "best_path_family_2_0x": "slow_grind",
+                "realism_bucket_1_5x": "extreme",
+                "realism_bucket_2_0x": "extreme",
+                "required_path_score": "-10",
+                "liquidity_bucket": "usable",
+                "recommended_entry_mode": "realistic",
+                "execution_penalty_score": "18.0",
+                "execution_verdict": "mid_possible_but_not_guaranteed",
+                "entry_sensitivity_score": "0",
+                "iv_sensitivity_score": "-8",
+                "matrix_fragility_score": "-8",
+                "peak_option_return_pct": "1.80",
+                "peak_date": "2026-05-12",
+                "expiry_option_return_pct": "0.95",
+                "sell_hold_interpretation": "Sell early path",
+                "historical_hit_rate_1_5x": "0.0",
+                "historical_hit_rate_2_0x": "0.0",
+                "historical_realism_bucket": "never_seen_in_sample",
+                "historical_verdict": "not_seen_in_available_history",
+                "total_score": "22",
+                "final_verdict": "Stock cleaner",
+                "concise_reason": "Required move is high.",
+                "top_risk": "historical rarity",
+            }
+        ],
+        "required_path_historical_realism.csv": [
+            {
+                "ticker": "GPRE",
+                "contract_label": "15C Dec-26",
+                "strike": "15.0",
+                "expiry": "2026-12-18",
+                "dte": "250",
+                "threshold_multiple": "1.5",
+                "required_move_pct": "1.23",
+                "required_terminal_stock_price": "34.0",
+                "required_days_to_clear": "94",
+                "historical_window_days": "90",
+                "historical_sample_count": "120",
+                "historical_forward_return_p50": "0.04",
+                "historical_forward_return_p75": "0.12",
+                "historical_forward_return_p90": "0.25",
+                "historical_forward_return_p95": "0.32",
+                "historical_forward_return_p99": "0.48",
+                "historical_max_forward_return": "0.55",
+                "historical_hit_count": "0",
+                "historical_hit_rate": "0.0",
+                "historical_max_drawdown_after_hit_median": "",
+                "historical_realism_bucket": "never_seen_in_sample",
+                "historical_verdict": "not_seen_in_available_history",
+                "concise_explanation": "The required move was never seen in comparable windows in available price history.",
             }
         ],
         "single_option_decision_summary.csv": [
@@ -2362,6 +2480,9 @@ def _create_fake_contract_selection_bundle(workspace_root: Path, *, run_slug: st
                 "required_path_iv_sensitivity.csv": "tables/required_path_iv_sensitivity.csv",
                 "required_path_entry_iv_matrix.csv": "tables/required_path_entry_iv_matrix.csv",
                 "required_path_sell_hold_summary.csv": "tables/required_path_sell_hold_summary.csv",
+                "required_path_execution_realism.csv": "tables/required_path_execution_realism.csv",
+                "required_path_candidate_ranking.csv": "tables/required_path_candidate_ranking.csv",
+                "required_path_historical_realism.csv": "tables/required_path_historical_realism.csv",
                 "required_move_summary.csv": "tables/required_move_summary.csv",
                 "required_move_vs_stock.csv": "tables/required_move_vs_stock.csv",
                 "required_iv_support_summary.csv": "tables/required_iv_support_summary.csv",
@@ -2573,6 +2694,9 @@ def test_build_model_outputs_projects_primary_contract_selection_artifacts(temp_
     assert (promoted_dir / "01_option_required_paths" / "required_path_iv_sensitivity.csv").exists()
     assert (promoted_dir / "01_option_required_paths" / "required_path_entry_iv_matrix.csv").exists()
     assert (promoted_dir / "01_option_required_paths" / "required_path_sell_hold_summary.csv").exists()
+    assert (promoted_dir / "01_option_required_paths" / "required_path_execution_realism.csv").exists()
+    assert (promoted_dir / "01_option_required_paths" / "required_path_candidate_ranking.csv").exists()
+    assert (promoted_dir / "01_option_required_paths" / "required_path_historical_realism.csv").exists()
     assert (promoted_dir / "01_option_required_paths" / "required_path_exit_ladder.md").exists()
     assert (promoted_dir / "01_option_required_paths" / "required_paths_long-call-2026-12-18-15-00.png").exists()
     assert (promoted_dir / "99_secondary_or_debug" / "action_board.md").exists()
@@ -2604,16 +2728,17 @@ def test_build_model_outputs_projects_primary_contract_selection_artifacts(temp_
     assert "analysis_outputs/GPRE/snapshot_2026-04-12/contract_selection/demo-run" in start_here
     expected_open_first = [
         "1. `00_core_view/required_paths_overview.png`",
-        "2. `00_core_view/required_path_summary.md`",
-        "3. `00_core_view/required_path_summary.csv`",
-        "4. `00_core_view/required_path_tables.html`",
-        "5. `00_core_view/required_path_tables.md`",
-        "6. `00_core_view/top_required_path_candidates.md`",
-        "7. `01_option_required_paths/required_paths_by_option.csv`",
-        "8. `01_option_required_paths/required_path_family_summary.csv`",
-        "9. `01_option_required_paths/required_path_peak_summary.csv`",
-        "10. Then open the per-option charts in `01_option_required_paths/`",
-        "11. Then use `99_secondary_or_debug/` only as supporting detail",
+        "2. `00_core_view/required_path_tables.html`",
+        "3. `01_option_required_paths/required_path_candidate_ranking.csv`",
+        "4. `00_core_view/required_path_summary.md`",
+        "5. `00_core_view/required_path_summary.csv`",
+        "6. `00_core_view/required_path_tables.md`",
+        "7. `00_core_view/top_required_path_candidates.md`",
+        "8. `01_option_required_paths/required_paths_by_option.csv`",
+        "9. `01_option_required_paths/required_path_family_summary.csv`",
+        "10. `01_option_required_paths/required_path_peak_summary.csv`",
+        "11. Then open the per-option charts in `01_option_required_paths/`",
+        "12. Then use `99_secondary_or_debug/` only as supporting detail",
     ]
     assert all(line in start_here for line in expected_open_first)
     assert [start_here.index(line) for line in expected_open_first] == sorted(start_here.index(line) for line in expected_open_first)
@@ -2626,6 +2751,8 @@ def test_build_model_outputs_projects_primary_contract_selection_artifacts(temp_
     assert "summary.md" in start_here
     assert "99_secondary_or_debug/path_packs/" not in start_here
     assert "option return relative to stock return" in start_here
+    assert "01_option_required_paths/required_path_candidate_ranking.csv" in start_here
+    assert "Open Candidate Ranking first, then Required Move Summary, then charts." in start_here
     assert "2026-04-17" in start_here
     assert "2027-01-15" in start_here
     assert "C:/Users" not in start_here
@@ -2651,6 +2778,7 @@ def test_build_model_outputs_projects_primary_contract_selection_artifacts(temp_
     assert "00_core_view/required_path_tables.html" in projection_manifest["promoted_files"]
     assert "00_core_view/required_path_tables.md" in projection_manifest["promoted_files"]
     assert "00_core_view/top_required_path_candidates.md" in projection_manifest["promoted_files"]
+    assert "01_option_required_paths/required_path_candidate_ranking.csv" in projection_manifest["promoted_files"]
     assert "01_option_required_paths/required_paths_by_option.csv" in projection_manifest["promoted_files"]
     assert "01_option_required_paths/required_path_family_summary.csv" in projection_manifest["promoted_files"]
     assert "01_option_required_paths/required_path_peak_summary.csv" in projection_manifest["promoted_files"]
@@ -2659,6 +2787,8 @@ def test_build_model_outputs_projects_primary_contract_selection_artifacts(temp_
     assert "01_option_required_paths/required_path_iv_sensitivity.csv" in projection_manifest["promoted_files"]
     assert "01_option_required_paths/required_path_entry_iv_matrix.csv" in projection_manifest["promoted_files"]
     assert "01_option_required_paths/required_path_sell_hold_summary.csv" in projection_manifest["promoted_files"]
+    assert "01_option_required_paths/required_path_execution_realism.csv" in projection_manifest["promoted_files"]
+    assert "01_option_required_paths/required_path_historical_realism.csv" in projection_manifest["promoted_files"]
     assert "01_option_required_paths/required_path_exit_ladder.md" in projection_manifest["promoted_files"]
     assert "01_option_required_paths/required_paths_long-call-2026-12-18-15-00.png" in projection_manifest["promoted_files"]
     assert "99_secondary_or_debug/thesis_path_gallery.png" not in projection_manifest["promoted_files"]

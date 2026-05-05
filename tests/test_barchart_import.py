@@ -59,6 +59,21 @@ def _write_high_iv_options_fixture(path: Path) -> None:
     )
 
 
+def _write_execution_options_fixture(path: Path) -> None:
+    path.write_text(
+        "\n".join(
+            [
+                'Symbol,Type,Price~,Latest,"Exp Date",DTE,Strike,Moneyness,Bid,Ask,Mid,Volume,"Open Int",IV,"IV Rank","IV Pctl",Delta,Gamma,Theta,Vega,Rho,"ITM Prob","OTM Prob","Profit Prob","BE (Bid)","BE (Ask)","BE (Mid)",Links',
+                'GPRE,Call,18.07,1.15,05/15/26,10,18,+0.39%,1.10,1.20,1.15,20,150,100.46%,+0.39%,51.00%,0.51,0.05,-0.02,0.04,0.01,51.00%,49.00%,51.00%,19.10,19.20,19.15,https://example.test/liquid',
+                'GPRE,Call,18.07,1.95,05/15/26,10,17,+6.29%,1.80,2.10,1.95,0,30,80.00%,+0.39%,51.00%,0.61,0.05,-0.02,0.04,0.01,61.00%,39.00%,51.00%,18.80,19.10,18.95,https://example.test/usable',
+                'GPRE,Call,18.07,0.00,05/15/26,10,20,-9.65%,0.20,1.00,0.60,0,0,98.00%,+0.39%,51.00%,0.28,0.05,-0.02,0.04,0.01,28.00%,72.00%,31.00%,20.20,21.00,20.60,https://example.test/wide',
+                '"Downloaded from Barchart.com as of 05-05-2026 07:59am CDT"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_barchart_options_import_normalizes_quotes_and_manifest(temp_data_root: Path, temp_workspace_root: Path):
     source = temp_workspace_root / "options-screener-GPRE_2026-05-05.csv"
     _write_options_screener_fixture(source)
@@ -268,3 +283,83 @@ def test_required_path_analysis_preserves_barchart_iv_and_entry_anchor(temp_data
     assert "modeled_option_value" in day_zero.columns
     assert "Bid/Ask/Mid are per-share option quotes." in result.required_path_tables_html
     assert "Entry premium is per-contract in required-path calculations." in result.required_path_tables_html
+
+
+def test_required_path_execution_realism_scores_barchart_quotes(temp_data_root: Path, temp_workspace_root: Path):
+    options_source = temp_workspace_root / "options-screener-GPRE_2026-05-05.csv"
+    price_source = temp_workspace_root / "gpre_price-history-05-05-2026.csv"
+    _write_execution_options_fixture(options_source)
+    _write_price_history_fixture(price_source)
+    import_barchart_price_history_csv("GPRE", price_source, data_root=temp_data_root)
+    import_barchart_options_csv("GPRE", options_source, snapshot_date="2026-05-05", data_root=temp_data_root)
+
+    result = build_contract_selection_analysis(
+        ticker="GPRE",
+        snapshot_date="2026-05-05",
+        target_price=24.0,
+        target_date="2026-05-15",
+        data_root=temp_data_root,
+        strategy_families=["long_stock", "long_call"],
+        entry_price_mode="mid",
+    )
+
+    execution = result.required_path_execution_realism
+    assert not execution.empty
+    assert {
+        "fill_quality_bucket",
+        "recommended_entry_mode",
+        "realistic_entry_per_share",
+        "execution_penalty_score",
+        "execution_verdict",
+    } <= set(execution.columns)
+
+    liquid = execution.loc[execution["contract_label"].eq("18C May-26")].iloc[0]
+    assert liquid["liquidity_bucket"] == "liquid"
+    assert liquid["fill_quality_bucket"] == "good_fill_likely"
+    assert liquid["recommended_entry_mode"] == "mid"
+    assert float(liquid["realistic_entry_per_share"]) == pytest.approx(1.175)
+    candidate_liquid = result.candidate_summary.loc[
+        result.candidate_summary["candidate_label"].eq("Long Call 2026-05-15 18.00")
+    ].iloc[0]
+    assert candidate_liquid["liquidity_bucket"] == "liquid"
+    assert candidate_liquid["recommended_entry_mode"] == "mid"
+
+    wide = execution.loc[execution["contract_label"].eq("20C May-26")].iloc[0]
+    assert float(wide["spread_pct_of_mid"]) > 0.40
+    assert wide["liquidity_bucket"] == "stale_or_wide"
+    assert wide["fill_quality_bucket"] == "avoid_due_to_spread"
+    assert wide["recommended_entry_mode"] == "avoid"
+    assert float(wide["realistic_entry_per_share"]) == pytest.approx(0.92)
+    assert bool(wide["wide_spread_flag"]) is True
+    assert bool(wide["zero_volume_flag"]) is True
+    assert bool(wide["zero_open_interest_flag"]) is True
+    assert float(wide["execution_penalty_score"]) >= 80.0
+    assert "avoid" in str(wide["execution_verdict"])
+
+    summary_wide = result.required_path_core_summary.loc[
+        result.required_path_core_summary["contract_label"].eq("20C May-26")
+    ].iloc[0]
+    assert summary_wide["recommended_entry_mode"] == "avoid"
+    assert summary_wide["execution_verdict"] == wide["execution_verdict"]
+    historical = result.required_path_historical_realism
+    assert not historical.empty
+    assert {
+        "historical_window_days",
+        "historical_sample_count",
+        "historical_hit_rate",
+        "historical_realism_bucket",
+        "historical_verdict",
+    } <= set(historical.columns)
+    ranking = result.required_path_candidate_ranking
+    assert not ranking.empty
+    assert {"final_verdict", "execution_verdict", "top_risk"} <= set(ranking.columns)
+    wide_ranking = ranking.loc[ranking["contract_label"].astype(str).eq("20C May-26")].iloc[0]
+    assert wide_ranking["final_verdict"] != "Worth deeper review"
+    assert "execution" in str(wide_ranking["top_risk"]).lower()
+    assert "Candidate ranking" in result.required_path_tables_html
+    assert "Execution realism" in result.required_path_tables_html
+    assert "Historical realism" in result.required_path_tables_html
+    assert "Historical realism is descriptive, not a probability model." in result.required_path_tables_html
+    assert "Mid is model base only." in result.required_path_tables_html
+    assert "Realistic entry includes estimated slippage." in result.required_path_tables_html
+    assert "avoid_due_to_spread" in result.top_required_path_candidates_markdown

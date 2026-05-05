@@ -146,6 +146,7 @@ model_outputs/
         required_path_tables.md
         top_required_path_candidates.md
       01_option_required_paths/
+        required_path_candidate_ranking.csv
         required_paths_<contract_slug>.png
         required_paths_by_option.csv
         required_path_family_summary.csv
@@ -155,6 +156,8 @@ model_outputs/
         required_path_iv_sensitivity.csv
         required_path_entry_iv_matrix.csv
         required_path_sell_hold_summary.csv
+        required_path_execution_realism.csv
+        required_path_historical_realism.csv
         required_path_exit_ladder.md
       99_secondary_or_debug/
         # supporting Markdown and CSV diagnostics only; old fixed-target,
@@ -198,6 +201,7 @@ Per-option required-path charts use option expiry as the default chart horizon. 
 Its bundle is expected to answer:
 
 - what stock path is required for each long call to beat owning stock by the configured outperformance hurdles
+- which calls deserve deeper review after combining required-path burden, execution realism, sensitivity, sell/hold behavior, and historical realism into `required_path_candidate_ranking.csv`
 - where each required-path family reaches peak modeled option return, so the user can compare holding versus selling after an early move
 - how the active assumed stock and IV paths evolve over time
 - how different IV paths change required paths and terminal outcomes
@@ -432,14 +436,15 @@ Long-call strike, expiry, and best-of charts are now split into two deliberate c
 The analyst-facing reading order is now:
 
 1. `00_core_view/required_paths_overview.png`
-2. `00_core_view/required_path_summary.md`
-3. `00_core_view/required_path_summary.csv`
-4. `00_core_view/required_path_tables.html`
-5. `00_core_view/required_path_tables.md`
-6. `00_core_view/top_required_path_candidates.md`
-7. `01_option_required_paths/required_paths_by_option.csv`
-8. `01_option_required_paths/required_path_family_summary.csv`
-9. `01_option_required_paths/required_path_peak_summary.csv`
+2. `00_core_view/required_path_tables.html`
+3. `01_option_required_paths/required_path_candidate_ranking.csv`
+4. `00_core_view/required_path_summary.md`
+5. `00_core_view/required_path_summary.csv`
+6. `00_core_view/required_path_tables.md`
+7. `00_core_view/top_required_path_candidates.md`
+8. `01_option_required_paths/required_paths_by_option.csv`
+9. `01_option_required_paths/required_path_family_summary.csv`
+10. `01_option_required_paths/required_path_peak_summary.csv`
 10. per-option charts in `01_option_required_paths/`
 11. `99_secondary_or_debug/` only for supporting Markdown and CSV diagnostics
 
@@ -484,10 +489,10 @@ Each promoted model-output folder includes:
 - `START_HERE.md`: compact guide for what to open first
 - `model_output_manifest.json`: machine-readable link back to the source bundle
 - `00_core_view/`: required-path overview, summary, spreadsheet-style required-path workbook, and top required-path candidates
-- `01_option_required_paths/`: per-option required-path charts plus path, family, peak/best-exit, entry sensitivity, IV sensitivity, entry x IV matrix, and sell/hold tables
+- `01_option_required_paths/`: per-option required-path charts plus candidate ranking, path, family, peak/best-exit, execution realism, historical realism, entry sensitivity, IV sensitivity, entry x IV matrix, and sell/hold tables
 - `99_secondary_or_debug/`: supporting Markdown and CSV diagnostics only
 
-The intended reading path is: start with `00_core_view/required_paths_overview.png`, then `required_path_summary.md`, then `required_path_tables.html` for the analyst-workbook table view, then the per-option charts in `01_option_required_paths/`. Entry-premium and IV sensitivity are secondary checks after the required stock path is understood. Old fixed-target, single-option, gallery, and path-pack charts are not promoted into `model_outputs`.
+The intended reading path is: start with `00_core_view/required_paths_overview.png`, open `required_path_tables.html` and read Candidate Ranking first, then Required Move Summary, then inspect the per-option charts in `01_option_required_paths/`. Execution realism is a first-pass sanity check: wide spreads, zero volume, low open interest, stale quotes, and avoid-level fills are penalized before a required-path candidate should look attractive. Historical realism compares required moves with available imported/local price history; it is descriptive frequency, not a probability forecast. Entry-premium and IV sensitivity are secondary checks after the required stock path, historical context, and execution quality are understood. Old fixed-target, single-option, gallery, and path-pack charts are not promoted into `model_outputs`.
 
 `build-model-outputs` never recomputes analysis. It only reads an existing canonical bundle and promotes the current primary files into a clearer workspace.
 
@@ -541,7 +546,7 @@ Barchart option imports are stored under `data/<TICKER>/options/barchart/`:
 - `normalized/`: per-expiry model-ready chain slices plus sidecar metadata
 - `manifests/`: import summaries with row counts, expiries, warnings, and provenance
 
-The normalized chain preserves bid, ask, mid, spread, IV, Greeks, probabilities, volume, open interest, liquidity bucket, quality flags, model eligibility, and source/trust metadata. Required-path analysis can then show `option_data_source = barchart_options_screener` and carry the quote fields into candidate and required-path tables. Same-day quote-usable IBKR still has top precedence; same-day Barchart Options Screener data is preferred over older manual `option_chains/` and legacy sparse fallbacks.
+The normalized chain preserves bid, ask, mid, spread, IV, Greeks, probabilities, volume, open interest, liquidity bucket, quality flags, model eligibility, and source/trust metadata. Required-path analysis can then show `option_data_source = barchart_options_screener`, carry the quote fields into candidate and required-path tables, and write `required_path_execution_realism.csv` with fill quality, recommended entry mode, realistic-entry slippage, exit-liquidity risk, and an execution penalty score. If local Barchart/Nasdaq price history exists, it also writes `required_path_historical_realism.csv` to compare each required move with comparable historical forward-return windows. The final one-row-per-contract decision layer is `required_path_candidate_ranking.csv`, which combines required moves, execution, sensitivity, sell/hold, and historical realism. Same-day quote-usable IBKR still has top precedence; same-day Barchart Options Screener data is preferred over older manual `option_chains/` and legacy sparse fallbacks.
 
 Risk-free remains local-first:
 

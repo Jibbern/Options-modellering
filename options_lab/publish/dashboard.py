@@ -7022,6 +7022,9 @@ def _render_contract_selection_body(
     required_path_iv_sensitivity = _load_csv(artifact_dir / "required_path_iv_sensitivity.csv")
     required_path_entry_iv_matrix = _load_csv(artifact_dir / "required_path_entry_iv_matrix.csv")
     required_path_sell_hold_summary = _load_csv(artifact_dir / "required_path_sell_hold_summary.csv")
+    required_path_execution_realism = _load_csv(artifact_dir / "required_path_execution_realism.csv")
+    required_path_historical_realism = _load_csv(artifact_dir / "required_path_historical_realism.csv")
+    required_path_candidate_ranking = _load_csv(artifact_dir / "required_path_candidate_ranking.csv")
     required_path_markdown = _load_markdown(artifact_dir / "required_path_summary.md")
     required_path_exit_ladder_markdown = _load_markdown(artifact_dir / "required_path_exit_ladder.md")
     required_path_tables_markdown = _load_markdown(artifact_dir / "required_path_tables.md")
@@ -7115,7 +7118,7 @@ def _render_contract_selection_body(
         href = Path(_relative_href(required_path_tables_html_path, base_dir)).as_posix()
         return (
             '<section class="panel"><h2>Required Path Tables</h2>'
-            '<p class="section-intro">Spreadsheet-style frozen workbook for required moves, entry premium sensitivity, IV sensitivity, sell/hold pressure, and absolute option-return exit ladders.</p>'
+            '<p class="section-intro">Spreadsheet-style frozen workbook with Candidate Ranking first, then required moves, execution realism, historical frequency, entry premium sensitivity, IV sensitivity, sell/hold pressure, and absolute option-return exit ladders.</p>'
             f'<p><a class="scenario-link-chip" href="{escape(href)}">Open required_path_tables.html</a></p>'
             f'<iframe title="Required Path Tables" src="{escape(href)}" style="width:100%; min-height:760px; border:1px solid #c8d7e6; border-radius:6px; background:#fff;"></iframe>'
             "</section>"
@@ -7344,6 +7347,27 @@ def _render_contract_selection_body(
         ],
         limit=12,
     )
+    required_path_candidate_ranking_table = subset_frame(
+        required_path_candidate_ranking,
+        [
+            "rank",
+            "contract_label",
+            "mid_per_share",
+            "spread_pct_of_mid",
+            "open_interest",
+            "implied_volatility",
+            "required_move_1_5x",
+            "required_move_2_0x",
+            "historical_hit_rate_1_5x",
+            "liquidity_bucket",
+            "entry_sensitivity_score",
+            "iv_sensitivity_score",
+            "sell_hold_interpretation",
+            "final_verdict",
+            "concise_reason",
+        ],
+        limit=24,
+    )
     required_path_summary_table = subset_frame(
         required_path_summary,
         [
@@ -7492,6 +7516,42 @@ def _render_contract_selection_body(
             "expiry_option_return_pct",
             "decay_from_peak_to_expiry_pct",
             "interpretation",
+        ],
+        limit=24,
+    )
+    required_path_execution_table = subset_frame(
+        required_path_execution_realism,
+        [
+            "contract_label",
+            "bid_per_share",
+            "ask_per_share",
+            "mid_per_share",
+            "spread_pct_of_mid",
+            "volume",
+            "open_interest",
+            "liquidity_bucket",
+            "recommended_entry_mode",
+            "realistic_entry_per_share",
+            "execution_verdict",
+            "concise_explanation",
+        ],
+        limit=24,
+    )
+    required_path_historical_table = subset_frame(
+        required_path_historical_realism,
+        [
+            "contract_label",
+            "threshold_multiple",
+            "required_move_pct",
+            "required_days_to_clear",
+            "historical_window_days",
+            "historical_hit_rate",
+            "historical_forward_return_p90",
+            "historical_forward_return_p95",
+            "historical_max_forward_return",
+            "historical_realism_bucket",
+            "historical_verdict",
+            "concise_explanation",
         ],
         limit=24,
     )
@@ -7720,7 +7780,10 @@ def _render_contract_selection_body(
         + render_markdown_panel("Required Path Summary", required_path_markdown)
         + render_markdown_panel("Required Path Tables Notes", required_path_tables_markdown)
         + render_markdown_panel("Top Required-Path Candidates", top_required_path_markdown)
+        + _render_inline_dataframe("Required Path Candidate Ranking", required_path_candidate_ranking_table, table_id="required-path-candidate-ranking", published=published)
         + _render_inline_dataframe("Required Path Summary Table", required_path_summary_table, table_id="required-path-summary", published=published)
+        + _render_inline_dataframe("Required Path Execution Realism", required_path_execution_table, table_id="required-path-execution-realism", published=published)
+        + _render_inline_dataframe("Required Path Historical Realism", required_path_historical_table, table_id="required-path-historical-realism", published=published)
         + render_chart_section(
             "Per-Option Required Paths",
             "Each chart shows the stock path the option requires over time, plus the option-return path that the stock move implies. These charts are frozen artifacts, not dashboard recomputation.",

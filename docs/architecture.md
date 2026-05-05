@@ -106,6 +106,9 @@ That same resolver now makes the spot and trust rules explicit:
 - expiry slices are labeled with source-quality classes such as `same_day_quoted`, `same_day_sparse`, `prior_day_quoted`, and `prior_day_sparse`
 - contract-selection summaries carry a bundle-level trust rollup so sparse/fallback expiries are visible before any HTML is opened
 - Barchart imports carry `source = barchart_options_screener`, `trust = manually_downloaded_barchart`, `entry_price_mode`, bid/ask/mid, spread, IV, volume, open interest, liquidity, quality flags, and model eligibility through candidate and required-path outputs
+- the required-path layer adds execution realism on top of quote metadata: liquidity bucket, fill quality bucket, recommended entry mode, realistic-entry slippage, exit-liquidity risk, execution penalty score, and an execution verdict
+- when local Barchart/Nasdaq price history is available, the required-path layer adds historical realism: descriptive forward-return hit rates, percentiles, max seen moves, and historical buckets for each required move; this is not treated as a probability model
+- `required_path_candidate_ranking.csv` is the final one-row-per-contract decision layer. It combines required-path score, execution realism, entry/IV fragility, sell/hold pressure, and historical realism into a deterministic rank, final verdict, concise reason, and top risk.
 
 Inside that bundle, the ranking model is intentionally split into two analysis-first layers:
 
@@ -114,7 +117,7 @@ Inside that bundle, the ranking model is intentionally split into two analysis-f
 
 Path-analysis terminology in the bundle layer:
 
-- required-path engine: the primary long-call product surface; it solves backwards from option-over-stock outperformance and writes `required_path_summary.csv`, `required_paths_by_option.csv`, `required_path_family_summary.csv`, `required_path_peak_summary.csv`, `required_path_exit_ladder.csv`, `required_path_entry_sensitivity.csv`, `required_path_iv_sensitivity.csv`, `required_path_entry_iv_matrix.csv`, `required_path_sell_hold_summary.csv`, `required_path_tables.html`, `required_paths_overview.png`, and per-contract `required_paths_<contract_slug>.png`
+- required-path engine: the primary long-call product surface; it solves backwards from option-over-stock outperformance and writes `required_path_summary.csv`, `required_path_candidate_ranking.csv`, `required_paths_by_option.csv`, `required_path_family_summary.csv`, `required_path_peak_summary.csv`, `required_path_exit_ladder.csv`, `required_path_execution_realism.csv`, `required_path_historical_realism.csv`, `required_path_entry_sensitivity.csv`, `required_path_iv_sensitivity.csv`, `required_path_entry_iv_matrix.csv`, `required_path_sell_hold_summary.csv`, `required_path_tables.html`, `required_paths_overview.png`, and per-contract `required_paths_<contract_slug>.png`
 - per-option required-path chart: the chart horizon defaults to option expiry, while any shorter analysis horizon is only a reference marker; option values are computed along the path with remaining time to expiry declining to intrinsic value at expiry
 - required path: the minimum stock path needed to clear a specific goal by each sampled horizon
 - assumed path: the active user-selected stock and IV paths used for the main modeled trace
@@ -332,13 +335,14 @@ For contract-selection, `model_outputs/` is where the user should look first. `a
 The curated reading order for `model_outputs/<TICKER>/latest/` is:
 
 1. `00_core_view/required_paths_overview.png`
-2. `00_core_view/required_path_summary.md`
-3. `00_core_view/required_path_summary.csv`
-4. `00_core_view/required_path_tables.html`
-5. `00_core_view/required_path_tables.md`
-6. `00_core_view/top_required_path_candidates.md`
-7. `01_option_required_paths/` for per-contract required stock and option-return charts plus sensitivity/sell-hold CSVs
-8. `99_secondary_or_debug/` for supporting Markdown and CSV diagnostics; old fixed-target, single-option, gallery, and path-pack charts stay out of the curated model-output surface
+2. `00_core_view/required_path_tables.html`
+3. `01_option_required_paths/required_path_candidate_ranking.csv`
+4. `00_core_view/required_path_summary.md`
+5. `00_core_view/required_path_summary.csv`
+6. `00_core_view/required_path_tables.md`
+7. `00_core_view/top_required_path_candidates.md`
+8. `01_option_required_paths/` for per-contract required stock and option-return charts plus execution, sensitivity, and sell/hold CSVs
+9. `99_secondary_or_debug/` for supporting Markdown and CSV diagnostics; old fixed-target, single-option, gallery, and path-pack charts stay out of the curated model-output surface
 
 ## 5. Runtime directories
 

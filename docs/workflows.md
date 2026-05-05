@@ -95,7 +95,7 @@ For manually downloaded Barchart Options Screener exports, import the local CSV 
   --entry-mode mid
 ```
 
-The normalized per-expiry slices land under `data/<TICKER>/options/barchart/normalized/`, and import manifests land under `data/<TICKER>/options/barchart/manifests/`. Calls are the default model input; pass `--include-puts` when the normalized store should also retain puts. `Latest` is imported as reference data, but required-path entry premium uses mid by default and preserves ask plus realistic entry (`mid + 0.25 * spread`) for conservative/sensitivity reads.
+The normalized per-expiry slices land under `data/<TICKER>/options/barchart/normalized/`, and import manifests land under `data/<TICKER>/options/barchart/manifests/`. Calls are the default model input; pass `--include-puts` when the normalized store should also retain puts. `Latest` is imported as reference data, but required-path entry premium uses mid by default and preserves ask plus realistic entry (`mid + 0.25 * spread`, or `mid + 0.40 * spread` for wider markets) for conservative/sensitivity reads and execution-realism scoring.
 
 Loose Barchart price-history files refresh the local price store:
 
@@ -175,6 +175,9 @@ This is the primary Python-first path-thesis workflow. The bundle should be usef
 - compare-vs-stock outputs
 - path/simulation charts that summarize required paths, representative examples, same-path valuation, and active assumed-path progression
 - peak/best-exit metadata for each required path family, showing where modeled option return is highest along the path
+- execution-realism scoring that flags wide spreads, low/zero volume, low open interest, stale quotes, recommended entry mode, realistic-entry slippage, and whether a theoretically good call is actually tradable
+- historical-realism scoring that compares required moves with available imported/local price history and labels them as historically plausible, uncommon, rare, never seen, or insufficient history; this is descriptive frequency, not a probability forecast
+- candidate ranking that combines required-path burden, execution realism, sensitivity, sell/hold pressure, and historical realism into `required_path_candidate_ranking.csv`
 - per-option required-path charts that continue to option expiry by default, with the shorter analysis horizon shown only as a reference date when present
 - an exit ladder for absolute option-return checkpoints such as +50%, +100%, +150%, +200%, and +500%, kept as secondary context after the relative-to-stock hurdle is understood
 
@@ -311,7 +314,7 @@ This command reads a frozen canonical bundle and writes a curated analyst-facing
 For contract-selection bundles, the promoted view is grouped by reading job:
 
 - `00_core_view/`: required-path overview, summary table, summary Markdown, spreadsheet-style required-path workbook, and top required-path candidates
-- `01_option_required_paths/`: per-option required-path charts plus path-level, family-level, peak/best-exit, entry-premium sensitivity, IV sensitivity, entry x IV matrix, and sell/hold required-path tables
+- `01_option_required_paths/`: candidate ranking, per-option required-path charts plus path-level, family-level, peak/best-exit, execution-realism, historical-realism, entry-premium sensitivity, IV sensitivity, entry x IV matrix, and sell/hold required-path tables
 - `99_secondary_or_debug/`: supporting Markdown and CSV diagnostics only; old fixed-target, single-option, gallery, and path-pack charts are intentionally not promoted into `model_outputs`
 
 `model_outputs/<TICKER>/latest/` is the default "look here first" workspace. It contains:
@@ -323,14 +326,15 @@ For contract-selection bundles, the promoted view is grouped by reading job:
 Its reading order is:
 
 1. `00_core_view/required_paths_overview.png`
-2. `00_core_view/required_path_summary.md`
-3. `00_core_view/required_path_summary.csv`
-4. `00_core_view/required_path_tables.html`
-5. `00_core_view/required_path_tables.md`
-6. `00_core_view/top_required_path_candidates.md`
-7. `01_option_required_paths/required_paths_by_option.csv`
-8. `01_option_required_paths/required_path_family_summary.csv`
-9. `01_option_required_paths/required_path_peak_summary.csv`
+2. `00_core_view/required_path_tables.html`
+3. `01_option_required_paths/required_path_candidate_ranking.csv`
+4. `00_core_view/required_path_summary.md`
+5. `00_core_view/required_path_summary.csv`
+6. `00_core_view/required_path_tables.md`
+7. `00_core_view/top_required_path_candidates.md`
+8. `01_option_required_paths/required_paths_by_option.csv`
+9. `01_option_required_paths/required_path_family_summary.csv`
+10. `01_option_required_paths/required_path_peak_summary.csv`
 10. per-option charts in `01_option_required_paths/`
 11. `99_secondary_or_debug/` only for supporting Markdown and CSV diagnostics
 
@@ -457,6 +461,7 @@ For contract-selection bundles, the published page is now a self-sufficient path
 
 - Decision Snapshot
 - Required-Path Engine
+- Required Path Tables workbook with Candidate Ranking first
 - Per-Option Required Paths
 - Chain Overview / Compare Options
 - Market Context / Trust Summary
